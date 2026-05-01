@@ -28,9 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, UserPlus, X, Plus, Trash2, Package, CalendarIcon } from "lucide-react";
+import { Loader2, UserPlus, X, Plus, Trash2, Package, CalendarIcon, ChevronDown } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format as formatDate } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
