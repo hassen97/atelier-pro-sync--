@@ -28,9 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, UserPlus, X, Plus, Trash2, Package, CalendarIcon } from "lucide-react";
+import { Loader2, UserPlus, X, Plus, Trash2, Package, CalendarIcon, ChevronDown } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format as formatDate } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -551,20 +552,35 @@ export function RepairDialog({
               />
             )}
 
-            {/* IMEI */}
-            <FormField
-              control={form.control}
-              name="imei"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>IMEI</FormLabel>
-                  <FormControl>
-                    <Input placeholder="IMEI (optionnel)" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* IMEI - dans accordéon "Plus d'infos" (fermé par défaut à la création) */}
+            <Collapsible defaultOpen={isEditing}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between text-muted-foreground hover:text-foreground -ml-2"
+                >
+                  <span>+ Plus d'infos (IMEI)</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <FormField
+                  control={form.control}
+                  name="imei"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IMEI</FormLabel>
+                      <FormControl>
+                        <Input placeholder="IMEI (optionnel)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Problem Description */}
             <FormField
@@ -584,23 +600,25 @@ export function RepairDialog({
               )}
             />
 
-            {/* Diagnosis */}
-            <FormField
-              control={form.control}
-              name="diagnosis"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Diagnostic</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Votre diagnostic technique..."
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Diagnosis - édition uniquement */}
+            {isEditing && (
+              <FormField
+                control={form.control}
+                name="diagnosis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Diagnostic</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Votre diagnostic technique..."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Replacement Parts from Inventory — hidden for employees */}
             {!isEmployee && (
@@ -662,8 +680,8 @@ export function RepairDialog({
             </div>
             )}
 
-            {/* Costs — hidden for employees (confidential) */}
-            {!isEmployee && (
+            {/* Costs détail — édition uniquement, masqué employés */}
+            {isEditing && !isEmployee && (
             <>
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -761,6 +779,39 @@ export function RepairDialog({
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
+                      <div className="flex flex-wrap gap-1 p-2 border-b">
+                        {[
+                          { label: "Aujourd'hui", days: 0 },
+                          { label: "Demain", days: 1 },
+                          { label: "48 h", days: 2 },
+                        ].map((preset) => (
+                          <Button
+                            key={preset.label}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              const d = new Date();
+                              d.setDate(d.getDate() + preset.days);
+                              field.onChange(d.toISOString().split("T")[0]);
+                            }}
+                          >
+                            {preset.label}
+                          </Button>
+                        ))}
+                        {field.value && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-muted-foreground"
+                            onClick={() => field.onChange("")}
+                          >
+                            Effacer
+                          </Button>
+                        )}
+                      </div>
                       <Calendar
                         mode="single"
                         selected={field.value ? new Date(field.value) : undefined}
@@ -776,27 +827,29 @@ export function RepairDialog({
               )}
             />
 
-            {/* Technician note */}
-            <FormField
-              control={form.control}
-              name="technician_note"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Note du technicien (visible par le client)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Ex: Écran remplacé. Test en cours. Pièce commandée, arrivée prévue demain..."
-                      {...field}
-                    />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground">Cette note sera visible par le client sur la page de suivi public</p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Technician note - édition uniquement */}
+            {isEditing && (
+              <FormField
+                control={form.control}
+                name="technician_note"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Note du technicien (visible par le client)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Ex: Écran remplacé. Test en cours. Pièce commandée, arrivée prévue demain..."
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">Cette note sera visible par le client sur la page de suivi public</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            {/* Staff / Intake fields */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Staff / Intake fields - "Réparé par" uniquement en édition */}
+            <div className={cn("grid gap-4", isEditing ? "grid-cols-2" : "grid-cols-1")}>
               <FormField
                 control={form.control}
                 name="received_by"
@@ -810,19 +863,21 @@ export function RepairDialog({
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="repaired_by"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Réparé par</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nom du technicien..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {isEditing && (
+                <FormField
+                  control={form.control}
+                  name="repaired_by"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Réparé par</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Nom du technicien..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             {/* Device condition at intake */}
