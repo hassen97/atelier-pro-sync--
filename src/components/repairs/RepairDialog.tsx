@@ -779,6 +779,39 @@ export function RepairDialog({
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
+                      <div className="flex flex-wrap gap-1 p-2 border-b">
+                        {[
+                          { label: "Aujourd'hui", days: 0 },
+                          { label: "Demain", days: 1 },
+                          { label: "48 h", days: 2 },
+                        ].map((preset) => (
+                          <Button
+                            key={preset.label}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              const d = new Date();
+                              d.setDate(d.getDate() + preset.days);
+                              field.onChange(d.toISOString().split("T")[0]);
+                            }}
+                          >
+                            {preset.label}
+                          </Button>
+                        ))}
+                        {field.value && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-muted-foreground"
+                            onClick={() => field.onChange("")}
+                          >
+                            Effacer
+                          </Button>
+                        )}
+                      </div>
                       <Calendar
                         mode="single"
                         selected={field.value ? new Date(field.value) : undefined}
