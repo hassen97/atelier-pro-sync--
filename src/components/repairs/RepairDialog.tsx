@@ -582,23 +582,25 @@ export function RepairDialog({
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Problem Description */}
-            <FormField
-              control={form.control}
-              name="problem_description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description du problème *</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Décrivez le problème signalé par le client..."
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Problem Description - édition uniquement */}
+            {isEditing && (
+              <FormField
+                control={form.control}
+                name="problem_description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description du problème</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Décrivez le problème signalé par le client..."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Diagnosis - édition uniquement */}
             {isEditing && (
