@@ -738,23 +738,25 @@ export function RepairDialog({
             </>
             )}
 
-            {/* Notes */}
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes internes</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Notes internes (non visibles par le client)..."
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Notes - édition uniquement */}
+            {isEditing && (
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes internes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Notes internes (non visibles par le client)..."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Estimated ready date */}
             <FormField
