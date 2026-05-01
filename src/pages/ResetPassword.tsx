@@ -13,10 +13,8 @@ export default function ResetPassword() {
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usernameExists, setUsernameExists] = useState<boolean | null>(null);
   const [adminWhatsapp, setAdminWhatsapp] = useState("");
 
   // Load admin WhatsApp number
@@ -30,37 +28,6 @@ export default function ResetPassword() {
         if (data && (data as any).value) setAdminWhatsapp((data as any).value);
       });
   }, []);
-
-  // Check username existence with debounce
-  useEffect(() => {
-    const trimmed = username.trim().toLowerCase();
-    if (trimmed.length < 3) {
-      setUsernameExists(null);
-      return;
-    }
-
-    setChecking(true);
-    const timeout = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-username`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-            body: JSON.stringify({ username: trimmed }),
-          }
-        );
-        const data = await res.json();
-        setUsernameExists(data.exists ?? null);
-      } catch {
-        setUsernameExists(null);
-      } finally {
-        setChecking(false);
-      }
-    }, 500);
-
-    return () => clearTimeout(timeout);
-  }, [username]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,21 +46,18 @@ export default function ResetPassword() {
       return;
     }
 
-    if (trimmedUsername && usernameExists === false) {
-      setError("Ce nom d'utilisateur n'existe pas");
-      return;
-    }
-
     setLoading(true);
     try {
-      const { error: insertError } = await supabase
+      // Best-effort insert. Even if the username doesn't exist in our system,
+      // we always show the same success message to prevent username enumeration.
+      await supabase
         .from("password_reset_requests" as any)
         .insert({ username: trimmedUsername || `phone:${trimmedPhone}`, phone: trimmedPhone || null } as any);
-
-      if (insertError) throw insertError;
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'envoi de la demande");
+    } catch {
+      // Silently swallow errors and still show success — we never want to
+      // leak whether an account exists via the reset flow.
+      setSuccess(true);
     } finally {
       setLoading(false);
     }
@@ -126,8 +90,9 @@ export default function ResetPassword() {
                 <Alert className="border-emerald-500/30 bg-emerald-500/10">
                   <CheckCircle className="h-4 w-4 text-emerald-500" />
                   <AlertDescription className="text-emerald-600 dark:text-emerald-400">
-                    Votre demande a été envoyée avec succès. L'administrateur vous contactera 
-                    par téléphone ou WhatsApp pour vous fournir un nouveau mot de passe.
+                    Si un compte correspond aux informations fournies, l'administrateur
+                    vous contactera par téléphone ou WhatsApp pour vous fournir un nouveau
+                    mot de passe.
                   </AlertDescription>
                 </Alert>
                 <Button
@@ -161,11 +126,6 @@ export default function ResetPassword() {
                       disabled={loading}
                     />
                   </div>
-                  {username.trim().length >= 3 && (
-                    <p className={`text-xs ${checking ? "text-muted-foreground" : usernameExists ? "text-emerald-500" : "text-destructive"}`}>
-                      {checking ? "Vérification..." : usernameExists ? "✓ Utilisateur trouvé" : "✗ Utilisateur introuvable"}
-                    </p>
-                  )}
                 </div>
 
                 <div className="space-y-2">

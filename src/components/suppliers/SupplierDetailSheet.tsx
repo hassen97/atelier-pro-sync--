@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { resolveSupplierProofUrl } from "@/lib/supplierProofs";
 import {
   Sheet,
   SheetContent,
@@ -97,7 +98,9 @@ export function SupplierDetailSheet({
     setWhatsappPopoverOpen(false);
   };
 
-  const handlePrintTransaction = (tx: SupplierTransaction & { computedBalance: number }) => {
+  const handlePrintTransaction = async (tx: SupplierTransaction & { computedBalance: number }) => {
+    // Resolve a viewable URL for the proof (legacy public URL or signed URL for private bucket)
+    const proofViewUrl = tx.proof_url ? await resolveSupplierProofUrl(tx.proof_url, 600) : null;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Paiement fournisseur</title><style>${getThermalPrintCss("72mm", "12px")}</style></head>
       <body class="thermal-print-root"><main class="thermal-print-container">
         <p class="shop-name">REÇU FOURNISSEUR</p>
@@ -106,13 +109,18 @@ export function SupplierDetailSheet({
         <p class="field">Date : ${format(new Date(tx.created_at), "dd/MM/yyyy", { locale: fr })}</p>
         <p class="field">Type : ${tx.type === "purchase" ? "Achat" : "Paiement"}</p>
         <p class="field">Description : ${thermalEscape(tx.description || "—")}</p>
-        ${tx.proof_url ? `<p class="field">Preuve : ${thermalEscape(tx.proof_url)}</p><img src="${thermalEscape(tx.proof_url)}" style="display:block;max-width:60mm;margin:2mm auto;height:auto;" alt="preuve" />` : ""}
+        ${proofViewUrl ? `<p class="field">Preuve jointe</p><img src="${thermalEscape(proofViewUrl)}" style="display:block;max-width:60mm;margin:2mm auto;height:auto;" alt="preuve" />` : ""}
         <div class="sep-bold"></div>
         <div class="total-row grand"><span>Montant :</span><span class="val">${formatCurrency(tx.amount)}</span></div>
         <div class="total-row"><span>Solde :</span><span class="val">${formatCurrency(Math.abs(tx.computedBalance))}</span></div>
         <div class="sep-bold"></div>
       </main></body></html>`;
     printThermalHtml(html, "width=400,height=600");
+  };
+
+  const handleViewProof = async (proofValue: string | null | undefined) => {
+    const url = await resolveSupplierProofUrl(proofValue, 300);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
   };
 
   // Compute running balance client-side for display
@@ -300,9 +308,14 @@ export function SupplierDetailSheet({
                           <div className="flex items-center gap-1">
                             {tx.description || "—"}
                             {tx.proof_url && (
-                              <a href={tx.proof_url} target="_blank" rel="noopener noreferrer">
+                              <button
+                                type="button"
+                                onClick={() => handleViewProof(tx.proof_url)}
+                                className="inline-flex items-center"
+                                aria-label="Voir la preuve"
+                              >
                                 <ExternalLink className="h-3 w-3 text-primary" />
-                              </a>
+                              </button>
                             )}
                           </div>
                         </TableCell>
