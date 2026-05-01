@@ -552,20 +552,35 @@ export function RepairDialog({
               />
             )}
 
-            {/* IMEI */}
-            <FormField
-              control={form.control}
-              name="imei"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>IMEI</FormLabel>
-                  <FormControl>
-                    <Input placeholder="IMEI (optionnel)" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* IMEI - dans accordéon "Plus d'infos" (fermé par défaut à la création) */}
+            <Collapsible defaultOpen={isEditing}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between text-muted-foreground hover:text-foreground -ml-2"
+                >
+                  <span>+ Plus d'infos (IMEI)</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <FormField
+                  control={form.control}
+                  name="imei"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IMEI</FormLabel>
+                      <FormControl>
+                        <Input placeholder="IMEI (optionnel)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Problem Description */}
             <FormField
