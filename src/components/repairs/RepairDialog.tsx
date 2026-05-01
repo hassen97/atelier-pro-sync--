@@ -680,8 +680,8 @@ export function RepairDialog({
             </div>
             )}
 
-            {/* Costs — hidden for employees (confidential) */}
-            {!isEmployee && (
+            {/* Costs détail — édition uniquement, masqué employés */}
+            {isEditing && !isEmployee && (
             <>
             <div className="grid grid-cols-2 gap-4">
               <FormField
