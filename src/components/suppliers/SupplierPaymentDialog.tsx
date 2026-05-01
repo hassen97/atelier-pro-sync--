@@ -40,17 +40,30 @@ export function SupplierPaymentDialog({ open, onOpenChange, supplier }: Supplier
     if (proofFile) {
       setUploading(true);
       try {
+        // Resolve owner id (employees inherit owner's bucket folder via storage RLS).
+        const { data: authData } = await supabase.auth.getUser();
+        const callerId = authData.user?.id;
+        if (!callerId) throw new Error("Not authenticated");
+        const { data: teamRow } = await supabase
+          .from("team_members")
+          .select("owner_id")
+          .eq("member_user_id", callerId)
+          .eq("status", "active")
+          .maybeSingle();
+        const ownerId = (teamRow as any)?.owner_id || callerId;
+
         const ext = proofFile.name.split(".").pop();
-        const fileName = `${supplier.id}/${Date.now()}.${ext}`;
+        // Path format: <ownerId>/<supplierId>/<timestamp>.<ext>
+        // Required by the supplier-proofs storage RLS (owner-or-team scoped).
+        const filePath = `${ownerId}/${supplier.id}/${Date.now()}.${ext}`;
         const { error: uploadError } = await supabase.storage
           .from("supplier-proofs")
-          .upload(fileName, proofFile);
+          .upload(filePath, proofFile);
 
         if (!uploadError) {
-          const { data: urlData } = supabase.storage
-            .from("supplier-proofs")
-            .getPublicUrl(fileName);
-          proofUrl = urlData.publicUrl;
+          // Store the storage path (not a public URL). The viewer
+          // generates a short-lived signed URL on demand.
+          proofUrl = filePath;
         }
       } catch {
         // proceed without proof if upload fails
