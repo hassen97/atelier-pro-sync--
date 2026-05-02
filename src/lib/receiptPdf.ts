@@ -416,6 +416,7 @@ ${thankYouHtml}
 
 interface PhoneLabelData {
   ticketNumber?: number | null;
+  ticketLabel?: string | null;
   customer: string;
   phone?: string;
   device: string;
@@ -431,16 +432,16 @@ export async function generatePhoneLabel(
   printerWidth: "80mm" | "58mm" = "80mm"
 ) {
   const pageW = printerWidth === "80mm" ? "72mm" : "48mm";
-  const ticketStr = data.ticketNumber ? String(data.ticketNumber).padStart(5, "0") : "";
+  const ticketDisplayLabel = data.ticketLabel
+    ?? (data.ticketNumber ? `REP-${String(data.ticketNumber).padStart(5, "0")}` : "");
 
   let barcodeImgTag = "";
-  if (data.ticketNumber) {
-    const barcodeValue = `REP-${ticketStr}`;
-    const barcodeDataUrl = await generateBarcodeDataUrl(barcodeValue);
+  if (ticketDisplayLabel) {
+    const barcodeDataUrl = await generateBarcodeDataUrl(ticketDisplayLabel);
     if (barcodeDataUrl) {
-      barcodeImgTag = `<img src="${barcodeDataUrl}" style="max-width:90%;height:auto;" alt="${escHtml(barcodeValue)}" />`;
+      barcodeImgTag = `<img src="${barcodeDataUrl}" style="max-width:90%;height:auto;" alt="${escHtml(ticketDisplayLabel)}" />`;
     } else {
-      barcodeImgTag = `<p style="font-size:11px;font-weight:bold;">${escHtml(barcodeValue)}</p>`;
+      barcodeImgTag = `<p style="font-size:11px;font-weight:bold;">${escHtml(ticketDisplayLabel)}</p>`;
     }
   }
 
@@ -454,14 +455,15 @@ export async function generatePhoneLabel(
 <style>
   ${getThermalPrintCss(pageW, "11px")}
   .shop { font-size: 12px; font-weight: bold; text-align: center; }
-  .ticket { font-size: 14px; font-weight: bold; text-align: center; margin: 2px 0; }
+  .ticket-label-tiny { font-size: 10px; font-weight: bold; text-align: center; letter-spacing: 1px; margin: 2px 0 0; }
+  .ticket-huge { font-size: 22px; font-weight: 900; text-align: center; letter-spacing: 1px; margin: 0 0 4px; }
   .field { font-size: 11px; margin: 1px 0; }
 </style>
 </head>
 <body class="thermal-print-root"><main class="thermal-print-container">
 
 <p class="shop">${escHtml(shopName)}</p>
-${ticketStr ? `<p class="ticket">N° ${ticketStr}</p>` : ""}
+${ticketDisplayLabel ? `<p class="ticket-label-tiny">TICKET N°</p><p class="ticket-huge">${escHtml(ticketDisplayLabel)}</p>` : ""}
 <div class="sep"></div>
 <p class="field"><span class="bold">Client:</span> ${escHtml(data.customer)}</p>
 ${data.phone ? `<p class="field"><span class="bold">Tél:</span> ${escHtml(data.phone)}</p>` : ""}
