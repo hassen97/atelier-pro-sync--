@@ -6,6 +6,35 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Derive 2–3 letter shop initials from a shop name.
+ * Examples: "Cybertek Shop" → "CS", "Mon Atelier" → "MA",
+ *           "Heaven" → "HE", "" → "REP".
+ */
+export function getShopInitials(shopName?: string | null): string {
+  if (!shopName) return "REP";
+  const cleaned = shopName.trim();
+  if (!cleaned) return "REP";
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return words.slice(0, 3).map((w) => w[0]?.toUpperCase() ?? "").join("") || "REP";
+  }
+  // Single word → first 2 letters
+  return cleaned.slice(0, 2).toUpperCase();
+}
+
+/** Format a ticket number as `INI-451` (no padding) for UI. */
+export function formatTicketNumber(initials: string, n?: number | null): string {
+  if (!n || n <= 0) return "";
+  return `${initials}-${n}`;
+}
+
+/** Format a ticket number as `INI-00451` (5-digit padded) for receipts/barcodes. */
+export function formatTicketNumberPadded(initials: string, n?: number | null): string {
+  if (!n || n <= 0) return "";
+  return `${initials}-${String(n).padStart(5, "0")}`;
+}
+
 /** Debounce a value by `delay` ms. Use for search inputs. */
 export function useDebounce<T>(value: T, delay = 300): T {
   const [debounced, setDebounced] = useState(value);
