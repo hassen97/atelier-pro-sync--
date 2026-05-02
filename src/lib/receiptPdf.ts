@@ -99,6 +99,8 @@ export function getThermalPrintCss(pageW = "72mm", fontSize = "12px") {
     .shop-info { font-size: 10px; text-align: center; }
     .title { font-size: 14px; font-weight: bold; text-align: center; margin: 3px 0 1px; }
     .ticket-num { font-size: 12px; font-weight: bold; text-align: center; margin-bottom: 2px; }
+    .ticket-label-small { font-size: 11px; font-weight: bold; text-align: center; letter-spacing: 1px; margin: 4px 0 0; }
+    .ticket-big { font-size: 28px; font-weight: 900; text-align: center; letter-spacing: 2px; margin: 0 0 6px; line-height: 1.1; }
     .sep { border-top: 1px dashed #000000; margin: 3px 0; }
     .sep-bold { border-top: 2px solid #000000; margin: 3px 0; }
     .field { font-size: 12px; margin: 1px 0; }
