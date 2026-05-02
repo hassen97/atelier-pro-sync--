@@ -334,6 +334,7 @@ ${data.time ? `<p class="field">Heure : ${escHtml(data.time)}</p>` : ""}
 ${data.customer ? `<p class="field">Client : ${escHtml(data.customer.name)}</p>` : ""}
 ${data.customer?.phone ? `<p class="field">Tél : ${escHtml(data.customer.phone)}</p>` : ""}
 ${data.type === "repair" && data.device ? `<p class="field">Appareil : ${escHtml(data.device)}</p>` : ""}
+${data.type === "repair" && data.category ? `<p class="field">Catégorie : ${escHtml(data.category)}</p>` : ""}
 ${data.type === "repair" && data.imei ? `<p class="field">IMEI : ${escHtml(data.imei)}</p>` : ""}
 ${data.deviceCondition ? `<p class="field">État à réception : ${escHtml(data.deviceCondition)}</p>` : ""}
 ${data.receivedBy ? `<p class="field">Reçu par : ${escHtml(data.receivedBy)}</p>` : ""}
