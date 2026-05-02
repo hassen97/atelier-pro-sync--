@@ -181,27 +181,6 @@ export function printThermalHtml(html: string, windowSize = "width=400,height=60
   }
 }
 
-async function generateBarcodeDataUrl(value: string): Promise<string | null> {
-  try {
-    const mod = await import("jsbarcode");
-    const JsBarcode = mod.default;
-    const canvas = document.createElement("canvas");
-    JsBarcode(canvas, value, {
-      format: "CODE128",
-      width: 2,
-      height: 40,
-      displayValue: true,
-      fontSize: 12,
-      margin: 2,
-      background: "#ffffff",
-      lineColor: "#000000",
-    });
-    return canvas.toDataURL("image/png");
-  } catch {
-    return null;
-  }
-}
-
 async function generateQrDataUrl(value: string): Promise<string | null> {
   try {
     const mod = await import("qrcode");
