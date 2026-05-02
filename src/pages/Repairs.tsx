@@ -16,6 +16,7 @@ import type { SelectedPart } from "@/components/repairs/RepairDialog";
 import { PaymentConfirmDialog } from "@/components/repairs/PaymentConfirmDialog";
 import {
   useRepairs,
+  useRepairByTicketNumber,
   useCreateRepair,
   useUpdateRepair,
   useUpdateRepairStatus,
@@ -26,6 +27,8 @@ import { useAllCustomers, useUpdateCustomer } from "@/hooks/useCustomers";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
+import { getShopInitials, formatTicketNumber } from "@/lib/utils";
 
 // Type for the repair with customer relation
 interface RepairWithCustomer {
