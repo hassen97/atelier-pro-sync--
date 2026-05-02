@@ -18,6 +18,8 @@ export interface Repair {
   tracking_token?: string;
   estimated_ready_date?: string | null;
   technician_note?: string | null;
+  ticket_number?: number | null;
+  ticket_label?: string;
 }
 
 interface RepairCardProps {
