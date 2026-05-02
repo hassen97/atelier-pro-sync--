@@ -352,11 +352,10 @@ ${settings.email ? `<p class="shop-info">${escHtml(settings.email)}</p>` : ""}
 <div class="sep-bold"></div>
 
 <p class="title">${data.type === "repair" ? "BON DE RÉPARATION" : "REÇU DE VENTE"}</p>
-${ticketStr ? `<p class="ticket-num">N° ${ticketStr}</p>` : ""}
+${ticketDisplayLabel ? `<p class="ticket-label-small">TICKET N°</p><p class="ticket-big">${escHtml(ticketDisplayLabel)}</p>` : ""}
 
 <div class="sep"></div>
 
-<p class="field">Référence : ${escHtml(data.id.slice(0, 8).toUpperCase())}</p>
 <p class="field">Date dépôt : ${escHtml(data.date)}</p>
 ${data.time ? `<p class="field">Heure : ${escHtml(data.time)}</p>` : ""}
 
