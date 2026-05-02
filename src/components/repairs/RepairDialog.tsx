@@ -60,7 +60,7 @@ const repairSchema = z.object({
   device_brand: z.string().optional(),
   device_model: z.string().min(1, "Le modèle est requis"),
   imei: z.string().optional(),
-  problem_description: z.string().min(1, "Le problème est requis"),
+  problem_description: z.string().optional().default(""),
   diagnosis: z.string().optional(),
   labor_cost: z.coerce.number().min(0, "Le coût doit être positif"),
   parts_cost: z.coerce.number().min(0, "Le coût doit être positif"),
