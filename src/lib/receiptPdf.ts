@@ -307,8 +307,7 @@ export async function generateThermalReceipt(
   // Phones
   const phones = [settings.phone, settings.whatsapp_phone].filter(Boolean);
 
-  // Ticket number
-  const ticketStr = data.ticketNumber ? String(data.ticketNumber).padStart(5, "0") : "";
+  // Ticket label is computed earlier as `ticketDisplayLabel`
 
   // Loyalty footer block (only when there is something to show)
   const showLoyalty = (data.loyaltyPointsEarned ?? 0) > 0 || (data.loyaltyPointsUsed ?? 0) > 0 || (data.loyaltyBalanceAfter !== null && data.loyaltyBalanceAfter !== undefined);
