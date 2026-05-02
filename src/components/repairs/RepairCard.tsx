@@ -45,8 +45,14 @@ export function RepairCard({ repair, onViewDetails, onEdit, onPrint, onCancel, o
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-muted-foreground">{repair.id}</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {repair.ticket_label ? (
+                <span className="font-mono text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                  {repair.ticket_label}
+                </span>
+              ) : (
+                <span className="font-mono text-xs text-muted-foreground">{repair.id.slice(0, 8).toUpperCase()}</span>
+              )}
               {repair.is_warranty && (
                 <Badge className="text-xs bg-orange-500/10 text-orange-500 border-orange-500/20">
                   <Shield className="h-3 w-3 mr-1" />Garantie
