@@ -181,27 +181,6 @@ export function printThermalHtml(html: string, windowSize = "width=400,height=60
   }
 }
 
-async function generateBarcodeDataUrl(value: string): Promise<string | null> {
-  try {
-    const mod = await import("jsbarcode");
-    const JsBarcode = mod.default;
-    const canvas = document.createElement("canvas");
-    JsBarcode(canvas, value, {
-      format: "CODE128",
-      width: 2,
-      height: 40,
-      displayValue: true,
-      fontSize: 12,
-      margin: 2,
-      background: "#ffffff",
-      lineColor: "#000000",
-    });
-    return canvas.toDataURL("image/png");
-  } catch {
-    return null;
-  }
-}
-
 async function generateQrDataUrl(value: string): Promise<string | null> {
   try {
     const mod = await import("qrcode");
@@ -230,16 +209,7 @@ export async function generateThermalReceipt(
   const ticketDisplayLabel = data.ticketLabel
     ?? (data.ticketNumber ? `REP-${String(data.ticketNumber).padStart(5, "0")}` : "");
 
-  // Prepare barcode image (uses the same label as the on-receipt big number)
-  let barcodeImgTag = "";
-  if (ticketDisplayLabel) {
-    const barcodeDataUrl = await generateBarcodeDataUrl(ticketDisplayLabel);
-    if (barcodeDataUrl) {
-      barcodeImgTag = `<img src="${barcodeDataUrl}" style="max-width:90%;height:auto;" alt="${escHtml(ticketDisplayLabel)}" />`;
-    } else {
-      barcodeImgTag = `<p style="font-size:11px;font-weight:bold;">${escHtml(ticketDisplayLabel)}</p>`;
-    }
-  }
+
 
   // QR code — generated locally as a base64 PNG so it always prints, even
   // offline or on slow networks. Falls back to plain-text URL if generation fails.
@@ -396,12 +366,7 @@ ${data.trackingUrl ? `
 </div>
 ` : ""}
 
-${barcodeImgTag ? `
-<div class="sep"></div>
-<div class="barcode-section">
-  ${barcodeImgTag}
-</div>
-` : ""}
+
 
 <p class="footer">Présentez ce ticket pour récupérer<br>votre appareil.</p>
 ${thankYouHtml}
@@ -435,15 +400,7 @@ export async function generatePhoneLabel(
   const ticketDisplayLabel = data.ticketLabel
     ?? (data.ticketNumber ? `REP-${String(data.ticketNumber).padStart(5, "0")}` : "");
 
-  let barcodeImgTag = "";
-  if (ticketDisplayLabel) {
-    const barcodeDataUrl = await generateBarcodeDataUrl(ticketDisplayLabel);
-    if (barcodeDataUrl) {
-      barcodeImgTag = `<img src="${barcodeDataUrl}" style="max-width:90%;height:auto;" alt="${escHtml(ticketDisplayLabel)}" />`;
-    } else {
-      barcodeImgTag = `<p style="font-size:11px;font-weight:bold;">${escHtml(ticketDisplayLabel)}</p>`;
-    }
-  }
+
 
   const problemTruncated = data.problem.length > 60 ? data.problem.slice(0, 57) + "..." : data.problem;
 
@@ -472,8 +429,7 @@ ${data.phone ? `<p class="field"><span class="bold">Tél:</span> ${escHtml(data.
 <p class="field"><span class="bold">Dépôt:</span> ${escHtml(data.depositDate)}</p>
 ${data.receivedBy ? `<p class="field"><span class="bold">Reçu par:</span> ${escHtml(data.receivedBy)}</p>` : ""}
 ${data.repairedBy ? `<p class="field"><span class="bold">Tech:</span> ${escHtml(data.repairedBy)}</p>` : ""}
-<div class="sep"></div>
-${barcodeImgTag ? `<div class="barcode">${barcodeImgTag}</div>` : ""}
+
 
 </main></body>
 </html>`;
