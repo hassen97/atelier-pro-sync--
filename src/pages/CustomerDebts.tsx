@@ -18,6 +18,8 @@ import { useCurrency } from "@/hooks/useCurrency";
 import { useAllCustomers, useUpdateCustomer, Customer } from "@/hooks/useCustomers";
 import { useAllUnpaidRepairs, useUpdateRepair } from "@/hooks/useRepairs";
 import { useSales, useUpdateSale } from "@/hooks/useSales";
+import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
+import { getShopInitials, formatTicketNumber } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface DebtItem {
