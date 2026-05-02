@@ -253,14 +253,9 @@ export async function generateThermalReceipt(
       </table>`;
   }
 
-  // Problem (simple mode)
-  let problemHtml = "";
-  if (data.problem && data.items.length === 0) {
-    problemHtml = `
-      <div class="sep"></div>
-      <p class="label">Problème déclaré</p>
-      <p>${escHtml(data.problem)}</p>`;
-  }
+  // Problem block removed: the category IS the problem and is already
+  // rendered in the customer/device block above as "Catégorie : ...".
+  const problemHtml = "";
 
   // Terms
   const defaultTerms = [
@@ -429,7 +424,7 @@ ${ticketDisplayLabel ? `<p class="ticket-label-tiny">TICKET N°</p><p class="tic
 ${data.phone ? `<p class="field"><span class="bold">Tél:</span> ${escHtml(data.phone)}</p>` : ""}
 <p class="field"><span class="bold">Appareil:</span> ${escHtml(data.device)}</p>
 ${data.category ? `<p class="field"><span class="bold">Catégorie:</span> ${escHtml(data.category)}</p>` : ""}
-<p class="field"><span class="bold">Problème:</span> ${escHtml(problemTruncated)}</p>
+
 <p class="field"><span class="bold">Dépôt:</span> ${escHtml(data.depositDate)}</p>
 ${data.receivedBy ? `<p class="field"><span class="bold">Reçu par:</span> ${escHtml(data.receivedBy)}</p>` : ""}
 ${data.repairedBy ? `<p class="field"><span class="bold">Tech:</span> ${escHtml(data.repairedBy)}</p>` : ""}
