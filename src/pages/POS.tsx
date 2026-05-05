@@ -508,9 +508,13 @@ export default function POS() {
           )}
         >
           <CardHeader className="pb-3 shrink-0">
+            <div className="lg:hidden mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted-foreground/30" />
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2"><Receipt className="h-4 w-4" />Panier</CardTitle>
-              {cart.length > 0 && <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:text-destructive">Vider</Button>}
+              <div className="flex items-center gap-1">
+                {cart.length > 0 && <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:text-destructive">Vider</Button>}
+                <Button variant="ghost" size="sm" onClick={() => setMobileCartOpen(false)} className="lg:hidden">Fermer</Button>
+              </div>
             </div>
           </CardHeader>
 
