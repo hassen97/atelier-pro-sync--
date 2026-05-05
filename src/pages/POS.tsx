@@ -472,8 +472,41 @@ export default function POS() {
           </Tabs>
         </div>
 
-        {/* Cart Section */}
-        <Card className={cn("hidden lg:flex flex-col min-h-0 transition-all", scanFlash && "ring-2 ring-success/60 bg-success/5")}>
+        {/* Mobile floating cart trigger */}
+        <Button
+          onClick={() => setMobileCartOpen(true)}
+          className="lg:hidden fixed bottom-4 inset-x-4 z-40 h-14 shadow-elevated bg-gradient-primary text-primary-foreground hover:opacity-90 flex items-center justify-between px-5"
+        >
+          <span className="flex items-center gap-2 font-semibold">
+            <ShoppingCart className="h-5 w-5" />
+            Panier
+            {cart.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-6 px-2">
+                {cart.reduce((n, i) => n + i.quantity, 0)}
+              </Badge>
+            )}
+          </span>
+          <span className="font-mono-numbers font-bold">{format(total)}</span>
+        </Button>
+
+        {/* Mobile backdrop */}
+        {mobileCartOpen && (
+          <div
+            className="lg:hidden fixed inset-0 z-40 bg-background/70 backdrop-blur-sm"
+            onClick={() => setMobileCartOpen(false)}
+          />
+        )}
+
+        {/* Cart Section (desktop inline, mobile bottom sheet) */}
+        <Card
+          className={cn(
+            "flex-col min-h-0 transition-all",
+            "lg:relative lg:flex lg:inset-auto lg:max-h-none lg:rounded-lg lg:shadow-none",
+            "fixed inset-x-0 bottom-0 z-50 max-h-[88vh] rounded-t-2xl rounded-b-none shadow-2xl",
+            mobileCartOpen ? "flex" : "hidden lg:flex",
+            scanFlash && "ring-2 ring-success/60 bg-success/5"
+          )}
+        >
           <CardHeader className="pb-3 shrink-0">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2"><Receipt className="h-4 w-4" />Panier</CardTitle>
