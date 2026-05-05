@@ -473,7 +473,7 @@ export default function POS() {
         </div>
 
         {/* Cart Section */}
-        <Card className={cn("flex flex-col min-h-0 transition-all", scanFlash && "ring-2 ring-success/60 bg-success/5")}>
+        <Card className={cn("hidden lg:flex flex-col min-h-0 transition-all", scanFlash && "ring-2 ring-success/60 bg-success/5")}>
           <CardHeader className="pb-3 shrink-0">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2"><Receipt className="h-4 w-4" />Panier</CardTitle>
