@@ -359,22 +359,23 @@ export default function POS() {
 
   if (productsLoading) {
     return (
-    <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] animate-fade-in pb-24">
+    <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] animate-fade-in">
         <PageHeader title="Point de Vente" description="Encaissement et ventes" />
-        <div className="flex flex-col lg:h-[calc(100%-5rem)]">
-          <div className="flex-1 min-h-0"><Skeleton className="h-10 w-full mb-4" /><div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{[...Array(10)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div></div>
+        <div className="grid gap-6 lg:grid-cols-3 lg:h-[calc(100%-5rem)]">
+          <div className="lg:col-span-2 min-h-[50vh] lg:min-h-0"><Skeleton className="h-10 w-full mb-4" /><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div></div>
+          <Skeleton className="h-96" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] animate-fade-in pb-24">
+    <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] animate-fade-in pb-24 lg:pb-0">
       <PageHeader title="Point de Vente" description="Encaissement et ventes" />
 
-      <div className="flex flex-col lg:h-[calc(100%-5rem)]">
+      <div className="grid gap-6 lg:grid-cols-3 lg:h-[calc(100%-5rem)]">
         {/* Products & Repairs Section */}
-        <div className="flex flex-col flex-1 lg:min-h-0">
+        <div className="lg:col-span-2 flex flex-col lg:min-h-0">
           <Tabs defaultValue="products" className="flex flex-col flex-1 min-h-0">
             <TabsList className="mb-3 w-fit">
               <TabsTrigger value="products">Produits</TabsTrigger>
@@ -406,7 +407,7 @@ export default function POS() {
                     {products.length === 0 ? "Aucun produit dans l'inventaire." : "Aucun produit trouvé."}
                   </div>
                 ) : (
-                  <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+                  <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                     {filteredProducts.map((product: any) => (
                       <Card key={product.id} className={cn("cursor-pointer transition-all hover:shadow-soft hover:border-primary/30", product.quantity <= 0 && "opacity-50 cursor-not-allowed")} onClick={() => addToCart(product)}>
                         <CardContent className="p-3">
@@ -427,11 +428,6 @@ export default function POS() {
             </TabsContent>
 
             <TabsContent value="repairs" className="flex flex-col flex-1 min-h-0 mt-0">
-              <div className="mb-3 text-sm text-muted-foreground">
-                {completedRepairs.length > 0
-                  ? `${completedRepairs.length} réparation${completedRepairs.length > 1 ? "s" : ""} terminée${completedRepairs.length > 1 ? "s" : ""} en attente d'encaissement`
-                  : "Liste des réparations terminées prêtes à encaisser"}
-              </div>
               <div className="lg:flex-1 lg:overflow-auto">
                 {completedRepairs.length === 0 ? (
                   <div className="flex items-center justify-center h-32 text-muted-foreground">Aucune réparation terminée en attente d'encaissement.</div>
@@ -473,10 +469,10 @@ export default function POS() {
           </Tabs>
         </div>
 
-        {/* Floating cart trigger (all breakpoints) */}
+        {/* Mobile floating cart trigger */}
         <Button
           onClick={() => setMobileCartOpen(true)}
-          className="fixed bottom-4 inset-x-4 lg:inset-x-auto lg:right-6 lg:bottom-6 lg:w-auto lg:min-w-[240px] z-40 h-14 shadow-elevated bg-gradient-primary text-primary-foreground hover:opacity-90 flex items-center justify-between px-5"
+          className="lg:hidden fixed bottom-4 inset-x-4 z-40 h-14 shadow-elevated bg-gradient-primary text-primary-foreground hover:opacity-90 flex items-center justify-between px-5"
         >
           <span className="flex items-center gap-2 font-semibold">
             <ShoppingCart className="h-5 w-5" />
@@ -490,21 +486,21 @@ export default function POS() {
           <span className="font-mono-numbers font-bold">{format(total)}</span>
         </Button>
 
-        {/* Backdrop */}
+        {/* Mobile backdrop */}
         {mobileCartOpen && (
           <div
-            className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm"
+            className="lg:hidden fixed inset-0 z-40 bg-background/70 backdrop-blur-sm"
             onClick={() => setMobileCartOpen(false)}
           />
         )}
 
-        {/* Cart Section (drawer on all breakpoints) */}
+        {/* Cart Section (desktop inline, mobile bottom sheet) */}
         <Card
           className={cn(
             "flex-col min-h-0 transition-all",
+            "lg:relative lg:flex lg:inset-auto lg:max-h-none lg:rounded-lg lg:shadow-none",
             "fixed inset-x-0 bottom-0 z-50 max-h-[88vh] rounded-t-2xl rounded-b-none shadow-2xl",
-            "lg:inset-x-auto lg:right-4 lg:bottom-4 lg:left-auto lg:w-[420px] lg:max-h-[85vh] lg:rounded-2xl",
-            mobileCartOpen ? "flex" : "hidden",
+            mobileCartOpen ? "flex" : "hidden lg:flex",
             scanFlash && "ring-2 ring-success/60 bg-success/5"
           )}
         >
@@ -514,7 +510,7 @@ export default function POS() {
               <CardTitle className="text-base flex items-center gap-2"><Receipt className="h-4 w-4" />Panier</CardTitle>
               <div className="flex items-center gap-1">
                 {cart.length > 0 && <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:text-destructive">Vider</Button>}
-                <Button variant="ghost" size="sm" onClick={() => setMobileCartOpen(false)}>Fermer</Button>
+                <Button variant="ghost" size="sm" onClick={() => setMobileCartOpen(false)} className="lg:hidden">Fermer</Button>
               </div>
             </div>
           </CardHeader>
