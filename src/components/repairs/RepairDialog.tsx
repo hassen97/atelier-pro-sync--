@@ -101,6 +101,7 @@ interface RepairDialogProps {
     received_by?: string | null;
     repaired_by?: string | null;
     device_condition?: string | null;
+    device_unlock_code?: string | null;
   } | null;
   onSubmit: (data: RepairFormValues, selectedParts: SelectedPart[]) => Promise<void>;
   isLoading?: boolean;
