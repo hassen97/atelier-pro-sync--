@@ -202,7 +202,7 @@ export function RepairDialog({
     device_brand: "", device_model: "", imei: "", problem_description: "",
     diagnosis: "", labor_cost: 0, parts_cost: 0, total_cost: 0, amount_paid: 0, notes: "",
     estimated_ready_date: "", technician_note: "", received_by: "", repaired_by: "",
-    device_condition: "",
+    device_condition: "", device_unlock_code: "",
   };
 
   const { clearDraft } = useFormDraft("repair", {
