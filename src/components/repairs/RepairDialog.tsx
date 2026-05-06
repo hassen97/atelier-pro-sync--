@@ -256,6 +256,7 @@ export function RepairDialog({
         received_by: (repair as any).received_by || "",
         repaired_by: (repair as any).repaired_by || "",
         device_condition: (repair as any).device_condition || "",
+        device_unlock_code: (repair as any).device_unlock_code || "",
       });
     } else {
       setSelectedBrand("");
