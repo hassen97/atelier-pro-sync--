@@ -193,7 +193,7 @@ export function RepairDialog({
       received_by: "",
       repaired_by: "",
       device_condition: "",
-    },
+      device_unlock_code: "",
   });
 
   const defaultDraftValues = {
