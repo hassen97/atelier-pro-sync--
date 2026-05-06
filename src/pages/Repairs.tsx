@@ -370,6 +370,7 @@ export default function Repairs() {
       received_by: data.received_by || null,
       repaired_by: data.repaired_by || null,
       device_condition: data.device_condition || null,
+      device_unlock_code: data.device_unlock_code || null,
     };
 
     let repairId: string;
