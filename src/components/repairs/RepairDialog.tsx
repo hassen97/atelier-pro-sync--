@@ -72,6 +72,7 @@ const repairSchema = z.object({
   received_by: z.string().optional(),
   repaired_by: z.string().optional(),
   device_condition: z.string().optional(),
+  device_unlock_code: z.string().max(100).optional(),
 }).refine((data) => data.amount_paid <= data.total_cost, {
   message: "L'avance ne peut pas dépasser le prix total",
   path: ["amount_paid"],
