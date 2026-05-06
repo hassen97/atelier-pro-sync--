@@ -22,18 +22,18 @@ export interface ActiveSubscription {
 }
 
 export function useSubscription() {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
   return useQuery({
-    queryKey: ["my-subscription", user?.id],
+    queryKey: ["my-subscription", effectiveUserId],
     queryFn: async () => {
-      if (!user) return null;
+      if (!effectiveUserId) return null;
       const { data, error } = await supabase
         .from("shop_subscriptions")
         .select(`
           id, plan_id, status, started_at, expires_at,
           plan:subscription_plans(id, name, price, currency, period, features, highlight)
         `)
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .in("status", ["active", "trialing"])
         .order("started_at", { ascending: false })
         .limit(1)
@@ -52,7 +52,7 @@ export function useSubscription() {
           : null,
       } as ActiveSubscription;
     },
-    enabled: !!user,
+    enabled: !!effectiveUserId,
     staleTime: 5 * 60 * 1000,
   });
 }
