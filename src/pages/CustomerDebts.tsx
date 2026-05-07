@@ -217,6 +217,46 @@ export default function CustomerDebts() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={newDebtOpen} onOpenChange={setNewDebtOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Nouvelle dette</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Client</Label>
+              <CustomerCombobox value={newDebtCustomerId} onValueChange={setNewDebtCustomerId} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-debt-amount">Montant</Label>
+              <Input
+                id="new-debt-amount"
+                type="number"
+                step="0.001"
+                min="0"
+                value={newDebtAmount}
+                onChange={(e) => setNewDebtAmount(e.target.value)}
+                placeholder="0.000"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-debt-note">Note (optionnel)</Label>
+              <Textarea
+                id="new-debt-note"
+                value={newDebtNote}
+                onChange={(e) => setNewDebtNote(e.target.value)}
+                rows={2}
+                placeholder="Motif de la dette…"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setNewDebtOpen(false)}>Annuler</Button>
+              <Button onClick={submitNewDebt} disabled={creatingDebt || !newDebtCustomerId || !newDebtAmount}>
+                Ajouter
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
