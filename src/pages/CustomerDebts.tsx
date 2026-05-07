@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Search, Filter, User, Phone, CreditCard, Calendar, MoreHorizontal, Banknote,
+  Search, Filter, User, Phone, CreditCard, Calendar, MoreHorizontal, Banknote, Plus,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
@@ -13,6 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { CustomerCombobox } from "@/components/customers/CustomerCombobox";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useAllCustomers, useUpdateCustomer, Customer } from "@/hooks/useCustomers";
