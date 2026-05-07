@@ -8,10 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Banknote, Gift, Receipt as ReceiptIcon, Wallet, Wrench, ShoppingCart, Pencil, Check } from "lucide-react";
+import { Banknote, Gift, Receipt as ReceiptIcon, Wallet, Wrench, ShoppingCart, Pencil, Check, MoreHorizontal, Trash2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCurrency } from "@/hooks/useCurrency";
-import { useEmployeeTransactions, useEmployeeMonthlyStats, useUpdateTeamMemberHr, type EmployeeTxType } from "@/hooks/useEmployeeTransactions";
+import { useEmployeeTransactions, useEmployeeMonthlyStats, useUpdateTeamMemberHr, useDeleteEmployeeTransaction, type EmployeeTxType, type EmployeeTransaction } from "@/hooks/useEmployeeTransactions";
 import { EmployeeTransactionDialog } from "./EmployeeTransactionDialog";
+import { EditEmployeeTransactionDialog } from "./EditEmployeeTransactionDialog";
 import type { TeamMember } from "@/hooks/useTeam";
 
 interface Props {
@@ -40,6 +43,9 @@ export function EmployeeDetailSheet({ open, onOpenChange, employee }: Props) {
   const [editHr, setEditHr] = useState(false);
   const [salary, setSalary] = useState<string>(employee?.base_salary != null ? String(employee.base_salary) : "0");
   const [hireDate, setHireDate] = useState<string>(employee?.hire_date ?? "");
+  const [editTx, setEditTx] = useState<EmployeeTransaction | null>(null);
+  const [deleteTx, setDeleteTx] = useState<EmployeeTransaction | null>(null);
+  const deleteMutation = useDeleteEmployeeTransaction();
 
   // monthly settlement
   const monthSummary = useMemo(() => {
@@ -134,9 +140,10 @@ export function EmployeeDetailSheet({ open, onOpenChange, employee }: Props) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                      <TableHead>Date</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead className="text-right">Montant</TableHead>
+                        <TableHead className="w-10"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -164,6 +171,26 @@ export function EmployeeDetailSheet({ open, onOpenChange, employee }: Props) {
                             </TableCell>
                             <TableCell className={`text-right font-medium ${meta.sign === 1 ? "text-success" : "text-warning"}`}>
                               {meta.sign === 1 ? "+" : "-"} {format(Number(t.amount))}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => setEditTx(t)}>
+                                    <Pencil className="h-4 w-4 mr-2" /> Modifier
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => setDeleteTx(t)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" /> Supprimer
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         );
@@ -261,6 +288,38 @@ export function EmployeeDetailSheet({ open, onOpenChange, employee }: Props) {
           defaultAmount={dialogType === "salary_payment" && netToPay > 0 ? netToPay : undefined}
         />
       )}
+
+      <EditEmployeeTransactionDialog
+        open={!!editTx}
+        onOpenChange={(v) => !v && setEditTx(null)}
+        transaction={editTx}
+      />
+
+      <AlertDialog open={!!deleteTx} onOpenChange={(v) => !v && setDeleteTx(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette transaction ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible.
+              {deleteTx?.expense_id && " L'écriture liée dans la caisse sera également supprimée."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (deleteTx) {
+                  await deleteMutation.mutateAsync(deleteTx.id);
+                  setDeleteTx(null);
+                }
+              }}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

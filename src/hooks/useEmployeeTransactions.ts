@@ -198,6 +198,95 @@ export function useCreateEmployeeTransaction() {
   });
 }
 
+export function useUpdateEmployeeTransaction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      id: string;
+      amount: number;
+      description?: string | null;
+      transaction_date?: string;
+    }) => {
+      const { data: existing, error: fetchErr } = await supabase
+        .from("employee_transactions" as any)
+        .select("expense_id, type")
+        .eq("id", params.id)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      const { error } = await supabase
+        .from("employee_transactions" as any)
+        .update({
+          amount: params.amount,
+          description: params.description ?? null,
+          ...(params.transaction_date ? { transaction_date: params.transaction_date } : {}),
+        })
+        .eq("id", params.id);
+      if (error) throw error;
+
+      // Keep linked cash expense in sync
+      const expenseId = (existing as any)?.expense_id;
+      if (expenseId) {
+        await supabase
+          .from("expenses")
+          .update({
+            amount: params.amount,
+            ...(params.description !== undefined ? { description: params.description ?? "" } : {}),
+            ...(params.transaction_date ? { expense_date: params.transaction_date } : {}),
+          })
+          .eq("id", expenseId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["profit"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Transaction modifiée");
+    },
+    onError: (e: any) => {
+      console.error(e);
+      toast.error(e?.message || "Erreur lors de la modification");
+    },
+  });
+}
+
+export function useDeleteEmployeeTransaction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data: existing, error: fetchErr } = await supabase
+        .from("employee_transactions" as any)
+        .select("expense_id")
+        .eq("id", id)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      const expenseId = (existing as any)?.expense_id;
+      if (expenseId) {
+        await supabase.from("expenses").delete().eq("id", expenseId);
+      }
+
+      const { error } = await supabase
+        .from("employee_transactions" as any)
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["profit"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Transaction supprimée");
+    },
+    onError: (e: any) => {
+      console.error(e);
+      toast.error(e?.message || "Erreur lors de la suppression");
+    },
+  });
+}
+
 export function useUpdateTeamMemberHr() {
   const queryClient = useQueryClient();
   return useMutation({

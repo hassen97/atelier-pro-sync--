@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Search, Filter, User, Phone, CreditCard, Calendar, MoreHorizontal, Banknote,
+  Search, Filter, User, Phone, CreditCard, Calendar, MoreHorizontal, Banknote, Plus,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
@@ -13,6 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { CustomerCombobox } from "@/components/customers/CustomerCombobox";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useAllCustomers, useUpdateCustomer, Customer } from "@/hooks/useCustomers";
@@ -32,6 +34,12 @@ export default function CustomerDebts() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<DebtItem | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+
+  const [newDebtOpen, setNewDebtOpen] = useState(false);
+  const [newDebtCustomerId, setNewDebtCustomerId] = useState("");
+  const [newDebtAmount, setNewDebtAmount] = useState("");
+  const [newDebtNote, setNewDebtNote] = useState("");
+  const [creatingDebt, setCreatingDebt] = useState(false);
 
   const { data: customers = [] } = useAllCustomers();
   const { data: repairs = [] } = useAllUnpaidRepairs();
@@ -100,9 +108,37 @@ export default function CustomerDebts() {
     } catch (error) { console.error("Error recording payment:", error); toast.error("Erreur lors de l'enregistrement"); }
   };
 
+  const submitNewDebt = async () => {
+    if (!newDebtCustomerId) { toast.error("Choisissez un client"); return; }
+    const amount = parseFloat(newDebtAmount);
+    if (isNaN(amount) || amount <= 0) { toast.error("Montant invalide"); return; }
+    const customer = customers.find((c) => c.id === newDebtCustomerId);
+    if (!customer) { toast.error("Client introuvable"); return; }
+    setCreatingDebt(true);
+    try {
+      await updateCustomer.mutateAsync({
+        id: customer.id,
+        balance: Number(customer.balance) + amount,
+      });
+      toast.success("Dette ajoutée");
+      setNewDebtOpen(false);
+      setNewDebtCustomerId(""); setNewDebtAmount(""); setNewDebtNote("");
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de l'ajout");
+    } finally {
+      setCreatingDebt(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Dettes Clients" description="Suivi des créances et paiements partiels" />
+      <PageHeader title="Dettes Clients" description="Suivi des créances et paiements partiels">
+        <Button onClick={() => setNewDebtOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Nouvelle dette
+        </Button>
+      </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title="Total créances" value={format(totalDebts)} icon={CreditCard} variant="warning" />
@@ -179,6 +215,46 @@ export default function CustomerDebts() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={newDebtOpen} onOpenChange={setNewDebtOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Nouvelle dette</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Client</Label>
+              <CustomerCombobox value={newDebtCustomerId} onValueChange={setNewDebtCustomerId} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-debt-amount">Montant</Label>
+              <Input
+                id="new-debt-amount"
+                type="number"
+                step="0.001"
+                min="0"
+                value={newDebtAmount}
+                onChange={(e) => setNewDebtAmount(e.target.value)}
+                placeholder="0.000"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-debt-note">Note (optionnel)</Label>
+              <Textarea
+                id="new-debt-note"
+                value={newDebtNote}
+                onChange={(e) => setNewDebtNote(e.target.value)}
+                rows={2}
+                placeholder="Motif de la dette…"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setNewDebtOpen(false)}>Annuler</Button>
+              <Button onClick={submitNewDebt} disabled={creatingDebt || !newDebtCustomerId || !newDebtAmount}>
+                Ajouter
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
