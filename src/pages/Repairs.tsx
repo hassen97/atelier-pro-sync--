@@ -51,6 +51,7 @@ interface RepairWithCustomer {
   ticket_number?: number | null;
   estimated_ready_date?: string | null;
   technician_note?: string | null;
+  device_unlock_code?: string | null;
   customer: {
     id: string;
     name: string;
