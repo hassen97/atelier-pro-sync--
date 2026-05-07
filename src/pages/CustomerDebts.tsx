@@ -35,6 +35,12 @@ export default function CustomerDebts() {
   const [selectedDebt, setSelectedDebt] = useState<DebtItem | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
 
+  const [newDebtOpen, setNewDebtOpen] = useState(false);
+  const [newDebtCustomerId, setNewDebtCustomerId] = useState("");
+  const [newDebtAmount, setNewDebtAmount] = useState("");
+  const [newDebtNote, setNewDebtNote] = useState("");
+  const [creatingDebt, setCreatingDebt] = useState(false);
+
   const { data: customers = [] } = useAllCustomers();
   const { data: repairs = [] } = useAllUnpaidRepairs();
   const { data: sales = [] } = useSales();
