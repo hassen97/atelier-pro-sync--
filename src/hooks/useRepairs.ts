@@ -71,6 +71,7 @@ export function useRepairs(page = 0) {
            total_cost, amount_paid, notes, tracking_token, ticket_number,
            estimated_ready_date, technician_note, customer_id, category_id,
            is_warranty, received_by, repaired_by, device_condition,
+           device_unlock_code,
            warranty_ticket_id, created_at, updated_at,
            customer:customers(id, name, phone, email),
            category:categories(id, name)`,
