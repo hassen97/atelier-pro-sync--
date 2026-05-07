@@ -119,9 +119,6 @@ export default function CustomerDebts() {
       await updateCustomer.mutateAsync({
         id: customer.id,
         balance: Number(customer.balance) + amount,
-        notes: newDebtNote.trim()
-          ? `${customer.notes ? customer.notes + "\n" : ""}[Dette ${new Date().toLocaleDateString("fr-FR")}] ${newDebtNote.trim()} (+${amount})`
-          : customer.notes,
       });
       toast.success("Dette ajoutée");
       setNewDebtOpen(false);
