@@ -43,6 +43,9 @@ export function EmployeeDetailSheet({ open, onOpenChange, employee }: Props) {
   const [editHr, setEditHr] = useState(false);
   const [salary, setSalary] = useState<string>(employee?.base_salary != null ? String(employee.base_salary) : "0");
   const [hireDate, setHireDate] = useState<string>(employee?.hire_date ?? "");
+  const [editTx, setEditTx] = useState<EmployeeTransaction | null>(null);
+  const [deleteTx, setDeleteTx] = useState<EmployeeTransaction | null>(null);
+  const deleteMutation = useDeleteEmployeeTransaction();
 
   // monthly settlement
   const monthSummary = useMemo(() => {
