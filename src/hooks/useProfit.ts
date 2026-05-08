@@ -3,11 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
-export function useProfit(period: string = "month") {
+export type ProfitPeriod = string | { from: Date; to: Date };
+
+export function useProfit(period: ProfitPeriod = "month") {
   const { user } = useAuth();
 
+  const isCustom = typeof period !== "string";
+  const customKey = isCustom ? `${(period as any).from.toISOString()}_${(period as any).to.toISOString()}` : period;
+
   return useQuery({
-    queryKey: ["profit", user?.id, period],
+    queryKey: ["profit", user?.id, customKey],
     queryFn: async () => {
       if (!user) return null;
 
@@ -17,33 +22,42 @@ export function useProfit(period: string = "month") {
       let prevStartDate: Date;
       let prevEndDate: Date;
 
-      switch (period) {
+      if (isCustom) {
+        const { from, to } = period as { from: Date; to: Date };
+        startDate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+        endDate = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999);
+        const lengthMs = endDate.getTime() - startDate.getTime();
+        prevEndDate = new Date(startDate.getTime() - 1);
+        prevStartDate = new Date(prevEndDate.getTime() - lengthMs);
+      } else {
+        switch (period) {
           case "today":
-         startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  prevStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  prevEndDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  break;
-        case "week":
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          prevStartDate = new Date(startDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-          prevEndDate = new Date(startDate.getTime() - 1);
-          break;
-        case "quarter":
-          startDate = subMonths(now, 3);
-          prevStartDate = subMonths(startDate, 3);
-          prevEndDate = new Date(startDate.getTime() - 1);
-          break;
-        case "year":
-          startDate = new Date(now.getFullYear(), 0, 1);
-          prevStartDate = new Date(now.getFullYear() - 1, 0, 1);
-          prevEndDate = new Date(now.getFullYear() - 1, 11, 31);
-          break;
-        default: // month
-          startDate = startOfMonth(now);
-          endDate = endOfMonth(now);
-          prevStartDate = startOfMonth(subMonths(now, 1));
-          prevEndDate = endOfMonth(subMonths(now, 1));
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+            prevStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            prevEndDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+          case "week":
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            prevStartDate = new Date(startDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+            prevEndDate = new Date(startDate.getTime() - 1);
+            break;
+          case "quarter":
+            startDate = subMonths(now, 3);
+            prevStartDate = subMonths(startDate, 3);
+            prevEndDate = new Date(startDate.getTime() - 1);
+            break;
+          case "year":
+            startDate = new Date(now.getFullYear(), 0, 1);
+            prevStartDate = new Date(now.getFullYear() - 1, 0, 1);
+            prevEndDate = new Date(now.getFullYear() - 1, 11, 31);
+            break;
+          default: // month
+            startDate = startOfMonth(now);
+            endDate = endOfMonth(now);
+            prevStartDate = startOfMonth(subMonths(now, 1));
+            prevEndDate = endOfMonth(subMonths(now, 1));
+        }
       }
 
       // Get current period sales + returns
