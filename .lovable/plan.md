@@ -1,42 +1,26 @@
-# 3 fixes
+## 1. Custom period / month picker on Profit page
 
-## 1. Unlock code not appearing on phone label
+**Current:** `src/pages/Profit.tsx` has a Select with fixed periods (today/week/month/quarter/year) passed to `useProfit(period)`.
 
-**Root cause:** the unlock code IS being saved correctly in the database (verified — `device_unlock_code = "Aaaaaa"` exists on a recent repair). The bug is in `useRepairs()` query in `src/hooks/useRepairs.ts` (lines 68–76): the `.select(...)` list doesn't include `device_unlock_code`, so it never reaches the UI. When `RepairReceiptDialog` reads `(repair as any).device_unlock_code` it gets `undefined` and the label skips that line.
+**Change:**
+- Add two new options to the period selector: **"Mois spécifique"** and **"Période personnalisée"**.
+- When "Mois spécifique" → show a month/year picker (simple month + year dropdowns) → compute `startDate = startOfMonth`, `endDate = endOfMonth` of that month.
+- When "Période personnalisée" → show a date-range picker (two shadcn Calendar popovers, From/To, with `pointer-events-auto`) → use those dates directly.
+- Refactor `useProfit` in `src/hooks/useProfit.ts` to accept either a period string OR `{ from: Date, to: Date }`. Internally it already builds `startDate`/`endDate`, so we just branch on the input. Previous-period comparison = same length window immediately before `from`.
+- Update the export filename and the text export header to show the actual date range when custom.
 
-**Fix:** Add `device_unlock_code` to the select in `useRepairs()` (and to `useRepairByTicketNumber` and `useAllUnpaidRepairs` if they also use a narrow select).
+**Files:** `src/pages/Profit.tsx`, `src/hooks/useProfit.ts`.
 
-## 2. Manually add a debt in Customer Debts page
+## 2. Let employees see remaining stock quantity
 
-In `src/pages/CustomerDebts.tsx`, add a "Nouvelle dette" button in the page header that opens a dialog:
-- Customer (CustomerCombobox, with a quick-add button like in repairs)
-- Amount (required, > 0)
-- Note (optional)
+**Current:** In `src/pages/Inventory.tsx` the **Stock** column header and cell are gated by `!isEmployee`, so employees see no stock at all. Cost / Margin / Adjust / Delete also hidden.
 
-On submit: increment the customer's `balance` by the amount via `useUpdateCustomer`. The existing aggregation already shows `customer.balance > 0` as a `CLI-…` row, so the new debt will appear automatically and be payable through the existing payment dialog.
+**Change (only stock visibility, nothing else):**
+- Show the **Stock** column to employees as **read-only** (just the number + low-stock badge), no inline edit and no "Ajuster stock" / "Supprimer" actions.
+- Keep Coût and Marge hidden for employees (financial privacy rule stays intact).
+- Update the empty-row `colSpan` accordingly (employees: 6 instead of 5).
+- Also reveal stock in `ProductSheet` quick view if it's currently hidden for employees (quick check; only adjust if needed).
 
-## 3. Edit & delete employee transaction history
+**Files:** `src/pages/Inventory.tsx` (and `src/components/inventory/ProductSheet.tsx` if needed).
 
-In `src/components/team/EmployeeDetailSheet.tsx` (Historique tab), add per-row actions (dropdown menu with Edit and Delete).
-
-In `src/hooks/useEmployeeTransactions.ts`, add two new mutations:
-
-- `useUpdateEmployeeTransaction({ id, amount, description, transaction_date })` — updates the row; if the original had an `expense_id` (cash-synced avance / salary), also update the linked `expenses` row's `amount` so the till stays consistent.
-- `useDeleteEmployeeTransaction({ id })` — fetches the row first; if `expense_id` is set, deletes that expense too; then deletes the transaction.
-
-UI:
-- **Edit dialog:** small reusable dialog with amount + description + date fields, prefilled. Cash-sync notice when `expense_id` is present.
-- **Delete:** AlertDialog confirmation; on confirm call delete mutation.
-
-Both invalidate `employee-transactions`, `expenses`, `dashboard-stats`, `profit`.
-
-Owner-only — page is already gated by `useIsOwner`. RLS already allows owner to update/delete `employee_transactions` and `expenses`.
-
-## Files touched
-- `src/hooks/useRepairs.ts` — add column to select(s)
-- `src/pages/CustomerDebts.tsx` — add button + new debt dialog
-- `src/hooks/useEmployeeTransactions.ts` — add update/delete mutations
-- `src/components/team/EmployeeDetailSheet.tsx` — row actions, edit/delete dialogs
-- new: `src/components/team/EditEmployeeTransactionDialog.tsx`
-
-No DB migrations needed.
+No DB migration, no RLS change — employees already have SELECT on `products` via `is_team_member`, this is purely a UI gate.

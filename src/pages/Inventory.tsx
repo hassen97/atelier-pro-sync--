@@ -409,14 +409,14 @@ export default function Inventory() {
                     {!isEmployee && <TableHead className="text-right">Coût</TableHead>}
                     <TableHead className="text-right">Prix vente</TableHead>
                     {!isEmployee && <TableHead className="text-right">Marge</TableHead>}
-                    {!isEmployee && <TableHead className="text-center">Stock</TableHead>}
+                    <TableHead className="text-center">Stock</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {displayedInventory.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isEmployee ? 5 : 8} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={isEmployee ? 6 : 8} className="text-center py-12 text-muted-foreground">
                         {totalCount === 0
                           ? "Aucun produit enregistré. Cliquez sur 'Nouveau produit' pour commencer."
                           : "Aucun produit trouvé pour cette recherche"}
@@ -457,18 +457,16 @@ export default function Inventory() {
                               <span className="text-success font-medium">+{margin.toFixed(0)}%</span>
                             </TableCell>
                           )}
-                          {!isEmployee && (
-                            <TableCell className="text-center">
-                              <Badge className={cn(
-                                "font-mono",
-                                isOutOfStock && "bg-destructive/10 text-destructive border-destructive/20",
-                                isLowStock && !isOutOfStock && "bg-warning/10 text-warning border-warning/20",
-                                !isLowStock && "bg-success/10 text-success border-success/20"
-                              )}>
-                                {item.stock}
-                              </Badge>
-                            </TableCell>
-                          )}
+                          <TableCell className="text-center">
+                            <Badge className={cn(
+                              "font-mono",
+                              isOutOfStock && "bg-destructive/10 text-destructive border-destructive/20",
+                              isLowStock && !isOutOfStock && "bg-warning/10 text-warning border-warning/20",
+                              !isLowStock && "bg-success/10 text-success border-success/20"
+                            )}>
+                              {item.stock}
+                            </Badge>
+                          </TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
