@@ -1,63 +1,33 @@
 ## Goal
+On the Repairs page, when a shop owner moves a repair to **Terminé** or **Livré**, always show the floating payment popup — even if the repair is already fully paid — so the owner explicitly confirms how much was received before the status changes.
 
-Make publishing changelogs effortless — so you don't have to open the Ultra Admin dashboard every time we ship a fix or feature, AND get a ready-to-paste Facebook version for free.
+## Changes
 
-## What exists today
+### 1. `src/pages/Repairs.tsx` — `handleStatusChange`
+Remove the `remaining > 0` guard for `completed` / `delivered`. Always open `PaymentConfirmDialog` for those two statuses. Other statuses (pending, in_progress) keep their current behavior.
 
-- `platform_announcements` table + `WhatsNewModal` already pops up for shop owners/employees on login when there's an unread announcement.
-- Posting today requires: log into Ultra Admin → Announcements view → fill 3 fields → publish. That's the friction.
+```text
+if (newStatus === "completed" || newStatus === "delivered") {
+  setPaymentConfirmRepair(repair);
+  setPendingStatus(newStatus);
+  setPaymentConfirmOpen(true);
+  return;
+}
+// fallthrough → updateStatus.mutate(...)
+```
 
-## What we'll add
+### 2. `src/components/repairs/PaymentConfirmDialog.tsx` — handle the "already paid" case
+- When `remaining <= 0`:
+  - Show a green "Déjà entièrement payé" summary block instead of the radio choices.
+  - Default `paymentOption` to `"full"` with `paymentAmount = 0` so confirming just changes the status (no double payment, no debt creation).
+  - Hide the partial-payment option entirely.
+- When `remaining > 0`: keep today's UI (full vs partial radios).
+- Keep the existing summary card (Total / Déjà payé / Reste à payer) visible in both cases.
 
-### 1. One-click "Quick Changelog" composer (everywhere in Admin)
+### 3. `handlePaymentConfirm` in `Repairs.tsx`
+Already safe: if `paymentAmount = 0`, `newAmountPaid` stays the same and `debtAmount = 0` so no customer balance update is triggered. No change needed beyond confirming the toast wording works for the "0 received" path (we'll show "Statut mis à jour" instead of "Paiement enregistré" when amount is 0).
 
-- Add a floating **"Publier un changelog"** button in the Admin shell (top-right of `AdminDashboard`, always visible — not buried in the Announcements tab).
-- Also wire it into the **Cmd+K command palette** (`AdminCommandPalette.tsx`) as `"Publier un changelog"` so you can fire it from any admin page in 2 keystrokes.
-- Opens a slim dialog with:
-  - Title (auto-suggested: `"Mise à jour du <date du jour>"`)
-  - Nouvelles fonctionnalités (textarea)
-  - Changements / Corrections (textarea)
-  - Target = "Toutes les boutiques" by default (keeps current targeting option as a collapsible advanced section)
-- On publish → uses existing `useCreateAnnouncement` → broadcasts to all shop owners + employees → `WhatsNewModal` pops up for them next time they open the app (already works).
-
-### 2. Facebook-ready copy button
-
-In the same dialog, after publishing (and also as a button on each row in the existing Announcements list):
-
-- **"Copier pour Facebook"** button → copies a nicely formatted post to clipboard:
-  ```
-  🚀 RepairPro — Mise à jour du 8 mai 2026
-
-  ✨ Nouveautés
-  • <bullet 1>
-  • <bullet 2>
-
-  🛠 Améliorations & corrections
-  • <bullet 1>
-  • <bullet 2>
-
-  👉 Mettez à jour votre app pour en profiter !
-  #RepairPro #GestionDeBoutique
-  ```
-- Uses your shop/brand name from `platform_settings` and current date.
-- Toast confirms "Copié — collez sur Facebook".
-
-### 3. Employees see the popup too (verify)
-
-- Confirm `WhatsNewModal` is mounted in the main shop layout (not only owner-only routes). If currently gated to owners, lift the gate so employees also see broadcasts. Targeted announcements (specific `target_user_id`) stay unchanged.
-
-## Files touched
-
-- `src/pages/AdminDashboard.tsx` — add floating "Publier un changelog" button.
-- `src/components/admin/QuickChangelogDialog.tsx` *(new)* — slim composer + "Copier pour Facebook".
-- `src/components/admin/AdminCommandPalette.tsx` — add command entry.
-- `src/components/admin/AdminAnnouncementsView.tsx` — add "Copier pour Facebook" button per row (reuses formatter).
-- `src/lib/changelogFormat.ts` *(new)* — single function `formatForFacebook({title, newFeatures, changesFixes, brandName})`.
-- `src/components/layout/MainLayout.tsx` (or wherever `WhatsNewModal` lives) — verify employees see it; lift gate if needed.
-
-No DB migration. No RLS change. Reuses existing `platform_announcements` + `useCreateAnnouncement` + `WhatsNewModal`.
-
-## Result
-
-- 2 clicks (or Cmd+K → Enter) from anywhere in admin to publish a changelog that pops up for every shop owner and employee.
-- One extra click to get a Facebook-ready post on your clipboard — no manual rewriting.
+## Out of scope
+- No DB / RLS / hook changes.
+- No change to `in_progress` flow (still uses `StatusAssignDialog`).
+- No change to status dropdown UI itself.

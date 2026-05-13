@@ -234,10 +234,8 @@ export default function Repairs() {
       return;
     }
 
-    // Check if moving to completed or delivered AND not fully paid
-    const remaining = repair.total - repair.paid;
-    
-    if ((newStatus === "completed" || newStatus === "delivered") && remaining > 0) {
+    // Always confirm payment when moving to completed or delivered
+    if (newStatus === "completed" || newStatus === "delivered") {
       setPaymentConfirmRepair(repair);
       setPendingStatus(newStatus);
       setPaymentConfirmOpen(true);
