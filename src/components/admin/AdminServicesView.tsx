@@ -13,12 +13,24 @@ export function AdminServicesView() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceRow | null>(null);
 
+  const activeCount = data.filter((s) => s.is_active).length;
+  const inactiveCount = data.length - activeCount;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Catalogue Services</h2>
-          <p className="text-xs text-slate-500 mt-0.5">FRP, KG, MDM bypass, location d'outils — gestion centrale.</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            FRP, KG, MDM bypass, location d'outils — gestion centrale.
+            {data.length > 0 && (
+              <span className="ml-2">
+                <span className="text-emerald-400">{activeCount} actif{activeCount > 1 ? "s" : ""}</span>
+                <span className="text-slate-600"> · </span>
+                <span className="text-slate-500">{inactiveCount} inactif{inactiveCount > 1 ? "s" : ""}</span>
+              </span>
+            )}
+          </p>
         </div>
         <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-[#00D4FF] hover:bg-[#00D4FF]/90 text-black">
           <Plus className="h-4 w-4 mr-1" /> Nouveau service
@@ -45,8 +57,17 @@ export function AdminServicesView() {
             {data.map((s) => {
               const cat = SERVICE_CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category;
               return (
-                <tr key={s.id} className="hover:bg-white/[0.02]">
-                  <td className="px-4 py-2.5 font-medium text-white">{s.name}</td>
+                <tr key={s.id} className={`hover:bg-white/[0.02] ${!s.is_active ? "opacity-60" : ""}`}>
+                  <td className="px-4 py-2.5 font-medium text-white">
+                    <div className="flex items-center gap-2">
+                      <span>{s.name}</span>
+                      {!s.is_active && (
+                        <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-300 text-[10px] px-1.5 py-0">
+                          Inactif
+                        </Badge>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-2.5"><Badge variant="outline" className="border-white/10 text-slate-300">{cat}</Badge></td>
                   <td className="px-4 py-2.5 text-slate-400">{s.type === "tool_rental" ? "Location" : "Service"}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{Number(s.price).toFixed(2)}</td>

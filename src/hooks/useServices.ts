@@ -91,8 +91,13 @@ export function useToggleService() {
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await supabase.from("services").update({ is_active }).eq("id", id);
       if (error) throw error;
+      return is_active;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["services"] }),
+    onSuccess: (is_active) => {
+      qc.invalidateQueries({ queryKey: ["services"] });
+      toast.success(is_active ? "Service activé — visible par les boutiques" : "Service désactivé — masqué côté boutiques");
+    },
+    onError: (e: any) => toast.error(e.message || "Erreur"),
   });
 }
 
