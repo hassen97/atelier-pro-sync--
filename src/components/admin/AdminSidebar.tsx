@@ -2,15 +2,17 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Store, Megaphone, MessageSquare, LogOut, KeyRound,
   Settings, Users, CreditCard, Tags, ClipboardList, Shield,
-  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag,
+  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox,
 } from "lucide-react";
+import { usePendingServiceRequestCount } from "@/hooks/useAdminServiceRequests";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
   | "settings" | "employees" | "plans" | "gateways" | "feature_flags"
-  | "waitlist" | "signup_attempts" | "orders" | "community" | "reports";
+  | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
+  | "services_catalog" | "services_requests";
 
 interface AdminSidebarProps {
   active: AdminView;
@@ -25,6 +27,7 @@ type NavItem = {
   label: string;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   badge?: string;
+  showPendingDot?: boolean;
 };
 
 const navSections: { label: string; items: NavItem[] }[] = [
@@ -43,6 +46,13 @@ const navSections: { label: string; items: NavItem[] }[] = [
       { id: "plans",    label: "Tarifs & Plans", icon: Tags },
       { id: "orders",   label: "Commandes",      icon: ClipboardList },
       { id: "gateways", label: "Paiements",      icon: CreditCard },
+    ],
+  },
+  {
+    label: "Services & Outils",
+    items: [
+      { id: "services_catalog",  label: "Catalogue services", icon: Cloud },
+      { id: "services_requests", label: "Demandes entrantes", icon: Inbox, showPendingDot: true },
     ],
   },
   {
@@ -67,6 +77,7 @@ const navSections: { label: string; items: NavItem[] }[] = [
 
 export function AdminSidebar({ active, onNavigate, onClose, collapsed = false, onToggleCollapse }: AdminSidebarProps) {
   const { user, signOut } = useAuth();
+  const { data: pendingCount = 0 } = usePendingServiceRequestCount();
 
   const handleNavigate = (view: AdminView) => {
     onNavigate(view);
@@ -126,25 +137,36 @@ export function AdminSidebar({ active, onNavigate, onClose, collapsed = false, o
                 {section.items.map((item) => {
                   const isActive = active === item.id;
                   const Icon = item.icon;
+                  const showDot = item.showPendingDot && pendingCount > 0;
                   const btn = (
                     <button
                       key={item.id}
                       onClick={() => handleNavigate(item.id)}
                       className={cn(
-                        "w-full flex items-center gap-2.5 rounded-lg text-sm font-medium transition-colors duration-150",
+                        "w-full flex items-center gap-2.5 rounded-lg text-sm font-medium transition-colors duration-150 relative",
                         collapsed ? "px-0 py-2 justify-center" : "px-2.5 py-2",
                         isActive
                           ? "bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/20"
                           : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent",
                       )}
                     >
-                      <Icon className="shrink-0" style={{ width: collapsed ? 18 : 16, height: collapsed ? 18 : 16 }} />
+                      <span className="relative shrink-0">
+                        <Icon style={{ width: collapsed ? 18 : 16, height: collapsed ? 18 : 16 }} />
+                        {showDot && (
+                          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-1 ring-[#080E1A]" />
+                        )}
+                      </span>
                       {!collapsed && (
                         <>
                           <span className="truncate overflow-hidden whitespace-nowrap flex-1 text-left">
                             {item.label}
                           </span>
-                          {item.badge && (
+                          {showDot && (
+                            <span className="text-[10px] font-bold rounded-full px-1.5 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30">
+                              {pendingCount}
+                            </span>
+                          )}
+                          {item.badge && !showDot && (
                             <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-[#00D4FF]/15 text-[#00D4FF]">
                               {item.badge}
                             </span>

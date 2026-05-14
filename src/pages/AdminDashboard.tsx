@@ -20,6 +20,8 @@ import { AdminCommandPalette } from "@/components/admin/AdminCommandPalette";
 import { AdminOrdersView } from "@/components/admin/AdminOrdersView";
 import { AdminCommunityView } from "@/components/admin/AdminCommunityView";
 import { AdminReportsView } from "@/components/admin/AdminReportsView"; // NEW
+import { AdminServicesView } from "@/components/admin/AdminServicesView";
+import { AdminServiceRequestsView } from "@/components/admin/AdminServiceRequestsView";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAdminSignupNotifier } from "@/hooks/useAdminSignupNotifier";
@@ -28,7 +30,8 @@ import { cn } from "@/lib/utils";
 type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
   | "settings" | "employees" | "plans" | "gateways" | "feature_flags"
-  | "waitlist" | "signup_attempts" | "orders" | "community" | "reports";
+  | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
+  | "services_catalog" | "services_requests";
 
 const viewLabels: Record<AdminView, string> = {
   overview:        "Dashboard",
@@ -46,6 +49,8 @@ const viewLabels: Record<AdminView, string> = {
   settings:        "Parametres",
   feature_flags:   "Feature Flags",
   reports:         "Rapports & Export",
+  services_catalog:  "Catalogue services",
+  services_requests: "Demandes services",
 };
 
 const AdminDashboard = () => {
@@ -248,7 +253,9 @@ const AdminDashboard = () => {
             {activeView === "signup_attempts" && <AdminSignupAttemptsView />}
             {activeView === "orders"          && <AdminOrdersView />}
             {activeView === "community"       && <AdminCommunityView />}
-            {activeView === "reports"         && <AdminReportsView />}
+            {activeView === "reports"          && <AdminReportsView />}
+            {activeView === "services_catalog"  && <AdminServicesView />}
+            {activeView === "services_requests" && <AdminServiceRequestsView />}
           </div>
         </main>
       </div>

@@ -22,6 +22,7 @@ const translations = {
     "nav.community": "Entraide",
     "nav.messages": "Messages",
     "nav.team": "Équipe",
+    "nav.services": "Services & Outils",
 
     // Common
     "common.save": "Enregistrer",
@@ -135,6 +136,7 @@ const translations = {
     "nav.community": "Community",
     "nav.messages": "Messages",
     "nav.team": "Team",
+    "nav.services": "Services & Tools",
     "nav.settings": "Settings",
     "nav.feedback": "Report / Suggest",
 

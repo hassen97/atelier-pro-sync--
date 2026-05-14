@@ -20,6 +20,7 @@ import {
   Shield,
   Users2,
   MessageCircle,
+  Cloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ const navigation = [
   { nameKey: "nav.warranty" as const, href: "/warranty", icon: Shield },
   { nameKey: "nav.team" as const, href: "/team", icon: Users2 },
   { nameKey: "nav.community" as const, href: "/communaute", icon: Users2 },
+  { nameKey: "nav.services" as const, href: "/services", icon: Cloud },
   { nameKey: "nav.messages" as const, href: "/messages", icon: MessageCircle },
 ];
 

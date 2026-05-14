@@ -1431,6 +1431,110 @@ export type Database = {
           },
         ]
       }
+      service_requests: {
+        Row: {
+          admin_note: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          input_data: Json
+          requested_by: string | null
+          result_data: Json
+          service_id: string | null
+          service_name_snapshot: string
+          service_price_snapshot: number
+          shop_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_note?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          input_data?: Json
+          requested_by?: string | null
+          result_data?: Json
+          service_id?: string | null
+          service_name_snapshot: string
+          service_price_snapshot?: number
+          shop_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_note?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          input_data?: Json
+          requested_by?: string | null
+          result_data?: Json
+          service_id?: string | null
+          service_name_snapshot?: string
+          service_price_snapshot?: number
+          shop_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_requests_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          category: string
+          created_at: string
+          currency: string | null
+          description: string | null
+          extra_fields: Json
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          requires_imei: boolean
+          requires_model: boolean
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          extra_fields?: Json
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          requires_imei?: boolean
+          requires_model?: boolean
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          extra_fields?: Json
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          requires_imei?: boolean
+          requires_model?: boolean
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shop_settings: {
         Row: {
           address: string | null
