@@ -297,23 +297,36 @@ export default function Repairs() {
         delivery_date: pendingStatus === "delivered" ? new Date().toISOString() : undefined,
       });
 
-      // 1b. Log payment attempt in history (only when an amount was received)
-      if (data.paymentAmount > 0) {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          await supabase.from("repair_payments").insert({
-            user_id: effectiveUserId!,
-            repair_id: repair.id,
-            customer_id: repair.customer_id,
-            amount: data.paymentAmount,
-            note: data.isFullPayment
-              ? `Paiement complet (statut: ${pendingStatus})`
-              : `Paiement partiel (statut: ${pendingStatus})`,
-            recorded_by: user?.id ?? null,
-          });
-        } catch (e) {
-          console.error("Failed to log repair payment:", e);
+      // 1b. Log every payment attempt (even when amount is 0)
+      try {
+        const wasAlreadyPaid = repair.paid >= repair.total && repair.total > 0;
+        let paymentType: "full" | "partial" | "already_paid" | "none";
+        let note: string;
+        if (wasAlreadyPaid) {
+          paymentType = "already_paid";
+          note = `Réparation déjà payée (statut: ${pendingStatus})`;
+        } else if (data.paymentAmount === 0) {
+          paymentType = "none";
+          note = `Aucun paiement reçu (statut: ${pendingStatus}, dette: ${debtAmount.toFixed(3)})`;
+        } else if (data.isFullPayment) {
+          paymentType = "full";
+          note = `Paiement complet (statut: ${pendingStatus})`;
+        } else {
+          paymentType = "partial";
+          note = `Paiement partiel (statut: ${pendingStatus}, dette restante: ${debtAmount.toFixed(3)})`;
         }
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.from("repair_payments").insert({
+          user_id: effectiveUserId!,
+          repair_id: repair.id,
+          customer_id: repair.customer_id,
+          amount: data.paymentAmount,
+          payment_type: paymentType,
+          note,
+          recorded_by: user?.id ?? null,
+        });
+      } catch (e) {
+        console.error("Failed to log repair payment:", e);
       }
 
       // 2. If partial payment and customer exists, add debt to customer balance

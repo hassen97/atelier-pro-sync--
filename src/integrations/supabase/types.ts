@@ -1169,6 +1169,7 @@ export type Database = {
           customer_id: string | null
           id: string
           note: string | null
+          payment_type: string
           recorded_by: string | null
           repair_id: string
           user_id: string
@@ -1179,6 +1180,7 @@ export type Database = {
           customer_id?: string | null
           id?: string
           note?: string | null
+          payment_type?: string
           recorded_by?: string | null
           repair_id: string
           user_id: string
@@ -1189,6 +1191,7 @@ export type Database = {
           customer_id?: string | null
           id?: string
           note?: string | null
+          payment_type?: string
           recorded_by?: string | null
           repair_id?: string
           user_id?: string
