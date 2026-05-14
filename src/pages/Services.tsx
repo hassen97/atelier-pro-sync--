@@ -25,7 +25,6 @@ export default function Services() {
       <PageHeader
         title="Services & Outils"
         description="FRP, KG, MDM bypass et location d'outils — demandes traitées par notre équipe."
-        icon={Cloud}
       />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
