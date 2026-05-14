@@ -59,14 +59,7 @@ export function KeyValueList({
   return (
     <dl className={`grid grid-cols-[auto,1fr] gap-x-3 gap-y-1.5 text-sm ${className ?? ""}`}>
       {entries.map(([k, v]) => (
-        <>
-          <dt key={`${k}-k`} className="text-xs uppercase tracking-wide text-muted-foreground pt-0.5">
-            {humanize(k)}
-          </dt>
-          <dd key={`${k}-v`} className="font-medium">
-            {renderValue(v)}
-          </dd>
-        </>
+        <FragmentRow key={k} label={humanize(k)} value={v} />
       ))}
     </dl>
   );
