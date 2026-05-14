@@ -1,0 +1,1 @@
+UPDATE public.services SET is_active = true WHERE id = '4b25cb59-c648-4eca-a106-431f40a5ed91';
