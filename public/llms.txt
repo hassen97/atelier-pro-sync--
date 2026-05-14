@@ -1,0 +1,13 @@
+# RepairPro
+
+> SaaS de gestion d'atelier de réparation mobile : inventaire, réparations, facturation, suivi clients (Tunisie & France).
+
+## Pages
+
+- [Accueil](/): Présentation du logiciel RepairPro et de ses fonctionnalités.
+- [Connexion / Inscription](/auth): Accès à l'application et création de compte boutique.
+- [Mot de passe oublié](/reset-password): Demande de réinitialisation de mot de passe.
+
+## Optional
+
+- [Suivi de réparation](/track/{token}): Page publique de suivi d'une réparation par token unique.
