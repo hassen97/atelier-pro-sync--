@@ -1,33 +1,28 @@
 ## Goal
-On the Repairs page, when a shop owner moves a repair to **Terminé** or **Livré**, always show the floating payment popup — even if the repair is already fully paid — so the owner explicitly confirms how much was received before the status changes.
+Make the payment popup expose a clear "amount received" input field, so the shop owner can type exactly how much the customer paid instead of choosing between "full" and "partial".
 
-## Changes
+## Changes — `src/components/repairs/PaymentConfirmDialog.tsx`
 
-### 1. `src/pages/Repairs.tsx` — `handleStatusChange`
-Remove the `remaining > 0` guard for `completed` / `delivered`. Always open `PaymentConfirmDialog` for those two statuses. Other statuses (pending, in_progress) keep their current behavior.
+When `remaining > 0` (money still owed), replace the two-radio block with a single, prominent **"Montant reçu"** input:
 
-```text
-if (newStatus === "completed" || newStatus === "delivered") {
-  setPaymentConfirmRepair(repair);
-  setPendingStatus(newStatus);
-  setPaymentConfirmOpen(true);
-  return;
-}
-// fallthrough → updateStatus.mutate(...)
-```
+- Large numeric `Input` pre-filled with `remaining` (the full outstanding amount).
+- Quick-action buttons next to / above the input:
+  - **"Payé intégralement"** → sets the input to `remaining`.
+  - **"Aucun paiement"** → sets the input to `0`.
+- Live summary directly under the input:
+  - If `amount >= remaining` → green "Réparation entièrement payée".
+  - If `0 < amount < remaining` → warning "→ {format(remaining - amount)} sera ajouté aux dettes du client".
+  - If `amount = 0` → muted "Aucun paiement enregistré, {format(remaining)} restera en dette".
+- Keep the existing "no customer associated" warning when a debt would be created without a `customer_id`.
+- Cap the value at `remaining` (no overpayment) and disallow negatives.
 
-### 2. `src/components/repairs/PaymentConfirmDialog.tsx` — handle the "already paid" case
-- When `remaining <= 0`:
-  - Show a green "Déjà entièrement payé" summary block instead of the radio choices.
-  - Default `paymentOption` to `"full"` with `paymentAmount = 0` so confirming just changes the status (no double payment, no debt creation).
-  - Hide the partial-payment option entirely.
-- When `remaining > 0`: keep today's UI (full vs partial radios).
-- Keep the existing summary card (Total / Déjà payé / Reste à payer) visible in both cases.
+When `remaining <= 0` (already paid): keep the green "Déjà entièrement payé" block exactly as it is — no input shown.
 
-### 3. `handlePaymentConfirm` in `Repairs.tsx`
-Already safe: if `paymentAmount = 0`, `newAmountPaid` stays the same and `debtAmount = 0` so no customer balance update is triggered. No change needed beyond confirming the toast wording works for the "0 received" path (we'll show "Statut mis à jour" instead of "Paiement enregistré" when amount is 0).
+### `handleConfirm` logic
+- `paymentAmount = clamp(Number(input), 0, remaining)`
+- `isFullPayment = paymentAmount >= remaining`
+- Pass `{ paymentAmount, isFullPayment }` to `onConfirm` — same shape as today, so `Repairs.tsx` needs no changes.
 
 ## Out of scope
-- No DB / RLS / hook changes.
-- No change to `in_progress` flow (still uses `StatusAssignDialog`).
-- No change to status dropdown UI itself.
+- No changes to `Repairs.tsx`, hooks, DB, or the `in_progress` flow.
+- No change to the "already paid" branch.

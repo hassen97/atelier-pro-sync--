@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertTriangle, CheckCircle2, Smartphone, User } from "lucide-react";
 import { useCurrency } from "@/hooks/useCurrency";
 import { type RepairStatus } from "./RepairStatusSelect";
@@ -21,28 +20,27 @@ interface PaymentConfirmDialogProps {
 }
 
 export function PaymentConfirmDialog({ open, onOpenChange, repair, pendingStatus, onConfirm, isLoading = false }: PaymentConfirmDialogProps) {
-  const [paymentOption, setPaymentOption] = useState<"full" | "partial">("full");
-  const [partialAmount, setPartialAmount] = useState("");
   const { format } = useCurrency();
-
   const remaining = repair ? Math.max(0, repair.total - repair.paid) : 0;
   const isAlreadyPaid = remaining <= 0;
   const hasCustomer = repair?.customer_id != null;
 
-  useEffect(() => { if (open) { setPaymentOption("full"); setPartialAmount(""); } }, [open]);
+  const [amountInput, setAmountInput] = useState("");
+
+  useEffect(() => {
+    if (open) setAmountInput(remaining > 0 ? String(remaining) : "0");
+  }, [open, remaining]);
+
+  const rawAmount = Number(amountInput) || 0;
+  const paymentAmount = Math.min(Math.max(0, rawAmount), remaining);
+  const debtAmount = Math.max(0, remaining - paymentAmount);
+  const isFullPayment = isAlreadyPaid || paymentAmount >= remaining;
+  const statusLabel = pendingStatus === "completed" ? "Terminé" : "Livré";
 
   const handleConfirm = () => {
     if (!repair) return;
-    const paymentAmount = isAlreadyPaid
-      ? 0
-      : paymentOption === "full"
-        ? remaining
-        : Math.min(Number(partialAmount) || 0, remaining);
-    onConfirm({ paymentAmount, isFullPayment: isAlreadyPaid || paymentOption === "full" });
+    onConfirm({ paymentAmount: isAlreadyPaid ? 0 : paymentAmount, isFullPayment });
   };
-
-  const debtAmount = paymentOption === "partial" ? remaining - (Number(partialAmount) || 0) : 0;
-  const statusLabel = pendingStatus === "completed" ? "Terminé" : "Livré";
 
   if (!repair) return null;
 
@@ -74,43 +72,46 @@ export function PaymentConfirmDialog({ open, onOpenChange, repair, pendingStatus
               </p>
             </div>
           ) : (
-            <>
-              <div className="space-y-3">
-                <Label>Comment souhaitez-vous procéder ?</Label>
-                <RadioGroup value={paymentOption} onValueChange={(value) => setPaymentOption(value as "full" | "partial")}>
-                  <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                    <RadioGroupItem value="full" id="full" className="mt-0.5" />
-                    <div className="space-y-1">
-                      <Label htmlFor="full" className="font-medium cursor-pointer">Marquer comme entièrement payé</Label>
-                      <p className="text-xs text-muted-foreground">Le client paie les {format(remaining)} restants</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                    <RadioGroupItem value="partial" id="partial" className="mt-0.5" />
-                    <div className="space-y-1 flex-1">
-                      <Label htmlFor="partial" className="font-medium cursor-pointer">Paiement partiel ou aucun paiement</Label>
-                      {paymentOption === "partial" && (
-                        <div className="space-y-2 mt-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-muted-foreground">Montant reçu:</span>
-                            <Input type="number" min="0" max={remaining} step="0.001" value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} placeholder="0.000" className="w-32" />
-                          </div>
-                          {debtAmount > 0 && <p className="text-xs text-warning">→ {format(debtAmount)} sera ajouté aux dettes du client</p>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </RadioGroup>
+            <div className="space-y-3">
+              <Label htmlFor="amount-received" className="text-base">Montant reçu du client</Label>
+              <Input
+                id="amount-received"
+                type="number"
+                min="0"
+                max={remaining}
+                step="0.001"
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value)}
+                className="h-12 text-lg font-semibold"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => setAmountInput(String(remaining))}>
+                  Payé intégralement ({format(remaining)})
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setAmountInput("0")}>
+                  Aucun paiement
+                </Button>
               </div>
 
-              {!hasCustomer && paymentOption === "partial" && debtAmount > 0 && (
+              {isFullPayment ? (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-success/10 border border-success/20">
+                  <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+                  <p className="text-sm text-success">Réparation entièrement payée.</p>
+                </div>
+              ) : paymentAmount > 0 ? (
+                <p className="text-xs text-warning">→ {format(debtAmount)} sera ajouté aux dettes du client</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Aucun paiement enregistré, {format(remaining)} restera en dette</p>
+              )}
+
+              {!hasCustomer && debtAmount > 0 && (
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
                   <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
                   <p className="text-xs text-warning">Aucun client associé à cette réparation. La dette de {format(debtAmount)} ne pourra pas être enregistrée.</p>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 
