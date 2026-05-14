@@ -302,18 +302,21 @@ export default function Repairs() {
         const wasAlreadyPaid = repair.paid >= repair.total && repair.total > 0;
         let paymentType: "full" | "partial" | "already_paid" | "none";
         let note: string;
-        if (wasAlreadyPaid) {
+        if (data.paymentAmount === 0 && wasAlreadyPaid) {
           paymentType = "already_paid";
           note = `Réparation déjà payée (statut: ${pendingStatus})`;
         } else if (data.paymentAmount === 0) {
           paymentType = "none";
-          note = `Aucun paiement reçu (statut: ${pendingStatus}, dette: ${debtAmount.toFixed(3)})`;
+          note = `Aucun paiement reçu (statut: ${pendingStatus}, dette: ${Math.max(0, debtAmount).toFixed(3)})`;
+        } else if (wasAlreadyPaid) {
+          paymentType = data.isFullPayment ? "full" : "partial";
+          note = `Paiement supplémentaire de ${data.paymentAmount.toFixed(3)} (statut: ${pendingStatus})`;
         } else if (data.isFullPayment) {
           paymentType = "full";
           note = `Paiement complet (statut: ${pendingStatus})`;
         } else {
           paymentType = "partial";
-          note = `Paiement partiel (statut: ${pendingStatus}, dette restante: ${debtAmount.toFixed(3)})`;
+          note = `Paiement partiel (statut: ${pendingStatus}, dette restante: ${Math.max(0, debtAmount).toFixed(3)})`;
         }
         const { data: { user } } = await supabase.auth.getUser();
         await supabase.from("repair_payments").insert({

@@ -1,31 +1,49 @@
 ## Goal
-Enregistrer **chaque** tentative de paiement dans `repair_payments`, même quand le montant reçu est `0`, avec un champ `payment_type` qui catégorise l'attempt (`full`, `partial`, `already_paid`, `none`) et la note descriptive existante.
+Permettre de saisir un montant payé par le client dans le dialogue "Confirmer le paiement" **même quand la réparation a un total de 0** (ou est déjà marquée comme payée). Aujourd'hui, dès que `remaining <= 0`, le champ de saisie est masqué et seul le bouton "Confirmer" apparaît — impossible d'enregistrer un paiement réel sur une réparation créée sans prix estimé.
 
-## 1. Migration DB — `repair_payments`
-- Ajouter une colonne `payment_type text NOT NULL DEFAULT 'none'`.
-- Ajouter une contrainte `CHECK (payment_type IN ('full','partial','already_paid','none'))`.
-- Pas de changement RLS (les policies actuelles couvrent déjà toutes les opérations).
+## 1. `src/components/repairs/PaymentConfirmDialog.tsx`
+
+### Changement principal
+Toujours afficher le champ "Montant reçu du client", quel que soit `remaining`.
+
+- Supprimer le branchement `isAlreadyPaid ? <bandeau success> : <champ saisie>`.
+- Afficher systématiquement :
+  - Le récap (Total / Déjà payé / Reste à payer) — inchangé.
+  - Un petit bandeau d'info (vert) **uniquement quand `remaining <= 0`** : "Cette réparation est déjà soldée. Vous pouvez tout de même enregistrer un paiement supplémentaire si nécessaire."
+  - Le `Label` + `Input` du montant reçu.
+  - Les deux boutons rapides :
+    - "Payé intégralement (`{remaining}`)" — désactivé si `remaining === 0`.
+    - "Aucun paiement" → met l'input à `"0"`.
+  - Le feedback dynamique sous le champ (paiement complet / dette restante / aucun paiement).
+
+### Logique de calcul à adapter
+- Retirer le plafonnement strict `Math.min(rawAmount, remaining)` qui force `paymentAmount = 0` quand `remaining = 0`.
+- Nouveau calcul :
+  - `paymentAmount = Math.max(0, rawAmount)` (plus de cap par `remaining`).
+  - `debtAmount = Math.max(0, remaining - paymentAmount)` (inchangé, reste 0 si trop-perçu).
+  - `isFullPayment = paymentAmount >= remaining` (couvre déjà le cas `remaining = 0` → toujours "complet").
+- Valeur initiale du champ à l'ouverture :
+  - Si `remaining > 0` → `String(remaining)` (comportement actuel).
+  - Sinon → `"0"` (l'utilisateur tape ce qu'il veut).
+- `handleConfirm` envoie `{ paymentAmount, isFullPayment }` directement, sans le forcer à 0 quand `isAlreadyPaid`.
+
+### Avertissement client absent
+La condition existante `!hasCustomer && debtAmount > 0` reste pertinente (uniquement utile si dette créée). Aucun changement.
 
 ## 2. `src/pages/Repairs.tsx` — `handlePaymentConfirm`
-Remplacer le bloc `if (data.paymentAmount > 0) { … insert … }` par un insert **inconditionnel** :
+La logique actuelle classifie déjà `payment_type` correctement à partir de `data.paymentAmount` et `data.isFullPayment`. Une seule petite mise à jour :
 
-- Calculer `paymentType` :
-  - `repair.paid >= repair.total` (déjà soldé avant ouverture du dialogue) → `'already_paid'`
-  - `data.paymentAmount === 0` → `'none'`
-  - `data.isFullPayment` (paie le restant complet) → `'full'`
-  - sinon → `'partial'`
-- Construire `note` lisible :
-  - `already_paid` → `"Réparation déjà payée (statut: {pendingStatus})"`
-  - `none` → `"Aucun paiement reçu (statut: {pendingStatus}, dette: {debtAmount})"`
-  - `full` → `"Paiement complet (statut: {pendingStatus})"`
-  - `partial` → `"Paiement partiel (statut: {pendingStatus}, dette restante: {debtAmount})"`
-- Insert systématique dans `repair_payments` avec `amount: data.paymentAmount` (peut être 0), `payment_type`, `note`, `customer_id`, `recorded_by`, `user_id`.
-- Le bloc `try/catch` reste pour ne pas casser la mise à jour si le log échoue.
+- Le label `'already_paid'` était attribué quand `repair.paid >= repair.total && repair.total > 0`. Ce cas reste valable **uniquement si `data.paymentAmount === 0`** (l'utilisateur n'a rien ajouté). Si l'utilisateur saisit un montant supplémentaire sur une réparation déjà soldée, on doit logger comme `'partial'` ou `'full'` normalement.
+- Nouvelle priorité de classification :
+  1. `data.paymentAmount === 0 && repair.paid >= repair.total && repair.total > 0` → `'already_paid'`
+  2. `data.paymentAmount === 0` → `'none'`
+  3. `data.isFullPayment` → `'full'`
+  4. sinon → `'partial'`
+- Notes : ajuster pour mentionner "paiement supplémentaire" quand `repair.paid >= repair.total && data.paymentAmount > 0`.
 
-## 3. Types Supabase
-Régénérés automatiquement après la migration — `payment_type` apparaîtra dans `Tables<"repair_payments">`.
+Aucun changement à la mise à jour de `repairs` (ajout normal à `amount_paid`), à la dette client (déjà conditionnée à `debtAmount > 0`), ni à la fidélité.
 
 ## Out of scope
-- Aucun changement à `PaymentConfirmDialog` (il continue d'envoyer `{ paymentAmount, isFullPayment }`).
-- Aucun changement à la logique de mise à jour de `repairs`, des dettes client, ou de la fidélité.
-- Pas d'écran d'historique des paiements (peut être ajouté plus tard).
+- Pas de changement DB / migration (le schéma supporte déjà tout).
+- Pas de modification du flux de changement de statut.
+- Pas d'écran d'historique.
