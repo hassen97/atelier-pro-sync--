@@ -9,6 +9,7 @@ import { useAdminServiceRequests, useUpdateServiceRequest, type AdminServiceRequ
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { MessageCircle, Phone, Search } from "lucide-react";
+import { KeyValueList } from "@/components/services/KeyValueList";
 
 const STATUS_BADGE: Record<AdminServiceRequest["status"], { label: string; cls: string }> = {
   pending:     { label: "En attente", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
