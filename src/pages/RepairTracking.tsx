@@ -603,11 +603,7 @@ export default function RepairTracking() {
           Propulsé par <span className="font-bold">AtelierProSync</span>
         </p>
       </div>
-    </div>
-  );
-}
-
-function DetailRow({
+    </main>
   label,
   value,
   highlight,
