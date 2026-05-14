@@ -32,14 +32,14 @@ export function PaymentConfirmDialog({ open, onOpenChange, repair, pendingStatus
   }, [open, remaining]);
 
   const rawAmount = Number(amountInput) || 0;
-  const paymentAmount = Math.min(Math.max(0, rawAmount), remaining);
+  const paymentAmount = Math.max(0, rawAmount);
   const debtAmount = Math.max(0, remaining - paymentAmount);
-  const isFullPayment = isAlreadyPaid || paymentAmount >= remaining;
+  const isFullPayment = paymentAmount >= remaining;
   const statusLabel = pendingStatus === "completed" ? "Terminé" : "Livré";
 
   const handleConfirm = () => {
     if (!repair) return;
-    onConfirm({ paymentAmount: isAlreadyPaid ? 0 : paymentAmount, isFullPayment });
+    onConfirm({ paymentAmount, isFullPayment });
   };
 
   if (!repair) return null;
