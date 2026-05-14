@@ -169,9 +169,20 @@ export function AdminServiceRequestsView() {
                 </div>
 
                 <div>
-                  <div className="text-xs text-slate-500 mb-1">Données envoyées</div>
-                  <pre className="rounded bg-white/5 border border-white/10 p-2 text-xs overflow-auto">{JSON.stringify(selected.input_data, null, 2)}</pre>
+                  <div className="text-xs text-slate-500 mb-1.5">Données envoyées</div>
+                  <div className="rounded bg-white/5 border border-white/10 p-3">
+                    <KeyValueList data={selected.input_data} />
+                  </div>
                 </div>
+
+                {selected.result_data && Object.keys(selected.result_data).length > 0 && (
+                  <div>
+                    <div className="text-xs text-slate-500 mb-1.5">Résultat actuel (vu par la boutique)</div>
+                    <div className="rounded bg-emerald-500/10 border border-emerald-500/30 p-3">
+                      <KeyValueList data={selected.result_data} />
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <div className="text-xs text-slate-500">Note admin (visible par la boutique)</div>
