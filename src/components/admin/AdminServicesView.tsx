@@ -13,12 +13,24 @@ export function AdminServicesView() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceRow | null>(null);
 
+  const activeCount = data.filter((s) => s.is_active).length;
+  const inactiveCount = data.length - activeCount;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Catalogue Services</h2>
-          <p className="text-xs text-slate-500 mt-0.5">FRP, KG, MDM bypass, location d'outils — gestion centrale.</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            FRP, KG, MDM bypass, location d'outils — gestion centrale.
+            {data.length > 0 && (
+              <span className="ml-2">
+                <span className="text-emerald-400">{activeCount} actif{activeCount > 1 ? "s" : ""}</span>
+                <span className="text-slate-600"> · </span>
+                <span className="text-slate-500">{inactiveCount} inactif{inactiveCount > 1 ? "s" : ""}</span>
+              </span>
+            )}
+          </p>
         </div>
         <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-[#00D4FF] hover:bg-[#00D4FF]/90 text-black">
           <Plus className="h-4 w-4 mr-1" /> Nouveau service
