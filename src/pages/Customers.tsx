@@ -66,6 +66,7 @@ export default function Customers() {
         <Button className="bg-gradient-primary hover:opacity-90" onClick={handleCreate}><Plus className="h-4 w-4 mr-2" />Nouveau client</Button>
       </PageHeader>
 
+      <h2 className="sr-only">Statistiques clients</h2>
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title="Total clients" value={totalCount} icon={User} variant="default" />
         <StatCard title="Clients avec crédit" value={customersWithDebts} icon={CreditCard} variant="warning" />
@@ -77,6 +78,7 @@ export default function Customers() {
         <Input placeholder="Rechercher par nom ou téléphone..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 max-w-md" />
       </div>
 
+      <h2 className="sr-only">Liste des clients</h2>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredCustomers.map((customer) => (
           <Card key={customer.id} className="hover:shadow-soft transition-shadow">
