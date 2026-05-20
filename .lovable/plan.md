@@ -1,73 +1,37 @@
-# Split the main bundle with manualChunks
+# Assouplir l'inscription : mots de passe faibles + email non requis
 
-## Goal
+## Problèmes constatés
 
-The main `index.js` chunk is ~680 kB (gzip 201 kB) because all eagerly-imported vendor libraries land in it. Splitting vendors into their own chunks reduces the size of any single asset uploaded during publish and helps the deploy pipeline succeed reliably. It also improves runtime caching (vendor chunks rarely change between deploys).
+1. **Mot de passe "faible" refusé à l'inscription** — la protection « Leaked Password » (HIBP) est activée côté backend, ce qui rejette tout mot de passe jugé compromis/faible.
+2. **« Email not confirmed » au login** — la confirmation d'email est obligatoire côté backend, alors que l'email est optionnel dans ce produit (auth par username).
 
-## Change
+## Changements proposés
 
-Edit `vite.config.ts` only. Add `build.rollupOptions.output.manualChunks` to group eagerly-loaded vendors into stable chunks, and bump `chunkSizeWarningLimit` to silence the cosmetic 500 kB warning.
+### 1. Backend — paramètres d'authentification
 
-```ts
-build: {
-  chunkSizeWarningLimit: 800,
-  rollupOptions: {
-    output: {
-      manualChunks(id) {
-        if (!id.includes("node_modules")) return;
-        if (id.includes("react-dom") || id.match(/node_modules\/react\//) || id.includes("scheduler")) {
-          return "vendor-react";
-        }
-        if (id.includes("react-router")) return "vendor-router";
-        if (id.includes("@radix-ui")) return "vendor-radix";
-        if (id.includes("@supabase")) return "vendor-supabase";
-        if (id.includes("@tanstack")) return "vendor-query";
-        if (id.includes("framer-motion")) return "vendor-motion";
-        if (id.includes("lucide-react")) return "vendor-icons";
-        if (id.includes("react-hook-form") || id.includes("@hookform") || id.includes("zod")) {
-          return "vendor-forms";
-        }
-        if (id.includes("date-fns")) return "vendor-date";
-        if (id.includes("sonner") || id.includes("vaul") || id.includes("cmdk") || id.includes("class-variance-authority") || id.includes("tailwind-merge") || id.includes("clsx")) {
-          return "vendor-ui";
-        }
-      },
-    },
-  },
-},
-```
+Modifier la configuration auth pour :
+- **Désactiver** la vérification HIBP (mots de passe faibles autorisés).
+- **Activer** l'auto-confirmation des emails (plus de blocage « Email not confirmed »).
+- Garder les inscriptions ouvertes et les comptes anonymes désactivés (inchangé).
 
-### Why these groups
+Effet : tout nouvel inscrit peut se connecter immédiatement, même avec un mot de passe simple, sans étape de vérification email.
 
-- **vendor-react**: react + react-dom + scheduler — required on first paint, stable across releases, big win for browser caching.
-- **vendor-router**: react-router-dom — loaded on every page, stable.
-- **vendor-radix**: all `@radix-ui/*` primitives — collectively ~150 kB.
-- **vendor-supabase**: the supabase client.
-- **vendor-query**: @tanstack/react-query.
-- **vendor-motion**: framer-motion (~100 kB).
-- **vendor-icons**: lucide-react — many icons, isolating helps cache.
-- **vendor-forms**: react-hook-form + @hookform/resolvers + zod.
-- **vendor-date**: date-fns.
-- **vendor-ui**: small UI helpers grouped together.
+### 2. Frontend — feedback utilisateur (optionnel mais recommandé)
 
-Libraries already lazy-loaded (`xlsx`, `jspdf`, `html2canvas`, `recharts`, `jsbarcode`, `qrcode`) keep their existing per-route chunks — not touched here.
+Sur le formulaire d'inscription (`src/pages/Auth.tsx`) :
+- Garder la règle minimale technique (≥ 6 caractères, déjà gérée par Supabase).
+- Afficher un petit indicateur visuel non bloquant si le mot de passe est court/simple, du style « Mot de passe faible — recommandé : 8+ caractères avec chiffres ». L'utilisateur peut quand même valider.
 
-## Expected impact
+Aucune autre logique métier n'est touchée.
 
-- `index.js` drops from ~680 kB → roughly ~150–200 kB.
-- Vendor chunks become ~50–150 kB each, cached separately, rarely re-downloaded on updates.
-- Smaller individual files → faster, more reliable publish uploads.
-- Initial page load: same number of bytes total (or slightly more due to chunk headers), but parallel fetched and cacheable across deploys.
+## Notes techniques
 
-## Out of scope
+- L'appel `supabase--configure_auth` couvre les deux corrections backend en une seule opération.
+- Les comptes déjà créés mais bloqués sur "email not confirmed" seront automatiquement confirmés à la prochaine connexion une fois l'auto-confirm activé (à confirmer ; sinon, un petit script SQL `UPDATE auth.users SET email_confirmed_at = now() WHERE email_confirmed_at IS NULL` peut être lancé via migration).
+- Aucun changement au flow de signup côté code (`AuthContext.signUp`) n'est nécessaire.
 
-- No PWA config changes (kept from previous step).
-- No removal/changing of existing lazy imports.
-- No code or business logic changes.
+## Sécurité
 
-## Verification
-
-1. Run a production build.
-2. Confirm `index.js` is significantly smaller and several `vendor-*.js` chunks appear.
-3. Smoke-check the preview loads (login page renders).
-4. Ask you to click Publish.
+Désactiver HIBP réduit la sécurité des comptes. Acceptable ici car :
+- Le produit cible des commerces avec auth par username interne (`@repairpro.local`), pas d'email réel exposé.
+- Les comptes admin restent protégés par d'autres mécanismes (rôles RLS, kill switch).
