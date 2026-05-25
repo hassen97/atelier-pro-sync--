@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { KeyRound, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo/SEO";
@@ -32,14 +32,12 @@ export default function Vault() {
       <PageHeader
         title="Coffre-fort de comptes"
         description="Identifiants iCloud, Google et Samsung de vos clients, sécurisés et liés à leur fiche."
-        icon={KeyRound}
-        action={
-          <Button onClick={openNew}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nouveau compte
-          </Button>
-        }
-      />
+      >
+        <Button onClick={openNew}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nouveau compte
+        </Button>
+      </PageHeader>
 
       <VaultTable search={search} onSearchChange={setSearch} onEdit={openEdit} />
 
