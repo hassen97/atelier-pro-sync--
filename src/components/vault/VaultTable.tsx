@@ -99,9 +99,16 @@ export function VaultTable({ search, onSearchChange, onEdit }: VaultTableProps) 
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
         <Input
+          type="search"
+          name="vault-search"
           placeholder="Rechercher (client, email, type)..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          inputMode="search"
           className="sm:max-w-sm"
         />
         <Button variant="outline" onClick={exportCsv}>
