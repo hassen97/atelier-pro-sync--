@@ -5,12 +5,17 @@ import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo/SEO";
 import { VaultTable } from "@/components/vault/VaultTable";
 import { VaultEntryDialog } from "@/components/vault/VaultEntryDialog";
-import type { VaultEntry } from "@/hooks/useCustomerVault";
+import { useVaultEntries, type VaultEntry } from "@/hooks/useCustomerVault";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffectiveUserId } from "@/hooks/useTeam";
 
 export default function Vault() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<VaultEntry | null>(null);
+  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
+  const { data: entries = [] } = useVaultEntries();
 
   const openNew = () => {
     setEditing(null);
