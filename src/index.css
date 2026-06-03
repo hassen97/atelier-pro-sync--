@@ -1,8 +1,8 @@
 /* Fonts loaded via index.html with non-blocking strategy */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@config "../tailwind.config.ts";
 
 /* RepairPro Tunisia - Design System
    Professional phone repair shop management
