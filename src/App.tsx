@@ -12,6 +12,7 @@ import { BrandThemeProvider } from "@/contexts/BrandThemeContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 function lazyWithRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
   return lazy(() =>
@@ -146,6 +147,7 @@ const App = () => (
             </Suspense>
           </ImpersonationProvider>
         </BrowserRouter>
+        <SpeedInsights />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
