@@ -12,6 +12,7 @@ import { BrandThemeProvider } from "@/contexts/BrandThemeContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { PointerEventsWatchdog } from "@/components/system/PointerEventsWatchdog";
 
 function lazyWithRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
   return lazy(() =>
@@ -78,6 +79,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
+        <PointerEventsWatchdog />
         <Toaster />
         <Sonner />
         <BrowserRouter>

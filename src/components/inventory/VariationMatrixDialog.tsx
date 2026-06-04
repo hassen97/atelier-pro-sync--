@@ -238,7 +238,9 @@ export function VariationMatrixDialog({ open, onOpenChange, onSaved }: Variation
                       <TableCell className="font-medium text-sm">{row.name}</TableCell>
                       <TableCell>
                         <Input
-                          ref={(el) => (barcodeRefs.current[index] = el)}
+                          ref={(el) => {
+                            barcodeRefs.current[index] = el;
+                          }}
                           placeholder="Scanner..."
                           value={row.barcode}
                           onChange={(e) => updateRow(index, "barcode", e.target.value)}
