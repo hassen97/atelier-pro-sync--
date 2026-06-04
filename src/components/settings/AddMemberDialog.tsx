@@ -57,7 +57,7 @@ export function AddMemberDialog({ disabled, disabledReason }: { disabled?: boole
 
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
   const [checkedUsername, setCheckedUsername] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const latestUsernameRef = useRef("");
 
   const { user } = useAuth();

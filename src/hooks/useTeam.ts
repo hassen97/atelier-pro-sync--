@@ -42,7 +42,6 @@ export const ALL_PAGES = [
   { href: "/repairs", label: "Réparations" },
   { href: "/inventory", label: "Stock" },
   { href: "/customers", label: "Clients" },
-  { href: "/vault", label: "Coffre-fort comptes" },
   { href: "/suppliers", label: "Fournisseurs" },
   { href: "/expenses", label: "Dépenses" },
   { href: "/customer-debts", label: "Dettes Clients" },

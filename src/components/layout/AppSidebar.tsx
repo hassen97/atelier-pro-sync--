@@ -21,7 +21,6 @@ import {
   Users2,
   MessageCircle,
   Cloud,
-  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -43,7 +42,6 @@ const navigation = [
   { nameKey: "nav.repairs" as const, href: "/repairs", icon: Wrench },
   { nameKey: "nav.inventory" as const, href: "/inventory", icon: Package },
   { nameKey: "nav.customers" as const, href: "/customers", icon: Users },
-  { nameKey: "nav.customers" as const, href: "/vault", icon: KeyRound, labelOverride: "Coffre-fort" },
   { nameKey: "nav.suppliers" as const, href: "/suppliers", icon: Truck },
   { nameKey: "nav.expenses" as const, href: "/expenses", icon: Receipt },
   { nameKey: "nav.debts" as const, href: "/customer-debts", icon: CreditCard },
@@ -86,10 +84,10 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
     return location.pathname.startsWith(path);
   };
 
-  const NavItem = ({ item }: { item: { nameKey: string; href: string; icon: any; labelOverride?: string } }) => {
+  const NavItem = ({ item }: { item: { nameKey: string; href: string; icon: any } }) => {
     const active = isActive(item.href);
     const Icon = item.icon;
-    const name = item.labelOverride ?? t(item.nameKey as any);
+    const name = t(item.nameKey as any);
     const hasUnread = item.href === "/messages" && unreadCount > 0;
 
     const linkContent = (
