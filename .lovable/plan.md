@@ -1,64 +1,37 @@
-## Goal
-Upgrade React, Vite, and Tailwind CSS to their latest major versions and fix everything that breaks, then verify the app still builds, tests pass, and the preview renders.
+## Problem
 
-## ⚠️ Important risk note
-The Lovable build/preview harness officially targets **React 18 + Vite 5 + Tailwind 3**. Going to React 19 / Vite 8 / Tailwind 4 are three simultaneous *major* upgrades with breaking changes. I confirmed the core Lovable plugins still allow it:
-- `lovable-tagger@1.3.0` → supports `vite >=5 <9` ✅ (but internally depends on Tailwind 3, so a nested v3 will coexist — harmless)
-- `@vitejs/plugin-react-swc` → needs bump to `^4` for Vite 8
-- `vite-plugin-pwa@1.3.0` → supports Vite 8 ✅
-- Node is `v22.22` ✅ (Vite 8 needs ≥20.19/22.12)
+After the React 19 / Vite 8 / Tailwind 4 upgrade, three symptoms appear, all coming from **one root cause**:
 
-Even so, Tailwind 4 is the highest-risk piece (new engine + import syntax). If the preview breaks badly after Tailwind 4, the fallback is to keep Tailwind 3 and ship only React 19 + Vite 8. I'll surface this if it happens.
+1. After clicking a button (especially anything that opens a dropdown, dialog, select, or the customer search popover), the whole page becomes unclickable until you refresh.
+2. New repairs can't be saved.
+3. New repairs get saved with "anonymous customer".
 
-## Target versions
-| Package | From | To |
-|---|---|---|
-| react / react-dom | 18.3.1 | ^19.2 |
-| @types/react / @types/react-dom | 18.x | ^19 |
-| vite | 5.4.19 | ^8 |
-| @vitejs/plugin-react-swc | 3.11 | ^4 |
-| tailwindcss | 3.4.17 | ^4.3 |
-| @tailwindcss/postcss | — | ^4.3 (new) |
-| tailwindcss-animate | 1.0.7 | replaced by `tw-animate-css` |
+### Root cause
 
-## Plan
+React 19 exposed a well-known incompatibility in the overlay libraries used by every menu/dialog/popover in the app:
 
-### Phase 1 — Vite 8 + React 19 (lower risk)
-1. Bump `vite@^8`, `@vitejs/plugin-react-swc@^4`, `vite-plugin-pwa@^1.3`.
-2. Bump `react@^19`, `react-dom@^19`, `@types/react@^19`, `@types/react-dom@^19`.
-3. Reinstall and resolve peer-dependency warnings. Watch specifically:
-   - `react-helmet-async` (React 19 compatibility — may need a patch or swap to `react-helmet-async`'s maintained fork if it errors).
-   - Radix UI, `framer-motion`, `react-day-picker`, `cmdk`, `vaul`, `sonner` — all recent, expected fine.
-4. Fix any React 19 breakages (removed `propTypes`/`defaultProps` on function components, stricter ref typing). The codebase uses `forwardRef` (e.g. `button.tsx`) which stays valid in 19.
-5. `vite.config.ts` — no API changes expected; verify the PWA + manualChunks config still loads under Vite 8.
+- **Radix UI** overlays (Dialog, DropdownMenu, Select, Popover) and **vaul** (the Drawer, currently `0.9.9`, which predates React 19) leave a `pointer-events: none` style stuck on the page `<body>` when they close. Once it's stuck, **no button anywhere is clickable** until a refresh. This is the "page freezes" symptom.
+- In the New Repair form, the customer picker is a Radix Popover. When you pick a customer, the popover closes and freezes the page — so the chosen customer often doesn't get committed (→ "anonymous customer") and the "Créer" button can no longer be clicked (→ "can't add repair"). All three reports are the same bug.
 
-### Phase 2 — Tailwind CSS 4 (high risk)
-6. Install `tailwindcss@^4` + `@tailwindcss/postcss@^4`; remove `tailwindcss-animate`, add `tw-animate-css` (the v4-native replacement).
-7. `postcss.config.js` — replace the `tailwindcss: {}` plugin with `'@tailwindcss/postcss': {}` (autoprefixer becomes optional; Tailwind 4 includes it).
-8. `src/index.css`:
-   - Replace `@tailwind base; @tailwind components; @tailwind utilities;` with `@import "tailwindcss";`.
-   - Keep the existing design system with the least churn by adding `@config "../tailwind.config.ts";` so the current `tailwind.config.ts` tokens/colors keep working (Tailwind 4 still supports JS config via `@config`).
-   - Swap the `tailwindcss-animate` import path for `tw-animate-css` and update the `@layer base`/`@layer utilities` blocks as needed (Tailwind 4 keeps `@layer` but a few utilities changed names).
-9. `tailwind.config.ts` — keep as the JS config referenced by `@config`. The `@tailwindcss/typography` plugin reference stays; `require("tailwindcss-animate")` is removed (now handled in CSS).
-10. Address known Tailwind 4 class renames if they appear (e.g. `shadow-sm`→`shadow-xs`, `outline-none`→`outline-hidden`, default border color change). I'll grep the codebase for affected utilities and fix only real breakages.
+## Fix
 
-### Phase 3 — Verification
-11. Run the build (harness auto-builds) and read sandbox dev-server logs for errors.
-12. Run the test suite (`vitest run`) — existing tests must pass.
-13. Open the preview, check console/runtime errors, and visually verify a few key pages (Dashboard, POS, Vault, Auth) for broken styling — Tailwind 4 issues show up as missing/incorrect styles.
-14. Fix any regressions found, re-verify until clean.
+1. **Upgrade `vaul`** from `0.9.9` to a React 19-compatible version (`^1.1.2`). The Drawer markup is compatible; no API changes needed in `drawer.tsx`.
 
-## Technical details / files touched
-- `package.json` — version bumps + dependency swap (`tailwindcss-animate` → `tw-animate-css`).
-- `postcss.config.js` — new Tailwind 4 PostCSS plugin.
-- `src/index.css` — import syntax, `@config`, animate import.
-- `tailwind.config.ts` — drop the animate plugin require.
-- `vite.config.ts` — only if Vite 8 surfaces an API change (none expected).
-- Component fixes only where React 19 / Tailwind 4 actually break them — kept minimal.
+2. **Add a global pointer-events watchdog** mounted once at the app root: a tiny effect that watches `document.body` and removes a stray inline `pointer-events: none` shortly after any overlay closes. This is the standard, low-risk safeguard for the Radix + React 19 lock and protects every dialog/menu/select/popover in the app at once, not just the repair form.
 
-## Out of scope
-- No feature/behavior changes, no design redesign, no backend/edge-function/Supabase changes.
-- Untouched: `src/integrations/supabase/*`, the Returns/RMA module, business logic.
+3. **Harden the customer value handling** in the repair create path so a selected customer is reliably saved and an empty selection is sent as `null` (not `""`), matching the existing FK guideline (empty string must be `undefined`/`null` for foreign keys). This guarantees no more accidental "anonymous customer" even if a UI race occurs.
 
-## Rollback
-If Tailwind 4 destabilizes the preview, revert just the Tailwind changes (Phase 2) and keep React 19 + Vite 8.
+## Verification
+
+After the changes I will test in the live preview (you need to stay logged in):
+- Open the mobile menu, dropdowns, and the user menu repeatedly → confirm buttons stay clickable, no freeze.
+- Open **New Repair**, pick a customer from the search popover, fill the device, and save → confirm it saves with the correct customer (not anonymous).
+- Add a new **client** from the Clients page and from the quick-add inside the repair form.
+- Smoke-test the other main pages (dashboard, vault, inventory, POS, invoices) for the freeze and console errors.
+
+If anything still misbehaves after the dependency fix, I'll reproduce it in the browser and apply targeted follow-ups.
+
+## Technical notes
+
+- Files likely touched: `package.json` (vaul bump), a new small `src/components/system/PointerEventsWatchdog.tsx` (or a hook) wired into `App.tsx`, and `src/hooks/useRepairs.ts` / `RepairDialog` submit mapping for the customer FK normalization.
+- No database, RLS, or business-logic changes. Frozen modules (Returns/RMA) untouched.
