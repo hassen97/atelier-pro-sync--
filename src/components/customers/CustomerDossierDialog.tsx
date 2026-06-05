@@ -107,7 +107,7 @@ export function CustomerDossierDialog({ customer, open, onOpenChange }: Customer
           </div>
         ) : (
           <Tabs defaultValue="repairs" className="mt-2">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="repairs">
                 <Wrench className="h-3.5 w-3.5 mr-1" />
                 <span className="hidden sm:inline">Rép. </span>({repairs.length})
@@ -123,6 +123,10 @@ export function CustomerDossierDialog({ customer, open, onOpenChange }: Customer
               <TabsTrigger value="loyalty">
                 <Sparkles className="h-3.5 w-3.5 mr-1" />
                 Fidélité
+              </TabsTrigger>
+              <TabsTrigger value="vault">
+                <KeyRound className="h-3.5 w-3.5 mr-1" />
+                Coffre
               </TabsTrigger>
             </TabsList>
 
