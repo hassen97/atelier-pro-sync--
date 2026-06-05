@@ -1,73 +1,42 @@
-# Split the main bundle with manualChunks
+# Customer Credentials Vault + Thermal Printing
 
 ## Goal
+Bring back the ability for shop owners to store customer account credentials (iCloud, Gmail, etc.) per customer, and print a **single selected credential** on the thermal printer.
 
-The main `index.js` chunk is ~680 kB (gzip 201 kB) because all eagerly-imported vendor libraries land in it. Splitting vendors into their own chunks reduces the size of any single asset uploaded during publish and helps the deploy pipeline succeed reliably. It also improves runtime caching (vendor chunks rarely change between deploys).
+## Important finding
+The `customer_vault` table already exists in the database (with 2 rows and full access rules), but there is currently **no UI anywhere in the app** to add, view, or print these credentials — it was removed previously. So this work rebuilds the vault tab as well as adds the print button.
 
-## Change
+## Where it lives
+A new **"Coffre-fort"** tab inside the Customer Dossier dialog (`src/components/customers/CustomerDossierDialog.tsx`), next to Réparations / Achats / Garanties / Fidélité.
 
-Edit `vite.config.ts` only. Add `build.rollupOptions.output.manualChunks` to group eagerly-loaded vendors into stable chunks, and bump `chunkSizeWarningLimit` to silence the cosmetic 500 kB warning.
+## What gets built
 
-```ts
-build: {
-  chunkSizeWarningLimit: 800,
-  rollupOptions: {
-    output: {
-      manualChunks(id) {
-        if (!id.includes("node_modules")) return;
-        if (id.includes("react-dom") || id.match(/node_modules\/react\//) || id.includes("scheduler")) {
-          return "vendor-react";
-        }
-        if (id.includes("react-router")) return "vendor-router";
-        if (id.includes("@radix-ui")) return "vendor-radix";
-        if (id.includes("@supabase")) return "vendor-supabase";
-        if (id.includes("@tanstack")) return "vendor-query";
-        if (id.includes("framer-motion")) return "vendor-motion";
-        if (id.includes("lucide-react")) return "vendor-icons";
-        if (id.includes("react-hook-form") || id.includes("@hookform") || id.includes("zod")) {
-          return "vendor-forms";
-        }
-        if (id.includes("date-fns")) return "vendor-date";
-        if (id.includes("sonner") || id.includes("vaul") || id.includes("cmdk") || id.includes("class-variance-authority") || id.includes("tailwind-merge") || id.includes("clsx")) {
-          return "vendor-ui";
-        }
-      },
-    },
-  },
-},
-```
+### 1. Data hook — `src/hooks/useCustomerVault.ts`
+- `useCustomerVault(customerId)` — reads credentials for a customer (scoped via `useEffectiveUserId`, ordered newest first).
+- `useAddVaultCredential()` — inserts a new credential.
+- `useUpdateVaultCredential()` — edits an existing one.
+- `useDeleteVaultCredential()` — removes one.
+- Each entry uses the existing columns: `account_type`, `email_id`, `password`.
+- React Query invalidation on the `["customer-vault", customerId]` key, toast feedback (French), following the existing `useCustomers` patterns.
 
-### Why these groups
+### 2. Vault tab UI (in Customer Dossier dialog)
+- Tabs list grows from 4 to 5 columns; new tab labeled "Coffre".
+- Lists saved credentials as cards: account type, email/identifiant, and password (password masked by default with a show/hide eye toggle).
+- "Ajouter" form: account type (free text — iCloud, Gmail, etc.), email/ID, password.
+- Per-card actions: copy email, copy password, edit, delete, and a **Imprimer** (printer icon) button that prints that single credential.
+- A small confirmation before delete.
 
-- **vendor-react**: react + react-dom + scheduler — required on first paint, stable across releases, big win for browser caching.
-- **vendor-router**: react-router-dom — loaded on every page, stable.
-- **vendor-radix**: all `@radix-ui/*` primitives — collectively ~150 kB.
-- **vendor-supabase**: the supabase client.
-- **vendor-query**: @tanstack/react-query.
-- **vendor-motion**: framer-motion (~100 kB).
-- **vendor-icons**: lucide-react — many icons, isolating helps cache.
-- **vendor-forms**: react-hook-form + @hookform/resolvers + zod.
-- **vendor-date**: date-fns.
-- **vendor-ui**: small UI helpers grouped together.
+### 3. Thermal print function — `src/lib/receiptPdf.ts`
+- New exported `generateCredentialSlip(...)` mirroring `generatePhoneLabel`.
+- Prints a single credential slip containing: shop name header, customer name, then the selected credential's account type, email/identifiant, and password. (Account-type/email/password only for the credential body, per your choice of "single selected credential".)
+- Uses the existing `getThermalPrintCss` + `printThermalHtml` helpers, supports 80mm/58mm widths.
+- Print button in the vault card calls this with the shop name from `useShopSettingsContext`.
 
-Libraries already lazy-loaded (`xlsx`, `jspdf`, `html2canvas`, `recharts`, `jsbarcode`, `qrcode`) keep their existing per-route chunks — not touched here.
+## Notes / decisions to confirm during build
+- Credentials are sensitive: passwords are masked in the UI by default and only revealed on demand. They are printed in plain text on the slip (that is the point of the feature).
+- No database migration is needed — the table and access rules already exist.
 
-## Expected impact
-
-- `index.js` drops from ~680 kB → roughly ~150–200 kB.
-- Vendor chunks become ~50–150 kB each, cached separately, rarely re-downloaded on updates.
-- Smaller individual files → faster, more reliable publish uploads.
-- Initial page load: same number of bytes total (or slightly more due to chunk headers), but parallel fetched and cacheable across deploys.
-
-## Out of scope
-
-- No PWA config changes (kept from previous step).
-- No removal/changing of existing lazy imports.
-- No code or business logic changes.
-
-## Verification
-
-1. Run a production build.
-2. Confirm `index.js` is significantly smaller and several `vendor-*.js` chunks appear.
-3. Smoke-check the preview loads (login page renders).
-4. Ask you to click Publish.
+## Technical summary
+- New file: `src/hooks/useCustomerVault.ts`
+- Edit: `src/components/customers/CustomerDossierDialog.tsx` (add 5th tab + vault UI + print wiring)
+- Edit: `src/lib/receiptPdf.ts` (add `generateCredentialSlip`)
