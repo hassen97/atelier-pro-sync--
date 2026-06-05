@@ -254,6 +254,10 @@ export function CustomerDossierDialog({ customer, open, onOpenChange }: Customer
                 )}
               </div>
             </TabsContent>
+
+            <TabsContent value="vault" className="max-h-[400px] overflow-y-auto mt-3">
+              <VaultTab customer={customer} shopName={settings.shop_name} />
+            </TabsContent>
           </Tabs>
         )}
       </DialogContent>
