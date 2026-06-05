@@ -7,11 +7,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wrench, ShoppingCart, Shield, Phone, Mail, MapPin, DollarSign, Sparkles, Plus, Minus } from "lucide-react";
+import { Wrench, ShoppingCart, Shield, Phone, Mail, MapPin, DollarSign, Sparkles, Plus, Minus, KeyRound, Eye, EyeOff, Copy, Printer, Pencil, Trash2, Save, X } from "lucide-react";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useCustomerHistory } from "@/hooks/useCustomerHistory";
 import { useLoyaltyTransactions, useAdjustLoyaltyPoints } from "@/hooks/useLoyalty";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
+import { useCustomerVault, useAddVaultCredential, useUpdateVaultCredential, useDeleteVaultCredential, type VaultCredential } from "@/hooks/useCustomerVault";
+import { generateCredentialSlip } from "@/lib/receiptPdf";
+import { toast } from "sonner";
 import type { Customer } from "@/hooks/useCustomers";
 
 interface CustomerDossierDialogProps {
