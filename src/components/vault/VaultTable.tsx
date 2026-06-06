@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Copy, Download, Eye, EyeOff, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Copy, Download, Eye, EyeOff, MoreHorizontal, Pencil, Printer, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -28,6 +28,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useDeleteVaultEntry, useVaultEntries, type VaultEntry } from "@/hooks/useCustomerVault";
+import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
+import { printVaultCredential } from "@/lib/receiptPdf";
 import { toast } from "sonner";
 
 const TYPE_LABELS: Record<string, string> = {
