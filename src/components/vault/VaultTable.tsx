@@ -47,8 +47,23 @@ interface VaultTableProps {
 export function VaultTable({ search, onSearchChange, onEdit }: VaultTableProps) {
   const { data: entries = [], isLoading } = useVaultEntries();
   const deleteEntry = useDeleteVaultEntry();
+  const { settings } = useShopSettingsContext();
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [confirmDelete, setConfirmDelete] = useState<VaultEntry | null>(null);
+
+  const handlePrint = (entry: VaultEntry) => {
+    printVaultCredential(
+      {
+        customer: entry.customers?.name ?? "Client supprimé",
+        phone: entry.customers?.phone ?? undefined,
+        accountType: TYPE_LABELS[entry.account_type] ?? entry.account_type,
+        emailId: entry.email_id,
+        password: entry.password,
+        createdAt: new Date(entry.created_at).toLocaleDateString("fr-FR"),
+      },
+      settings.shop_name,
+    );
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
