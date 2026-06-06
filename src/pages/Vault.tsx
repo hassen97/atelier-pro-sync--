@@ -25,12 +25,12 @@ export default function Vault() {
   return (
     <div className="space-y-6">
       <SEO
-        title="Coffre-fort de comptes — RepairPro"
+        title="Accounts — RepairPro"
         description="Enregistrez en toute sécurité les identifiants iCloud, Google et Samsung de vos clients."
         path="/vault"
       />
       <PageHeader
-        title="Coffre-fort de comptes"
+        title="Accounts"
         description="Identifiants iCloud, Google et Samsung de vos clients, sécurisés et liés à leur fiche."
       >
         <Button onClick={openNew}>
