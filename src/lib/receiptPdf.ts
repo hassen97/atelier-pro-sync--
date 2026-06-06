@@ -437,3 +437,56 @@ ${data.repairedBy ? `<p class="field"><span class="bold">Tech:</span> ${escHtml(
 
   printThermalHtml(html, "width=350,height=400");
 }
+
+// ── Vault Credential (client saved account: iCloud / Google / Samsung) ──
+
+export interface VaultCredentialData {
+  customer: string;
+  phone?: string;
+  accountType: string; // already-localized label, e.g. "iCloud"
+  emailId: string;
+  password: string;
+  createdAt: string; // formatted date
+}
+
+export function printVaultCredential(
+  data: VaultCredentialData,
+  shopName: string,
+  printerWidth: "80mm" | "58mm" = "80mm"
+) {
+  const pageW = printerWidth === "80mm" ? "72mm" : "48mm";
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Identifiants client</title>
+<style>
+  ${getThermalPrintCss(pageW, "12px")}
+  .shop { font-size: 14px; font-weight: bold; text-align: center; }
+  .title { font-size: 11px; font-weight: bold; text-align: center; letter-spacing: 1px; margin: 2px 0 4px; }
+  .field { font-size: 12px; margin: 2px 0; word-break: break-all; }
+  .pass { font-size: 13px; margin: 3px 0; word-break: break-all; }
+  .footer { font-size: 9px; text-align: center; margin-top: 6px; }
+</style>
+</head>
+<body class="thermal-print-root"><main class="thermal-print-container">
+
+<p class="shop">${escHtml(shopName)}</p>
+<p class="title">IDENTIFIANTS DU COMPTE</p>
+<div class="sep"></div>
+<p class="field"><span class="bold">Client:</span> ${escHtml(data.customer)}</p>
+${data.phone ? `<p class="field"><span class="bold">Tél:</span> ${escHtml(data.phone)}</p>` : ""}
+<p class="field"><span class="bold">Type:</span> ${escHtml(data.accountType)}</p>
+<div class="sep"></div>
+<p class="field"><span class="bold">Email / ID:</span> ${escHtml(data.emailId)}</p>
+<p class="pass"><span class="bold">Mot de passe:</span> ${escHtml(data.password)}</p>
+<div class="sep"></div>
+<p class="field"><span class="bold">Créé le:</span> ${escHtml(data.createdAt)}</p>
+<p class="footer">Conservez ces informations en lieu sûr.</p>
+
+</main></body>
+</html>`;
+
+  printThermalHtml(html, "width=350,height=450");
+}

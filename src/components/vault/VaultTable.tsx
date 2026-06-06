@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Copy, Download, Eye, EyeOff, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Copy, Download, Eye, EyeOff, MoreHorizontal, Pencil, Printer, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -28,6 +28,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useDeleteVaultEntry, useVaultEntries, type VaultEntry } from "@/hooks/useCustomerVault";
+import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
+import { printVaultCredential } from "@/lib/receiptPdf";
 import { toast } from "sonner";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -45,8 +47,23 @@ interface VaultTableProps {
 export function VaultTable({ search, onSearchChange, onEdit }: VaultTableProps) {
   const { data: entries = [], isLoading } = useVaultEntries();
   const deleteEntry = useDeleteVaultEntry();
+  const { settings } = useShopSettingsContext();
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [confirmDelete, setConfirmDelete] = useState<VaultEntry | null>(null);
+
+  const handlePrint = (entry: VaultEntry) => {
+    printVaultCredential(
+      {
+        customer: entry.customers?.name ?? "Client supprimé",
+        phone: entry.customers?.phone ?? undefined,
+        accountType: TYPE_LABELS[entry.account_type] ?? entry.account_type,
+        emailId: entry.email_id,
+        password: entry.password,
+        createdAt: new Date(entry.created_at).toLocaleDateString("fr-FR"),
+      },
+      settings.shop_name,
+    );
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -228,6 +245,10 @@ export function VaultTable({ search, onSearchChange, onEdit }: VaultTableProps) 
                           <DropdownMenuItem onClick={() => onEdit(entry)}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Modifier
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handlePrint(entry)}>
+                            <Printer className="h-4 w-4 mr-2" />
+                            Imprimer
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setConfirmDelete(entry)}
