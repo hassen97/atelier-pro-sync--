@@ -246,6 +246,10 @@ export function VaultTable({ search, onSearchChange, onEdit }: VaultTableProps) 
                             <Pencil className="h-4 w-4 mr-2" />
                             Modifier
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handlePrint(entry)}>
+                            <Printer className="h-4 w-4 mr-2" />
+                            Imprimer
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setConfirmDelete(entry)}
                             className="text-destructive focus:text-destructive"
