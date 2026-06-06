@@ -2,103 +2,125 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffectiveUserId } from "@/hooks/useTeam";
 import { toast } from "sonner";
-import type { Tables } from "@/integrations/supabase/types";
 
-export type VaultCredential = Tables<"customer_vault">;
+export type VaultAccountType = "icloud" | "google" | "samsung";
 
-export interface VaultCredentialInput {
-  account_type: string;
+export interface VaultEntry {
+  id: string;
+  user_id: string;
+  customer_id: string;
+  account_type: VaultAccountType;
+  email_id: string;
+  password: string;
+  created_at: string;
+  updated_at: string;
+  customers?: {
+    id: string;
+    name: string;
+    phone: string | null;
+  } | null;
+}
+
+export interface VaultEntryInput {
+  customer_id: string;
+  account_type: VaultAccountType;
   email_id: string;
   password: string;
 }
 
-/** Credentials stored for a given customer (iCloud, Gmail, etc.). */
-export function useCustomerVault(customerId?: string) {
+export function useVaultEntries() {
   const effectiveUserId = useEffectiveUserId();
 
   return useQuery({
-    queryKey: ["customer-vault", customerId],
+    queryKey: ["customer-vault", effectiveUserId],
     queryFn: async () => {
-      if (!customerId) return [] as VaultCredential[];
+      if (!effectiveUserId) return [] as VaultEntry[];
       const { data, error } = await supabase
-        .from("customer_vault")
-        .select("*")
-        .eq("customer_id", customerId)
+        .from("customer_vault" as any)
+        .select(
+          "id, user_id, customer_id, account_type, email_id, password, created_at, updated_at, customers:customer_id(id, name, phone)"
+        )
+        .eq("user_id", effectiveUserId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as VaultEntry[];
     },
-    enabled: !!customerId && !!effectiveUserId,
+    enabled: !!effectiveUserId,
   });
 }
 
-export function useAddVaultCredential() {
-  const queryClient = useQueryClient();
+export function useCreateVaultEntry() {
+  const qc = useQueryClient();
   const effectiveUserId = useEffectiveUserId();
 
   return useMutation({
-    mutationFn: async ({ customerId, input }: { customerId: string; input: VaultCredentialInput }) => {
-      if (!effectiveUserId) throw new Error("Utilisateur introuvable");
+    mutationFn: async (input: VaultEntryInput) => {
+      if (!effectiveUserId) throw new Error("Non authentifié");
       const { data, error } = await supabase
-        .from("customer_vault")
-        .insert({
-          user_id: effectiveUserId,
-          customer_id: customerId,
-          account_type: input.account_type,
-          email_id: input.email_id,
-          password: input.password,
-        })
+        .from("customer_vault" as any)
+        .insert({ ...input, user_id: effectiveUserId })
         .select()
         .single();
       if (error) throw error;
       return data;
     },
-    onSuccess: (_data, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["customer-vault", vars.customerId] });
-      toast.success("Identifiant ajouté");
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customer-vault"] });
+      toast.success("Compte ajouté au coffre-fort");
     },
-    onError: () => toast.error("Erreur lors de l'ajout de l'identifiant"),
+    onError: (e: any) => {
+      console.error(e);
+      toast.error("Erreur lors de l'ajout");
+    },
   });
 }
 
-export function useUpdateVaultCredential() {
-  const queryClient = useQueryClient();
-
+export function useUpdateVaultEntry() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, input }: { id: string; customerId: string; input: VaultCredentialInput }) => {
+    mutationFn: async ({ id, ...updates }: Partial<VaultEntryInput> & { id: string }) => {
       const { data, error } = await supabase
-        .from("customer_vault")
-        .update({
-          account_type: input.account_type,
-          email_id: input.email_id,
-          password: input.password,
-        })
+        .from("customer_vault" as any)
+        .update(updates)
         .eq("id", id)
         .select()
         .single();
       if (error) throw error;
       return data;
     },
-    onSuccess: (_data, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["customer-vault", vars.customerId] });
-      toast.success("Identifiant mis à jour");
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customer-vault"] });
+      toast.success("Compte mis à jour");
     },
     onError: () => toast.error("Erreur lors de la mise à jour"),
   });
 }
 
-export function useDeleteVaultCredential() {
-  const queryClient = useQueryClient();
-
+export function useDeleteVaultEntry() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id }: { id: string; customerId: string }) => {
-      const { error } = await supabase.from("customer_vault").delete().eq("id", id);
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("customer_vault" as any).delete().eq("id", id);
       if (error) throw error;
+      return id;
     },
-    onSuccess: (_data, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["customer-vault", vars.customerId] });
-      toast.success("Identifiant supprimé");
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customer-vault"] });
+      toast.success("Entrée supprimée");
     },
     onError: () => toast.error("Erreur lors de la suppression"),
   });
+}
+
+/** Generate a strong password like "Apple2026!xyz". */
+export function generateStrongPassword(): string {
+  const words = ["Apple", "Cloud", "Pixel", "Samsung", "Galaxy", "Heaven", "Repair", "Vault", "Secure", "Mobile"];
+  const symbols = "!@#$%&*?";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const word = words[Math.floor(Math.random() * words.length)];
+  const year = String(2024 + Math.floor(Math.random() * 5));
+  const sym = symbols[Math.floor(Math.random() * symbols.length)];
+  let suffix = "";
+  for (let i = 0; i < 3; i++) suffix += lower[Math.floor(Math.random() * lower.length)];
+  return `${word}${year}${sym}${suffix}`;
 }

@@ -52,6 +52,7 @@ const MessagesPage = lazyWithRetry(() => import("./pages/Messages"));
 const OnboardingSetup = lazyWithRetry(() => import("./pages/OnboardingSetup"));
 const Team = lazyWithRetry(() => import("./pages/Team"));
 const Services = lazyWithRetry(() => import("./pages/Services"));
+const Vault = lazyWithRetry(() => import("./pages/Vault"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -137,6 +138,7 @@ const App = () => (
                   <Route path="/communaute" element={<Communaute />} />
                   <Route path="/messages" element={<MessagesPage />} />
                   <Route path="/services" element={<Services />} />
+                  <Route path="/vault" element={<Vault />} />
                 </Route>
                 
                 <Route path="*" element={<NotFound />} />
