@@ -22,6 +22,7 @@ import {
   MessageCircle,
   Cloud,
   KeyRound,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ const navigation = [
   { nameKey: "nav.inventory" as const, href: "/inventory", icon: Package },
   { nameKey: "nav.customers" as const, href: "/customers", icon: Users },
   { nameKey: "nav.customers" as const, href: "/vault", icon: KeyRound, labelOverride: "Coffre-fort" },
+  { nameKey: "nav.customers" as const, href: "/panic-analyzer", icon: Activity, labelOverride: "Analyseur Panic" },
   { nameKey: "nav.suppliers" as const, href: "/suppliers", icon: Truck },
   { nameKey: "nav.expenses" as const, href: "/expenses", icon: Receipt },
   { nameKey: "nav.debts" as const, href: "/customer-debts", icon: CreditCard },
