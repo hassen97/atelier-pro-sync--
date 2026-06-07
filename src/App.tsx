@@ -53,6 +53,7 @@ const OnboardingSetup = lazyWithRetry(() => import("./pages/OnboardingSetup"));
 const Team = lazyWithRetry(() => import("./pages/Team"));
 const Services = lazyWithRetry(() => import("./pages/Services"));
 const Vault = lazyWithRetry(() => import("./pages/Vault"));
+const PanicAnalyzer = lazyWithRetry(() => import("./pages/PanicAnalyzer"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -139,6 +140,7 @@ const App = () => (
                   <Route path="/messages" element={<MessagesPage />} />
                   <Route path="/services" element={<Services />} />
                   <Route path="/vault" element={<Vault />} />
+                  <Route path="/panic-analyzer" element={<PanicAnalyzer />} />
                 </Route>
                 
                 <Route path="*" element={<NotFound />} />
