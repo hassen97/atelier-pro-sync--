@@ -32,6 +32,7 @@ export function WaitlistInvitationsAdminCard() {
     signedUp: 0,
   });
   const [sending, setSending] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const loadStats = async (showToast = false) => {
     setLoading(true);
