@@ -87,6 +87,27 @@ export function WaitlistInvitationsAdminCard() {
     }
   };
 
+  const resendInvitations = async () => {
+    setResending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("notify-waitlist", {
+        body: { resend: true },
+      });
+      if (error) throw error;
+      const queued = (data as any)?.queued ?? 0;
+      const skipped = (data as any)?.skipped ?? 0;
+      toast.success(
+        `${queued} email${queued > 1 ? "s" : ""} renvoyé${queued > 1 ? "s" : ""} en file d'attente${skipped > 0 ? ` · ${skipped} ignoré${skipped > 1 ? "s" : ""}` : ""}`
+      );
+      await loadStats();
+    } catch (e: any) {
+      console.error("[WaitlistInvitations] resend:", e);
+      toast.error(e?.message ?? "Erreur lors du renvoi");
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <Card className="admin-glass-card border-cyan-500/20">
       <CardHeader>
