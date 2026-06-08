@@ -1,63 +1,30 @@
-# Panic Analyzer — iPhone Panic Log Diagnostic
+# Fix: Test emails never arrive from the Ultra Admin page
 
-A new client-side page where shop owners paste or upload Apple panic logs. The app scans the text against a known-fault dictionary and shows the probable failing hardware component plus a recommended repair. No backend, no database — everything runs in the browser.
+## Diagnosis
 
-## 1. Navigation
-
-Add a sidebar entry **"Analyseur Panic"** directly below "Coffre-fort":
-- Icon: `Activity` (heartbeat) from lucide-react, or `Cpu` as an alternative — will use `Activity`.
-- Route: `/panic-analyzer`.
-- Registered in the protected routes group and lazy-loaded like other pages.
-
-## 2. Page Layout
-
-`/panic-analyzer` page using the existing `PageHeader`, `SEO`, dark theme, and shadcn components.
-
-- **Input section** (left/top):
-  - Large `Textarea` for pasting raw log text.
-  - A drag & drop upload zone accepting `.ips` and `.txt` files; dropping/selecting a file reads its text into the textarea (`FileReader`). Also a click-to-browse fallback `<input type="file">`.
-  - Prominent **"Analyser le log"** button (disabled when input is empty).
-  - A "Clear" / reset button.
-- **Results section** (right/bottom): a diagnostic `Card` rendered only after analysis runs.
-
-Responsive: two columns on desktop, stacked on mobile.
-
-## 3. Diagnostic Engine
-
-A constant dictionary array in the page/component file. Each entry: `{ pattern, regex, component, solution }`. Patterns (matched case-insensitively against the log text, evaluated in order):
+The email *domain* (`notify.getheavencoin.com`) is verified and healthy. The failure is downstream, in the queue worker `process-email-queue`. Its logs show a consistent rejection on every send:
 
 ```text
-I2C0        -> Écran / Tactile / Rétroéclairage — Tester avec un écran neuf. Vérifier les lignes I2C0.
-I2C1        -> Caméra arrière / Face ID — Débrancher Face ID/caméras et retester. Remplacer le flex défectueux.
-I2C2        -> Tristar / Tigris / Connecteur de charge — Remplacer le flex de charge. Vérifier l'IC Tristar.
-I2C3        -> Audio IC / Taptic Engine — Vérifier l'Audio IC, remplacer le Taptic Engine.
-WDT timeout -> Watchdog Timeout (batterie ou charge) — Remplacer la batterie ou le flex du connecteur de charge.
-AOP PANIC   -> Capteur de proximité / luminosité (ALS) — Débrancher le flex de l'écouteur. Remplacer si nécessaire.
-SMC PANIC   -> Capteurs thermiques / données batterie — Remplacer batterie avec carte data d'origine, vérifier connecteur.
-NAND/nvme   -> Stockage / NAND Flash — Restaurer via iTunes/3uTools. Si l'erreur persiste, reballing/remplacement NAND.
+Email send failed {
+  queue: "transactional_emails",
+  error: 'Email API error: 403 {"type":"lovable_api_key_not_registered",
+          "message":"LOVABLE_API_KEY is not registered for this project"}'
+}
 ```
 
-A `analyzePanicLog(text)` function returns the **first** matching entry, or `null`. The matcher detects all matches but surfaces the primary one (could optionally list additional matches as secondary chips).
+So the flow works up to the actual send: the email is rendered, enqueued in pgmq, picked up by the worker every 5s — then the email API rejects the `LOVABLE_API_KEY`. The key decrypts but is not in Lovable's active key registry for this project (key drift / stale copy). Result: every queued email fails and eventually lands in the DLQ; nothing is delivered.
 
-## 4. Results Display
+This is an infrastructure/credential problem, not a code bug. The admin "test email" UI and the edge functions are wired correctly.
 
-When a match is found, the card shows:
-- **Status**: red/orange warning icon (`AlertTriangle`) with a "Faute détectée" heading.
-- **Detected code**: e.g. `Erreur détectée : I2C1` (badge style).
-- **Probable cause**: the failing component, visually emphasized.
-- **Recommended solution**: inside a prominent green-highlighted box.
+## Fix
 
-When no pattern matches, show the fallback:
-> "Log Panic non reconnu. Probable défaut de carte mère nécessitant un diagnostic en micro-soudure. Veuillez vérifier le texte complet du log."
+1. **Rotate `LOVABLE_API_KEY`** using the dedicated rotate tool (not add/update/delete). This issues a fresh key that is registered in the active registry and writes it back into project secrets.
+2. **Redeploy the email edge functions** so they pick up the new secret at runtime: `process-email-queue`, and the auth/app send functions (`auth-email-hook`, `notify-admin-signup`, `notify-waitlist`, etc.) that rely on the key.
+3. **Clear / retry the stuck queue**: the previously failed messages already sat for several attempts. After rotation, trigger a fresh test send from the Ultra Admin page (or invoke `process-email-queue`) and confirm a new `sent` row.
+4. **Verify** via the `email_send_log` table that the newest send for the test recipient shows `status = sent` rather than `dlq` / `failed`, and confirm the test inbox receives it.
 
-## 5. Design System
+## Notes / scope
 
-Uses existing semantic tokens and dark theme. shadcn `Card`, `Textarea`, `Button`, `Badge`. Warning/success states use existing `destructive` token and a green accent built from theme-consistent classes. No new colors introduced outside the token system.
-
-## Technical Details
-
-- New file `src/pages/PanicAnalyzer.tsx` (page + dictionary + analyze logic + drag/drop). Optionally split the dictionary into `src/lib/panicPatterns.ts` for clarity.
-- `src/App.tsx`: add `const PanicAnalyzer = lazyWithRetry(() => import("./pages/PanicAnalyzer"))` and a `<Route path="/panic-analyzer" element={<PanicAnalyzer />} />` inside the protected layout group.
-- `src/components/layout/AppSidebar.tsx`: add nav item `{ nameKey: "nav.customers", href: "/panic-analyzer", icon: Activity, labelOverride: "Analyseur Panic" }` immediately after the Coffre-fort entry; import `Activity` from lucide-react.
-- File reading is purely client-side via `FileReader`; `.ips` files are read as text (Apple panic logs are JSON/plain text).
-- No migrations, no edge functions, no schema changes.
+- No template or business-logic changes are required — the templates and triggers are fine.
+- The unrelated `notify-admin-signup` "duplicate key" warnings on `email_unsubscribe_tokens` are harmless (token already exists) and not the cause of non-delivery; I can optionally make that insert an idempotent upsert as a small cleanup if you want.
+- If rotation does not clear the `lovable_api_key_not_registered` error, the next step is to contact Lovable support, as the key registry would need a manual reset.
