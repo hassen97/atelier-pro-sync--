@@ -130,7 +130,7 @@ export default function Dashboard() {
       )}
       <PageHeader
         title="Tableau de bord"
-        description="Vue d'ensemble de votre activité"
+        description={`Vue d'ensemble · ${formatDate(new Date(), "EEEE d MMMM yyyy", { locale: fr })}`}
       >
         <SubscriptionBadge />
         <Button variant="outline" size="sm" onClick={handleExport}>
