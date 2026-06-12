@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay, format as formatDate } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, subDays, startOfDay, endOfDay, format as formatDate } from "date-fns";
 
 export type ProfitPeriod = string | { from: Date; to: Date };
 
