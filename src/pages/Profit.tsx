@@ -11,7 +11,8 @@ import {
   Download,
   CalendarIcon,
 } from "lucide-react";
-import { format as formatDate, startOfMonth, endOfMonth } from "date-fns";
+import { format as formatDate, startOfMonth, endOfMonth, startOfDay, endOfDay, subDays, subMonths } from "date-fns";
+import { fr } from "date-fns/locale";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -72,6 +73,35 @@ export default function Profit() {
           return `${formatDate(customFrom, "dd/MM/yyyy")} → ${formatDate(customTo, "dd/MM/yyyy")}`;
         return "Période personnalisée";
       default: return period;
+    }
+  }, [period, pickedMonth, pickedYear, customFrom, customTo]);
+
+  // Explicit date the figures reference (local time), so owners trust freshness
+  const referenceLabel = useMemo(() => {
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+    const today = new Date();
+    const fmt = (d: Date) => formatDate(d, "EEEE d MMMM yyyy", { locale: fr });
+    switch (period) {
+      case "today":
+        return cap(fmt(today));
+      case "week":
+        return `Du ${formatDate(subDays(today, 6), "d MMM", { locale: fr })} au ${fmt(today)}`;
+      case "month":
+        return `Du ${formatDate(startOfMonth(today), "d MMM", { locale: fr })} au ${fmt(endOfMonth(today))}`;
+      case "quarter":
+        return `Du ${formatDate(subMonths(today, 3), "d MMM yyyy", { locale: fr })} au ${fmt(today)}`;
+      case "year":
+        return `Du 1 janv. au ${fmt(today)}`;
+      case "specific_month": {
+        const d = new Date(pickedYear, pickedMonth, 1);
+        return cap(formatDate(d, "MMMM yyyy", { locale: fr }));
+      }
+      case "custom":
+        if (customFrom && customTo)
+          return `Du ${formatDate(customFrom, "d MMM yyyy", { locale: fr })} au ${formatDate(customTo, "d MMM yyyy", { locale: fr })}`;
+        return "";
+      default:
+        return "";
     }
   }, [period, pickedMonth, pickedYear, customFrom, customTo]);
 
@@ -150,7 +180,7 @@ Généré le ${new Date().toLocaleString("fr-TN")}
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Profit & Comptabilité"
-        description="Analyse des revenus, dépenses et marges"
+        description={referenceLabel ? `${periodLabel} · ${referenceLabel}` : "Analyse des revenus, dépenses et marges"}
       >
         <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger className="w-44">

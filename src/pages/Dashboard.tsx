@@ -39,6 +39,8 @@ import { OnboardingReminderBanner } from "@/components/onboarding/OnboardingRemi
 import { WaitlistTrialBanner } from "@/components/dashboard/WaitlistTrialBanner";
 import { OnboardingReminderModal } from "@/components/onboarding/OnboardingReminderModal";
 import { useOnboardingReminder } from "@/hooks/useOnboardingReminder";
+import { format as formatDate } from "date-fns";
+import { fr } from "date-fns/locale";
 
 const statusConfig = {
   pending: { label: "En attente", icon: Clock, className: "bg-warning/10 text-warning border-warning/20" },
@@ -128,7 +130,7 @@ export default function Dashboard() {
       )}
       <PageHeader
         title="Tableau de bord"
-        description="Vue d'ensemble de votre activité"
+        description={`Vue d'ensemble · ${formatDate(new Date(), "EEEE d MMMM yyyy", { locale: fr })}`}
       >
         <SubscriptionBadge />
         <Button variant="outline" size="sm" onClick={handleExport}>
