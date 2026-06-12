@@ -11,7 +11,8 @@ import {
   Download,
   CalendarIcon,
 } from "lucide-react";
-import { format as formatDate, startOfMonth, endOfMonth } from "date-fns";
+import { format as formatDate, startOfMonth, endOfMonth, startOfDay, endOfDay, subDays, subMonths } from "date-fns";
+import { fr } from "date-fns/locale";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
