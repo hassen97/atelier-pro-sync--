@@ -123,8 +123,8 @@ export function useProfit(period: ProfitPeriod = "month") {
         .from("expenses")
         .select("id, amount, category")
         .eq("user_id", user.id)
-        .gte("expense_date", startDate.toISOString().split("T")[0])
-        .lte("expense_date", endDate.toISOString().split("T")[0]);
+        .gte("expense_date", formatDate(startDate, "yyyy-MM-dd"))
+        .lte("expense_date", formatDate(endDate, "yyyy-MM-dd"));
 
       if (expensesError) throw expensesError;
 
