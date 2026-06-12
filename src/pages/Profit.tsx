@@ -180,7 +180,7 @@ Généré le ${new Date().toLocaleString("fr-TN")}
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Profit & Comptabilité"
-        description="Analyse des revenus, dépenses et marges"
+        description={referenceLabel ? `${periodLabel} · ${referenceLabel}` : "Analyse des revenus, dépenses et marges"}
       >
         <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger className="w-44">
