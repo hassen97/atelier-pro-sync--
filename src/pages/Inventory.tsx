@@ -352,6 +352,15 @@ export default function Inventory() {
             <Package className="h-4 w-4" />
             Stock
           </TabsTrigger>
+          <TabsTrigger value="out-of-stock" className="gap-1.5">
+            <PackageX className="h-4 w-4" />
+            Rupture
+            {outOfStockItems > 0 && (
+              <Badge className="ml-1 h-5 min-w-5 px-1 bg-destructive/10 text-destructive border-destructive/20">
+                {outOfStockItems}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="history" className="gap-1.5">
             <History className="h-4 w-4" />
             Historique
