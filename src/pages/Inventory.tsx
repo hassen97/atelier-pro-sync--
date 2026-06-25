@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Search, Plus, Package, AlertTriangle, MoreHorizontal, Download, History, Zap, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Search, Plus, Package, AlertTriangle, MoreHorizontal, Download, History, Zap, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2, PackageX } from "lucide-react";
 import { useEffectiveUserId } from "@/hooks/useTeam";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/ui/page-header";
