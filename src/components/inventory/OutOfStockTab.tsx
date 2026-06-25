@@ -12,6 +12,7 @@ import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { format as formatDate } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import { printThermalHtml } from "@/lib/receiptPdf";
 
 interface ShortageItem {
   id: string;
@@ -41,11 +42,6 @@ export function OutOfStockTab() {
       toast.error("Aucun produit à imprimer");
       return;
     }
-    const printWindow = window.open("", "_blank", "width=380,height=600");
-    if (!printWindow) {
-      toast.error("Impossible d'ouvrir la fenêtre d'impression");
-      return;
-    }
 
     const shopName = settings.shop_name || "RepairPro";
     const address = settings.address || "";
@@ -63,11 +59,12 @@ export function OutOfStockTab() {
       )
       .join("");
 
-    printWindow.document.write(`
+    const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Bon de commande — ${escapeHtml(shopName)}</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
@@ -113,14 +110,14 @@ export function OutOfStockTab() {
         <div class="footer">Généré par ${escapeHtml(shopName)}</div>
       </body>
       </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 350);
+    `;
+
+    // Use the project's proven thermal print helper: it waits for the document
+    // to load and does NOT auto-close the window, so the print job is not cut
+    // off on mobile (iOS/Android) where the print dialog opens asynchronously.
+    printThermalHtml(html);
   };
+
 
   if (isLoading) {
     return (
