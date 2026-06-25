@@ -12,6 +12,7 @@ import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { format as formatDate } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import { printThermalHtml } from "@/lib/receiptPdf";
 
 interface ShortageItem {
   id: string;
