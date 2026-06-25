@@ -25,6 +25,7 @@ import { VariationMatrixDialog } from "@/components/inventory/VariationMatrixDia
 import { InventoryUnlockDialog } from "@/components/inventory/InventoryUnlockDialog";
 import { ExcelImportDialog } from "@/components/inventory/ExcelImportDialog";
 import { ActivityLogTab } from "@/components/inventory/ActivityLogTab";
+import { OutOfStockTab } from "@/components/inventory/OutOfStockTab";
 import { useInventoryAccess } from "@/hooks/useInventoryAccess";
 import { PremiumFeature } from "@/components/billing/PremiumFeature";
 import { Lock, Unlock } from "lucide-react";
