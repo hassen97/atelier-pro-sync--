@@ -536,6 +536,12 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="out-of-stock">
+          <OutOfStockTab />
+        </TabsContent>
+
+
+
         <TabsContent value="history">
           <ActivityLogTab />
         </TabsContent>
