@@ -327,6 +327,44 @@ export function useLowStockProducts() {
   });
 }
 
+/** All out-of-stock (and low-stock) products — for the shortage/supplier view.
+ *  Fetches in batches of 1000 to bypass the default row limit. */
+export function useOutOfStockProducts() {
+  const effectiveUserId = useEffectiveUserId();
+
+  return useQuery({
+    queryKey: ["products-out-of-stock", effectiveUserId],
+    queryFn: async () => {
+      if (!effectiveUserId) return [];
+
+      const PAGE = 1000;
+      let all: any[] = [];
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, name, sku, barcodes, quantity, min_quantity, category_id, category:categories(id, name)")
+          .eq("user_id", effectiveUserId)
+          .lte("quantity", 5)
+          .order("name")
+          .range(from, from + PAGE - 1);
+
+        if (error) throw error;
+        all = all.concat(data ?? []);
+        hasMore = (data?.length ?? 0) === PAGE;
+        from += PAGE;
+      }
+
+      // Keep only products at/below their own threshold (covers out-of-stock + low stock)
+      return all.filter((p) => (p.quantity ?? 0) <= (p.min_quantity ?? 5)) as any[];
+    },
+    enabled: !!effectiveUserId,
+    staleTime: 30 * 1000,
+  });
+}
+
 /** Lightweight global stats across ALL products — not limited by pagination. */
 export function useInventoryStats() {
   const effectiveUserId = useEffectiveUserId();
