@@ -141,6 +141,7 @@ export function useCreateProduct() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       toast.success("Produit créé avec succès");
     },
@@ -199,6 +200,7 @@ export function useUpdateProduct() {
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["product", data.id] });
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       toast.success("Produit mis à jour");
     },
@@ -252,6 +254,7 @@ export function useUpdateProductStock() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
     },
   });
@@ -297,6 +300,7 @@ export function useDeleteProduct() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       toast.success("Produit supprimé");
     },
@@ -324,6 +328,44 @@ export function useLowStockProducts() {
       );
     },
     enabled: !!effectiveUserId,
+  });
+}
+
+/** All out-of-stock (and low-stock) products — for the shortage/supplier view.
+ *  Fetches in batches of 1000 to bypass the default row limit. */
+export function useOutOfStockProducts() {
+  const effectiveUserId = useEffectiveUserId();
+
+  return useQuery({
+    queryKey: ["products-out-of-stock", effectiveUserId],
+    queryFn: async () => {
+      if (!effectiveUserId) return [];
+
+      const PAGE = 1000;
+      let all: any[] = [];
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, name, sku, barcodes, quantity, min_quantity, category_id, category:categories(id, name)")
+          .eq("user_id", effectiveUserId)
+          .lte("quantity", 5)
+          .order("name")
+          .range(from, from + PAGE - 1);
+
+        if (error) throw error;
+        all = all.concat(data ?? []);
+        hasMore = (data?.length ?? 0) === PAGE;
+        from += PAGE;
+      }
+
+      // Keep only products at/below their own threshold (covers out-of-stock + low stock)
+      return all.filter((p) => (p.quantity ?? 0) <= (p.min_quantity ?? 5)) as any[];
+    },
+    enabled: !!effectiveUserId,
+    staleTime: 30 * 1000,
   });
 }
 

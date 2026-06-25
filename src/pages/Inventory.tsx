@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Search, Plus, Package, AlertTriangle, MoreHorizontal, Download, History, Zap, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Search, Plus, Package, AlertTriangle, MoreHorizontal, Download, History, Zap, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2, PackageX } from "lucide-react";
 import { useEffectiveUserId } from "@/hooks/useTeam";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/ui/page-header";
@@ -25,6 +25,7 @@ import { VariationMatrixDialog } from "@/components/inventory/VariationMatrixDia
 import { InventoryUnlockDialog } from "@/components/inventory/InventoryUnlockDialog";
 import { ExcelImportDialog } from "@/components/inventory/ExcelImportDialog";
 import { ActivityLogTab } from "@/components/inventory/ActivityLogTab";
+import { OutOfStockTab } from "@/components/inventory/OutOfStockTab";
 import { useInventoryAccess } from "@/hooks/useInventoryAccess";
 import { PremiumFeature } from "@/components/billing/PremiumFeature";
 import { Lock, Unlock } from "lucide-react";
@@ -351,6 +352,15 @@ export default function Inventory() {
             <Package className="h-4 w-4" />
             Stock
           </TabsTrigger>
+          <TabsTrigger value="out-of-stock" className="gap-1.5">
+            <PackageX className="h-4 w-4" />
+            Rupture
+            {outOfStockItems > 0 && (
+              <Badge className="ml-1 h-5 min-w-5 px-1 bg-destructive/10 text-destructive border-destructive/20">
+                {outOfStockItems}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="history" className="gap-1.5">
             <History className="h-4 w-4" />
             Historique
@@ -525,6 +535,12 @@ export default function Inventory() {
             )}
           </Card>
         </TabsContent>
+
+        <TabsContent value="out-of-stock">
+          <OutOfStockTab />
+        </TabsContent>
+
+
 
         <TabsContent value="history">
           <ActivityLogTab />
