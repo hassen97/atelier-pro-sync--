@@ -1,11 +1,19 @@
-import { useMemo, useState } from "react";
-import { Printer, PackageX, AlertTriangle, Loader2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Printer, PackageX, AlertTriangle, Eye, ZoomIn, ZoomOut } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useOutOfStockProducts } from "@/hooks/useProducts";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
@@ -24,10 +32,17 @@ interface ShortageItem {
   category?: { id: string; name: string } | null;
 }
 
+const ZOOM_MIN = 0.6;
+const ZOOM_MAX = 2.2;
+const ZOOM_STEP = 0.2;
+
 export function OutOfStockTab() {
   const { data: rawItems = [], isLoading } = useOutOfStockProducts();
   const { settings } = useShopSettingsContext();
   const [filterMode, setFilterMode] = useState<"all" | "out">("all");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [zoom, setZoom] = useState(1.2);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const items = useMemo(() => {
     const list = rawItems as ShortageItem[];
@@ -37,12 +52,7 @@ export function OutOfStockTab() {
   const suggestedQty = (p: ShortageItem) =>
     Math.max((p.min_quantity || 5) - (p.quantity ?? 0), 1);
 
-  const handlePrint = () => {
-    if (items.length === 0) {
-      toast.error("Aucun produit à imprimer");
-      return;
-    }
-
+  const buildReceiptHtml = () => {
     const shopName = settings.shop_name || "RepairPro";
     const address = settings.address || "";
     const phone = settings.phone || "";
@@ -59,7 +69,7 @@ export function OutOfStockTab() {
       )
       .join("");
 
-    const html = `
+    return `
       <!DOCTYPE html>
       <html>
       <head>
@@ -69,22 +79,55 @@ export function OutOfStockTab() {
         <style>
           @page { size: 80mm auto; margin: 0; }
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { width: 80mm; padding: 4mm 3mm; font-family: 'Courier New', monospace; color: #000; font-size: 11px; }
-          .shop { text-align: center; font-size: 14px; font-weight: bold; text-transform: uppercase; }
-          .meta { text-align: center; font-size: 10px; margin-bottom: 2mm; }
-          .title { text-align: center; font-weight: bold; font-size: 12px; margin: 2mm 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 1.5mm 0; }
-          .date { text-align: center; font-size: 10px; margin-bottom: 2mm; }
-          table { width: 100%; border-collapse: collapse; }
-          th { font-size: 10px; text-align: left; border-bottom: 1px solid #000; padding: 1mm 0.5mm; }
+          html, body { width: 80mm; }
+          body {
+            padding: 4mm 3mm;
+            font-family: 'Courier New', Courier, monospace;
+            color: #000;
+            background: #fff;
+            font-size: 12px;
+            line-height: 1.4;
+            -webkit-font-smoothing: none;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .shop {
+            text-align: center;
+            font-size: 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+            word-break: break-word;
+          }
+          .meta { text-align: center; font-size: 10.5px; margin-bottom: 1mm; word-break: break-word; }
+          .title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 12.5px;
+            margin: 2mm 0;
+            border-top: 1px dashed #000;
+            border-bottom: 1px dashed #000;
+            padding: 1.5mm 0;
+          }
+          .date { text-align: center; font-size: 10.5px; margin-bottom: 2mm; }
+          table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          th { font-size: 11px; text-align: left; border-bottom: 1px solid #000; padding: 1mm 0.5mm; }
           th.center, td.center { text-align: center; }
-          td { font-size: 10px; padding: 1.2mm 0.5mm; border-bottom: 1px dotted #999; vertical-align: top; }
-          td.name { width: 60%; }
-          .sku { font-size: 9px; color: #444; }
+          td {
+            font-size: 11px;
+            padding: 1.4mm 0.5mm;
+            border-bottom: 1px dotted #999;
+            vertical-align: top;
+            overflow-wrap: break-word;
+            word-break: break-word;
+          }
+          td.name { width: 58%; }
+          th.center, td.center { width: 21%; }
+          .sku { font-size: 9.5px; color: #333; }
           td.qty { font-weight: bold; }
-          .total { margin-top: 2mm; font-size: 11px; font-weight: bold; text-align: right; }
-          .sign { margin-top: 8mm; font-size: 10px; }
-          .sign-line { margin-top: 6mm; border-top: 1px solid #000; width: 50mm; padding-top: 1mm; }
-          .footer { text-align: center; font-size: 9px; margin-top: 4mm; }
+          .total { margin-top: 2mm; font-size: 12px; font-weight: bold; text-align: right; }
+          .sign { margin-top: 8mm; font-size: 10.5px; }
+          .sign-line { margin-top: 6mm; border-top: 1px solid #000; width: 50mm; max-width: 100%; padding-top: 1mm; }
+          .footer { text-align: center; font-size: 9.5px; margin-top: 4mm; word-break: break-word; }
         </style>
       </head>
       <body>
@@ -111,13 +154,40 @@ export function OutOfStockTab() {
       </body>
       </html>
     `;
+  };
 
+  const openPreview = () => {
+    if (items.length === 0) {
+      toast.error("Aucun produit à imprimer");
+      return;
+    }
+    setZoom(1.2);
+    setPreviewOpen(true);
+  };
+
+  const handlePrint = () => {
+    if (items.length === 0) {
+      toast.error("Aucun produit à imprimer");
+      return;
+    }
     // Use the project's proven thermal print helper: it waits for the document
     // to load and does NOT auto-close the window, so the print job is not cut
     // off on mobile (iOS/Android) where the print dialog opens asynchronously.
-    printThermalHtml(html);
+    printThermalHtml(buildReceiptHtml());
   };
 
+  const resizeIframe = () => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    try {
+      const doc = iframe.contentDocument;
+      if (doc?.body) {
+        iframe.style.height = `${doc.body.scrollHeight + 8}px`;
+      }
+    } catch {
+      /* noop */
+    }
+  };
 
   if (isLoading) {
     return (
@@ -147,9 +217,13 @@ export function OutOfStockTab() {
             {items.length} produit{items.length > 1 ? "s" : ""}
           </span>
         </div>
-        <Button onClick={handlePrint} disabled={items.length === 0} className="gap-2 bg-gradient-primary hover:opacity-90">
-          <Printer className="h-4 w-4" />
-          Imprimer la liste fournisseur
+        <Button
+          onClick={openPreview}
+          disabled={items.length === 0}
+          className="gap-2 bg-gradient-primary hover:opacity-90"
+        >
+          <Eye className="h-4 w-4" />
+          Aperçu & Imprimer
         </Button>
       </div>
 
@@ -213,6 +287,86 @@ export function OutOfStockTab() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-3 border-b">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Printer className="h-4 w-4" />
+              Aperçu du reçu 80mm
+            </DialogTitle>
+            <DialogDescription>
+              Vérifiez le contenu avant d'imprimer. Utilisez le zoom pour mieux lire.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Zoom controls */}
+          <div className="flex items-center justify-center gap-3 px-4 py-2 border-b bg-muted/40">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setZoom((z) => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)))}
+              disabled={zoom <= ZOOM_MIN}
+              aria-label="Réduire le zoom"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-mono-numbers w-14 text-center tabular-nums">
+              {Math.round(zoom * 100)}%
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setZoom((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)))}
+              disabled={zoom >= ZOOM_MAX}
+              aria-label="Augmenter le zoom"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Scrollable preview area */}
+          <div className="max-h-[55vh] overflow-auto bg-muted/30 p-4 flex justify-center">
+            <div
+              style={{
+                width: 302 * zoom,
+                transition: "width 0.15s ease",
+              }}
+            >
+              <div
+                style={{
+                  width: 302,
+                  transform: `scale(${zoom})`,
+                  transformOrigin: "top left",
+                }}
+              >
+                <iframe
+                  ref={iframeRef}
+                  title="Aperçu du reçu"
+                  srcDoc={buildReceiptHtml()}
+                  onLoad={resizeIframe}
+                  className="w-[302px] border border-border bg-white shadow-sm"
+                  style={{ display: "block" }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 pt-3 border-t flex-row justify-end gap-2">
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>
+              Fermer
+            </Button>
+            <Button onClick={handlePrint} className="gap-2 bg-gradient-primary hover:opacity-90">
+              <Printer className="h-4 w-4" />
+              Imprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
