@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { Search, Plus, Package, AlertTriangle, MoreHorizontal, Download, History, Zap, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2, PackageX } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Search, Plus, Package, AlertTriangle, MoreHorizontal, Download, History, Zap, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2, PackageX, Trash2, FolderInput, X } from "lucide-react";
 import { useEffectiveUserId } from "@/hooks/useTeam";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/ui/page-header";
@@ -13,9 +13,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn, useDebounce } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useUpdateProductStock, useInventoryStats, PRODUCTS_PAGE_SIZE } from "@/hooks/useProducts";
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useUpdateProductStock, useInventoryStats, useBulkDeleteProducts, useBulkUpdateCategory, PRODUCTS_PAGE_SIZE } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { ProductDialog } from "@/components/inventory/ProductDialog";
@@ -67,6 +70,12 @@ export default function Inventory() {
   // Pulse animation
   const [pulsedProductId, setPulsedProductId] = useState<string | null>(null);
 
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
+  const [bulkCategoryValue, setBulkCategoryValue] = useState<string>("__none__");
+
   // Fetch categories for the filter dropdown
   const { data: categoriesData = [] } = useCategories("product");
 
@@ -90,6 +99,8 @@ export default function Inventory() {
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
   const updateStock = useUpdateProductStock();
+  const bulkDelete = useBulkDeleteProducts();
+  const bulkUpdateCategory = useBulkUpdateCategory();
   const { format } = useCurrency();
   const { isLocked, isEmployee, inventoryLocked, verifyCode, verifying, unlocked } = useInventoryAccess();
   const { data: inventoryStats } = useInventoryStats();
@@ -127,6 +138,48 @@ export default function Inventory() {
     }
     return list;
   })();
+
+  // Clear selection when the visible result set changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [currentPage, debouncedSearch, selectedCategory]);
+
+  const canBulkEdit = !isEmployee && !isLocked;
+  const selectedCount = selectedIds.size;
+  const allVisibleSelected = displayedInventory.length > 0 && displayedInventory.every((p) => selectedIds.has(p.id));
+  const someVisibleSelected = displayedInventory.some((p) => selectedIds.has(p.id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (displayedInventory.every((p) => prev.has(p.id))) return new Set();
+      return new Set(displayedInventory.map((p) => p.id));
+    });
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDeleteConfirm = async () => {
+    await bulkDelete.mutateAsync(Array.from(selectedIds));
+    setBulkDeleteOpen(false);
+    clearSelection();
+  };
+
+  const handleBulkCategoryConfirm = async () => {
+    const categoryId = bulkCategoryValue === "__none__" ? null : bulkCategoryValue;
+    await bulkUpdateCategory.mutateAsync({ ids: Array.from(selectedIds), categoryId });
+    setBulkCategoryOpen(false);
+    clearSelection();
+  };
+
 
   const totalPages = Math.ceil(totalCount / PRODUCTS_PAGE_SIZE);
   const pageStart = currentPage * PRODUCTS_PAGE_SIZE + 1;
@@ -409,12 +462,53 @@ export default function Inventory() {
             </Select>
           </div>
 
+          {canBulkEdit && selectedCount > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+              <span className="text-sm font-medium">
+                {selectedCount} produit{selectedCount > 1 ? "s" : ""} sélectionné{selectedCount > 1 ? "s" : ""}
+              </span>
+              <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => { setBulkCategoryValue("__none__"); setBulkCategoryOpen(true); }}
+                >
+                  <FolderInput className="h-4 w-4" />
+                  Changer la catégorie
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+                  onClick={() => setBulkDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer
+                </Button>
+                <Button variant="ghost" size="sm" className="gap-2" onClick={clearSelection}>
+                  <X className="h-4 w-4" />
+                  Désélectionner
+                </Button>
+              </div>
+            </div>
+          )}
+
           <h2 className="sr-only">Liste des produits</h2>
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {canBulkEdit && (
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                          onCheckedChange={toggleSelectAll}
+                          aria-label="Tout sélectionner"
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Produit</TableHead>
                     <TableHead>Codes-barres</TableHead>
                     <TableHead>Catégorie</TableHead>
@@ -428,7 +522,7 @@ export default function Inventory() {
                 <TableBody>
                   {displayedInventory.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isEmployee ? 6 : 8} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={(isEmployee ? 6 : 8) + (canBulkEdit ? 1 : 0)} className="text-center py-12 text-muted-foreground">
                         {totalCount === 0
                           ? "Aucun produit enregistré. Cliquez sur 'Nouveau produit' pour commencer."
                           : "Aucun produit trouvé pour cette recherche"}
@@ -443,8 +537,18 @@ export default function Inventory() {
                       return (
                         <TableRow
                           key={item.id}
+                          data-state={selectedIds.has(item.id) ? "selected" : undefined}
                           className={cn(isPulsed && "animate-neon-pulse")}
                         >
+                          {canBulkEdit && (
+                            <TableCell className="w-10">
+                              <Checkbox
+                                checked={selectedIds.has(item.id)}
+                                onCheckedChange={() => toggleSelectOne(item.id)}
+                                aria-label={`Sélectionner ${item.name}`}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
@@ -603,6 +707,57 @@ export default function Inventory() {
           returnFocusToScanBar();
         }}
       />
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer définitivement {selectedCount} produit{selectedCount > 1 ? "s" : ""} ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Les produits sélectionnés seront supprimés définitivement de votre inventaire.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDelete.isPending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleBulkDeleteConfirm(); }}
+              disabled={bulkDelete.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDelete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk change category */}
+      <Dialog open={bulkCategoryOpen} onOpenChange={setBulkCategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Changer la catégorie</DialogTitle>
+            <DialogDescription>
+              Affecter une catégorie aux {selectedCount} produit{selectedCount > 1 ? "s" : ""} sélectionné{selectedCount > 1 ? "s" : ""}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Select value={bulkCategoryValue} onValueChange={setBulkCategoryValue}>
+              <SelectTrigger><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Non catégorisé</SelectItem>
+                {categoriesData.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkCategoryOpen(false)} disabled={bulkUpdateCategory.isPending}>Annuler</Button>
+            <Button onClick={handleBulkCategoryConfirm} disabled={bulkUpdateCategory.isPending}>
+              {bulkUpdateCategory.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Appliquer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
