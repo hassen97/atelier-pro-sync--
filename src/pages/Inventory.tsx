@@ -537,8 +537,18 @@ export default function Inventory() {
                       return (
                         <TableRow
                           key={item.id}
+                          data-state={selectedIds.has(item.id) ? "selected" : undefined}
                           className={cn(isPulsed && "animate-neon-pulse")}
                         >
+                          {canBulkEdit && (
+                            <TableCell className="w-10">
+                              <Checkbox
+                                checked={selectedIds.has(item.id)}
+                                onCheckedChange={() => toggleSelectOne(item.id)}
+                                aria-label={`Sélectionner ${item.name}`}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
