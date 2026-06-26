@@ -707,6 +707,57 @@ export default function Inventory() {
           returnFocusToScanBar();
         }}
       />
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer définitivement {selectedCount} produit{selectedCount > 1 ? "s" : ""} ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Les produits sélectionnés seront supprimés définitivement de votre inventaire.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDelete.isPending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleBulkDeleteConfirm(); }}
+              disabled={bulkDelete.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDelete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk change category */}
+      <Dialog open={bulkCategoryOpen} onOpenChange={setBulkCategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Changer la catégorie</DialogTitle>
+            <DialogDescription>
+              Affecter une catégorie aux {selectedCount} produit{selectedCount > 1 ? "s" : ""} sélectionné{selectedCount > 1 ? "s" : ""}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Select value={bulkCategoryValue} onValueChange={setBulkCategoryValue}>
+              <SelectTrigger><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Non catégorisé</SelectItem>
+                {categoriesData.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkCategoryOpen(false)} disabled={bulkUpdateCategory.isPending}>Annuler</Button>
+            <Button onClick={handleBulkCategoryConfirm} disabled={bulkUpdateCategory.isPending}>
+              {bulkUpdateCategory.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Appliquer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
