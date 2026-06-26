@@ -462,12 +462,53 @@ export default function Inventory() {
             </Select>
           </div>
 
+          {canBulkEdit && selectedCount > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+              <span className="text-sm font-medium">
+                {selectedCount} produit{selectedCount > 1 ? "s" : ""} sélectionné{selectedCount > 1 ? "s" : ""}
+              </span>
+              <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => { setBulkCategoryValue("__none__"); setBulkCategoryOpen(true); }}
+                >
+                  <FolderInput className="h-4 w-4" />
+                  Changer la catégorie
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+                  onClick={() => setBulkDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer
+                </Button>
+                <Button variant="ghost" size="sm" className="gap-2" onClick={clearSelection}>
+                  <X className="h-4 w-4" />
+                  Désélectionner
+                </Button>
+              </div>
+            </div>
+          )}
+
           <h2 className="sr-only">Liste des produits</h2>
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {canBulkEdit && (
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                          onCheckedChange={toggleSelectAll}
+                          aria-label="Tout sélectionner"
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Produit</TableHead>
                     <TableHead>Codes-barres</TableHead>
                     <TableHead>Catégorie</TableHead>
@@ -481,7 +522,7 @@ export default function Inventory() {
                 <TableBody>
                   {displayedInventory.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isEmployee ? 6 : 8} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={(isEmployee ? 6 : 8) + (canBulkEdit ? 1 : 0)} className="text-center py-12 text-muted-foreground">
                         {totalCount === 0
                           ? "Aucun produit enregistré. Cliquez sur 'Nouveau produit' pour commencer."
                           : "Aucun produit trouvé pour cette recherche"}
