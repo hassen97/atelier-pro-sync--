@@ -139,6 +139,48 @@ export default function Inventory() {
     return list;
   })();
 
+  // Clear selection when the visible result set changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [currentPage, debouncedSearch, selectedCategory]);
+
+  const canBulkEdit = !isEmployee && !isLocked;
+  const selectedCount = selectedIds.size;
+  const allVisibleSelected = displayedInventory.length > 0 && displayedInventory.every((p) => selectedIds.has(p.id));
+  const someVisibleSelected = displayedInventory.some((p) => selectedIds.has(p.id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (displayedInventory.every((p) => prev.has(p.id))) return new Set();
+      return new Set(displayedInventory.map((p) => p.id));
+    });
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDeleteConfirm = async () => {
+    await bulkDelete.mutateAsync(Array.from(selectedIds));
+    setBulkDeleteOpen(false);
+    clearSelection();
+  };
+
+  const handleBulkCategoryConfirm = async () => {
+    const categoryId = bulkCategoryValue === "__none__" ? null : bulkCategoryValue;
+    await bulkUpdateCategory.mutateAsync({ ids: Array.from(selectedIds), categoryId });
+    setBulkCategoryOpen(false);
+    clearSelection();
+  };
+
+
   const totalPages = Math.ceil(totalCount / PRODUCTS_PAGE_SIZE);
   const pageStart = currentPage * PRODUCTS_PAGE_SIZE + 1;
   const pageEnd = Math.min((currentPage + 1) * PRODUCTS_PAGE_SIZE, totalCount);
