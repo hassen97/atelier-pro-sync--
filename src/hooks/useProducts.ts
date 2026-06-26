@@ -307,6 +307,63 @@ export function useDeleteProduct() {
   });
 }
 
+/** Permanently delete multiple products at once by their IDs. */
+export function useBulkDeleteProducts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (ids.length === 0) return 0;
+      const { error } = await supabase.from("products").delete().in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-all"] });
+      queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-stats"] });
+      toast.success(`${count} produit${count > 1 ? "s" : ""} supprimé${count > 1 ? "s" : ""}`);
+    },
+    onError: (error) => {
+      console.error("Bulk delete failed:", error);
+      toast.error("Erreur lors de la suppression");
+    },
+  });
+}
+
+/** Assign a category (or clear it) for multiple products at once. */
+export function useBulkUpdateCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ ids, categoryId }: { ids: string[]; categoryId: string | null }) => {
+      if (ids.length === 0) return 0;
+      const { error } = await supabase
+        .from("products")
+        .update({ category_id: categoryId, updated_at: new Date().toISOString() })
+        .in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-all"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success(`Catégorie mise à jour pour ${count} produit${count > 1 ? "s" : ""}`);
+    },
+    onError: (error) => {
+      console.error("Bulk category update failed:", error);
+      toast.error("Erreur lors de la mise à jour de la catégorie");
+    },
+  });
+}
+
 export function useLowStockProducts() {
   const effectiveUserId = useEffectiveUserId();
 
