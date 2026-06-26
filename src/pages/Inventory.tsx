@@ -70,6 +70,12 @@ export default function Inventory() {
   // Pulse animation
   const [pulsedProductId, setPulsedProductId] = useState<string | null>(null);
 
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
+  const [bulkCategoryValue, setBulkCategoryValue] = useState<string>("__none__");
+
   // Fetch categories for the filter dropdown
   const { data: categoriesData = [] } = useCategories("product");
 
