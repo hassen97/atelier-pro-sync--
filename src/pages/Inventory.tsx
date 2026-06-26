@@ -99,6 +99,8 @@ export default function Inventory() {
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
   const updateStock = useUpdateProductStock();
+  const bulkDelete = useBulkDeleteProducts();
+  const bulkUpdateCategory = useBulkUpdateCategory();
   const { format } = useCurrency();
   const { isLocked, isEmployee, inventoryLocked, verifyCode, verifying, unlocked } = useInventoryAccess();
   const { data: inventoryStats } = useInventoryStats();
