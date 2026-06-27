@@ -343,7 +343,10 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
                           <Combobox
                             options={categoryOptions}
                             value={field.value || ""}
-                            onValueChange={field.onChange}
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              form.setValue("subcategory_id", "");
+                            }}
                             placeholder="Sélectionner catégorie"
                             searchPlaceholder="Rechercher catégorie..."
                             emptyText="Aucune catégorie"
@@ -354,6 +357,31 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
                     )}
                   />
                 )}
+
+                {/* Subcategory (depends on selected category) */}
+                {selectedCategoryId && subcategoryOptions.length > 0 && (
+                  <FormField
+                    control={form.control}
+                    name="subcategory_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sous-catégorie</FormLabel>
+                        <FormControl>
+                          <Combobox
+                            options={subcategoryOptions}
+                            value={field.value || ""}
+                            onValueChange={field.onChange}
+                            placeholder="Sélectionner sous-catégorie"
+                            searchPlaceholder="Rechercher sous-catégorie..."
+                            emptyText="Aucune sous-catégorie"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
 
                 {/* Description */}
                 <FormField
