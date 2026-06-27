@@ -177,9 +177,16 @@ export default function Inventory() {
 
   const handleBulkCategoryConfirm = async () => {
     const categoryId = bulkCategoryValue === "__none__" ? null : bulkCategoryValue;
-    await bulkUpdateCategory.mutateAsync({ ids: Array.from(selectedIds), categoryId });
+    const subcategoryId =
+      categoryId === null || bulkSubcategoryValue === "__none__" ? null : bulkSubcategoryValue;
+    await bulkUpdateCategory.mutateAsync({ ids: Array.from(selectedIds), categoryId, subcategoryId });
     setBulkCategoryOpen(false);
     clearSelection();
+  };
+
+  const handleBulkCategoryValueChange = (val: string) => {
+    setBulkCategoryValue(val);
+    setBulkSubcategoryValue("__none__");
   };
 
 
