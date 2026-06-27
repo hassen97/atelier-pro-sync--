@@ -19,7 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { cn, useDebounce } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useUpdateProductStock, useInventoryStats, useBulkDeleteProducts, useBulkUpdateCategory, PRODUCTS_PAGE_SIZE } from "@/hooks/useProducts";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategories, useSubcategories } from "@/hooks/useCategories";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { ProductDialog } from "@/components/inventory/ProductDialog";
 import { ProductSheet, ProductSheetRef } from "@/components/inventory/ProductSheet";
@@ -75,9 +75,11 @@ export default function Inventory() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
   const [bulkCategoryValue, setBulkCategoryValue] = useState<string>("__none__");
+  const [bulkSubcategoryValue, setBulkSubcategoryValue] = useState<string>("__none__");
 
   // Fetch categories for the filter dropdown
   const { data: categoriesData = [] } = useCategories("product");
+  const { data: subcategoriesData = [] } = useSubcategories();
 
   // Reset to page 0 when search or category changes
   const handleSearchChange = (val: string) => { setSearchQuery(val); setCurrentPage(0); };
@@ -175,9 +177,16 @@ export default function Inventory() {
 
   const handleBulkCategoryConfirm = async () => {
     const categoryId = bulkCategoryValue === "__none__" ? null : bulkCategoryValue;
-    await bulkUpdateCategory.mutateAsync({ ids: Array.from(selectedIds), categoryId });
+    const subcategoryId =
+      categoryId === null || bulkSubcategoryValue === "__none__" ? null : bulkSubcategoryValue;
+    await bulkUpdateCategory.mutateAsync({ ids: Array.from(selectedIds), categoryId, subcategoryId });
     setBulkCategoryOpen(false);
     clearSelection();
+  };
+
+  const handleBulkCategoryValueChange = (val: string) => {
+    setBulkCategoryValue(val);
+    setBulkSubcategoryValue("__none__");
   };
 
 
@@ -472,7 +481,7 @@ export default function Inventory() {
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  onClick={() => { setBulkCategoryValue("__none__"); setBulkCategoryOpen(true); }}
+                  onClick={() => { setBulkCategoryValue("__none__"); setBulkSubcategoryValue("__none__"); setBulkCategoryOpen(true); }}
                 >
                   <FolderInput className="h-4 w-4" />
                   Changer la catégorie
@@ -739,16 +748,37 @@ export default function Inventory() {
               Affecter une catégorie aux {selectedCount} produit{selectedCount > 1 ? "s" : ""} sélectionné{selectedCount > 1 ? "s" : ""}.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-2">
-            <Select value={bulkCategoryValue} onValueChange={setBulkCategoryValue}>
-              <SelectTrigger><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Non catégorisé</SelectItem>
-                {categoriesData.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Catégorie</label>
+              <Select value={bulkCategoryValue} onValueChange={handleBulkCategoryValueChange}>
+                <SelectTrigger><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Non catégorisé</SelectItem>
+                  {categoriesData.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Sous-catégorie</label>
+              <Select
+                value={bulkSubcategoryValue}
+                onValueChange={setBulkSubcategoryValue}
+                disabled={bulkCategoryValue === "__none__"}
+              >
+                <SelectTrigger><SelectValue placeholder="Choisir une sous-catégorie" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Aucune sous-catégorie</SelectItem>
+                  {subcategoriesData
+                    .filter((s) => s.category_id === bulkCategoryValue)
+                    .map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkCategoryOpen(false)} disabled={bulkUpdateCategory.isPending}>Annuler</Button>

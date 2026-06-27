@@ -335,16 +335,28 @@ export function useBulkDeleteProducts() {
   });
 }
 
-/** Assign a category (or clear it) for multiple products at once. */
+/** Assign a category and optional sub-category (or clear them) for multiple products at once. */
 export function useBulkUpdateCategory() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ ids, categoryId }: { ids: string[]; categoryId: string | null }) => {
+    mutationFn: async ({
+      ids,
+      categoryId,
+      subcategoryId = null,
+    }: {
+      ids: string[];
+      categoryId: string | null;
+      subcategoryId?: string | null;
+    }) => {
       if (ids.length === 0) return 0;
       const { error } = await supabase
         .from("products")
-        .update({ category_id: categoryId, updated_at: new Date().toISOString() })
+        .update({
+          category_id: categoryId,
+          subcategory_id: subcategoryId,
+          updated_at: new Date().toISOString(),
+        })
         .in("id", ids);
       if (error) throw error;
       return ids.length;
@@ -353,6 +365,7 @@ export function useBulkUpdateCategory() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
