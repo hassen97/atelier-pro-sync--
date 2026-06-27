@@ -409,11 +409,19 @@ export default function POS() {
                   <Input placeholder="Rechercher un produit..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <Button variant={selectedCategory === null ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory(null)}>Tout</Button>
+                  <Button variant={selectedCategory === null ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(null); setSelectedSubcategory(null); }}>Tout</Button>
                   {categories.map((cat) => (
-                    <Button key={cat} variant={selectedCategory === cat ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory(cat)}>{cat}</Button>
+                    <Button key={cat} variant={selectedCategory === cat ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(cat); setSelectedSubcategory(null); }}>{cat}</Button>
                   ))}
                 </div>
+                {selectedCategory && subcategories.length > 0 && (
+                  <div className="flex gap-2 flex-wrap pl-2 border-l-2 border-muted">
+                    <Button variant={selectedSubcategory === null ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(null)}>Toutes</Button>
+                    {subcategories.map((sub) => (
+                      <Button key={sub} variant={selectedSubcategory === sub ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(sub)}>{sub}</Button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex-1 overflow-auto min-h-0">
                 {filteredProducts.length === 0 ? (
