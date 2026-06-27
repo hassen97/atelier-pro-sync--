@@ -42,6 +42,7 @@ export default function POS() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [scanInput, setScanInput] = useState("");
@@ -83,11 +84,24 @@ export default function POS() {
 
   const categories = [...new Set(products.map((p: any) => p.category?.name).filter(Boolean))];
 
+  // Subcategories available for the currently selected main category
+  const subcategories = selectedCategory
+    ? [
+        ...new Set(
+          products
+            .filter((p: any) => p.category?.name === selectedCategory)
+            .map((p: any) => p.subcategory?.name)
+            .filter(Boolean)
+        ),
+      ]
+    : [];
+
   const filteredProducts = products.filter((p: any) => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = !selectedCategory || p.category?.name === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesSubcategory = !selectedSubcategory || p.subcategory?.name === selectedSubcategory;
+    return matchesSearch && matchesCategory && matchesSubcategory;
   });
 
   const playBeep = useCallback(() => {
@@ -395,11 +409,19 @@ export default function POS() {
                   <Input placeholder="Rechercher un produit..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <Button variant={selectedCategory === null ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory(null)}>Tout</Button>
+                  <Button variant={selectedCategory === null ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(null); setSelectedSubcategory(null); }}>Tout</Button>
                   {categories.map((cat) => (
-                    <Button key={cat} variant={selectedCategory === cat ? "default" : "outline"} size="sm" onClick={() => setSelectedCategory(cat)}>{cat}</Button>
+                    <Button key={cat} variant={selectedCategory === cat ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(cat); setSelectedSubcategory(null); }}>{cat}</Button>
                   ))}
                 </div>
+                {selectedCategory && subcategories.length > 0 && (
+                  <div className="flex gap-2 flex-wrap pl-2 border-l-2 border-muted">
+                    <Button variant={selectedSubcategory === null ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(null)}>Toutes</Button>
+                    {subcategories.map((sub) => (
+                      <Button key={sub} variant={selectedSubcategory === sub ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(sub)}>{sub}</Button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex-1 overflow-auto min-h-0">
                 {filteredProducts.length === 0 ? (

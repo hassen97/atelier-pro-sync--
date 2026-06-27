@@ -1010,6 +1010,7 @@ export type Database = {
           quantity: number
           sell_price: number
           sku: string | null
+          subcategory_id: string | null
           updated_at: string
           user_id: string
         }
@@ -1025,6 +1026,7 @@ export type Database = {
           quantity?: number
           sell_price?: number
           sku?: string | null
+          subcategory_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1040,6 +1042,7 @@ export type Database = {
           quantity?: number
           sell_price?: number
           sku?: string | null
+          subcategory_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1049,6 +1052,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
         ]

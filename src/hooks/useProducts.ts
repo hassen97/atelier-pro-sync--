@@ -32,8 +32,9 @@ export function useProducts({ page = 0, search = "", categoryId }: UseProductsOp
         .from("products")
         .select(
           `id, name, sku, barcodes, description, cost_price, sell_price,
-           quantity, min_quantity, category_id,
-           category:categories(id, name)`,
+           quantity, min_quantity, category_id, subcategory_id,
+           category:categories(id, name),
+           subcategory:subcategories(id, name)`,
           { count: "exact" }
         )
         .eq("user_id", effectiveUserId)
@@ -80,7 +81,7 @@ export function useAllProducts() {
       while (hasMore) {
         const { data, error } = await supabase
           .from("products")
-          .select("id, name, sku, barcodes, sell_price, cost_price, quantity, min_quantity, category_id, category:categories(id, name)")
+          .select("id, name, sku, barcodes, sell_price, cost_price, quantity, min_quantity, category_id, subcategory_id, category:categories(id, name), subcategory:subcategories(id, name)")
           .eq("user_id", effectiveUserId)
           .order("name")
           .range(from, from + PAGE - 1);
@@ -108,7 +109,7 @@ export function useProduct(id: string | undefined) {
 
       const { data, error } = await supabase
         .from("products")
-        .select(`*, category:categories(id, name)`)
+        .select(`*, category:categories(id, name), subcategory:subcategories(id, name)`)
         .eq("id", id)
         .maybeSingle();
 
