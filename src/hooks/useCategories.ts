@@ -133,3 +133,71 @@ export function useSeedDefaultCategories() {
     },
   });
 }
+
+// ---------------- Subcategories (stock only) ----------------
+
+export function useSubcategories() {
+  const effectiveUserId = useEffectiveUserId();
+
+  return useQuery({
+    queryKey: ["subcategories", effectiveUserId],
+    queryFn: async () => {
+      if (!effectiveUserId) return [];
+
+      const { data, error } = await supabase
+        .from("subcategories")
+        .select("*")
+        .eq("user_id", effectiveUserId)
+        .order("name");
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!effectiveUserId,
+  });
+}
+
+export function useCreateSubcategory() {
+  const queryClient = useQueryClient();
+  const effectiveUserId = useEffectiveUserId();
+
+  return useMutation({
+    mutationFn: async ({ name, categoryId }: { name: string; categoryId: string }) => {
+      if (!effectiveUserId) throw new Error("Non authentifié");
+
+      const { data, error } = await supabase
+        .from("subcategories")
+        .insert({ name, category_id: categoryId, user_id: effectiveUserId })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
+      toast.success("Sous-catégorie créée");
+    },
+    onError: () => {
+      toast.error("Erreur lors de la création");
+    },
+  });
+}
+
+export function useDeleteSubcategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("subcategories").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
+      toast.success("Sous-catégorie supprimée");
+    },
+    onError: () => {
+      toast.error("Erreur lors de la suppression");
+    },
+  });
+}
