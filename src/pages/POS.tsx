@@ -55,6 +55,8 @@ export default function POS() {
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
   const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [closeRegisterOpen, setCloseRegisterOpen] = useState(false);
+  const canCloseRegister = useCanCloseRegister();
   const scanRef = useRef<HTMLInputElement>(null);
   const beepRef = useRef<AudioContext | null>(null);
 
