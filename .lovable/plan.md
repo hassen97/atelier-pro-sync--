@@ -1,35 +1,66 @@
-## Goal
+# Nested Subcategories for Stock Categories
 
-Add the ability to select multiple products in the inventory "Stock" table and perform bulk actions:
-- **Delete permanently** (multiple at once)
-- **Change / move category** (assign all selected products to a chosen category, or set them to "no category")
+Add a hierarchical subcategory layer to **Catégories de stock** only. Repair and expense category lists stay flat.
 
-Note: "move to a category" and "modify their default category" are the same database operation (updating each product's category). They will be combined into one bulk "Change category" action.
+## 1. Database
 
-## What the user will see
+There is no subcategory support today. The `categories` table has `id, user_id, name, type, created_at` and no parent link.
 
-- A checkbox column added to the left of the product table, plus a "select all" checkbox in the header (selects all products on the current page).
-- When at least one product is selected, a **bulk action bar** appears above the table showing:
-  - "X produit(s) sélectionné(s)"
-  - A **"Changer la catégorie"** dropdown/button → opens a small dialog to pick a target category (including a "Non catégorisé" option to clear it).
-  - A **"Supprimer"** button (destructive) → opens a confirmation dialog ("Supprimer définitivement X produits ?") before deleting.
-  - A "Désélectionner" / clear button.
-- Selection automatically clears after a successful bulk action and when changing page, search, or category filter.
-- Bulk actions are hidden/disabled for employees and when the inventory is locked (matching the existing per-row delete/edit restrictions).
+Create a new `public.subcategories` table:
 
-## Technical details
+```text
+subcategories
+- id           uuid (pk)
+- user_id      uuid (owner, for RLS + tenant isolation)
+- category_id  uuid  -> FK to categories.id (ON DELETE CASCADE)
+- name         text
+- created_at   timestamptz
+```
 
-**Hooks (`src/hooks/useProducts.ts`)**
-- Add `useBulkDeleteProducts()` — deletes products by an array of IDs (`.in("id", ids)`), then invalidates the same query keys the existing `useDeleteProduct` uses (`products`, `products-all`, `low-stock-alerts`, `products-out-of-stock`, `dashboard-stats`).
-- Add `useBulkUpdateCategory()` — updates `category_id` for an array of IDs (`.in("id", ids)`, `category_id` can be a string or `null`), with the same invalidations plus `categories`.
-- Both show a success/error toast (e.g. "X produits supprimés", "Catégorie mise à jour").
+- `ON DELETE CASCADE` so deleting a main category auto-removes its subcategories at the DB level.
+- GRANTs: `authenticated` (SELECT/INSERT/UPDATE/DELETE) and `service_role` (ALL). No `anon`.
+- Enable RLS and mirror the `categories` policies exactly:
+  - Owner or team member can manage (`auth.uid() = user_id OR is_team_member(user_id, auth.uid())`).
+  - Platform admin can view all.
 
-**Page (`src/pages/Inventory.tsx`)**
-- Add `selectedIds` state (a `Set<string>` or array). Add a `useEffect`/handlers to clear it when `currentPage`, `debouncedSearch`, or `selectedCategory` change.
-- Add a checkbox `TableHead` and per-row `TableCell` using the existing `@/components/ui/checkbox`. Header checkbox toggles all rows currently displayed.
-- Render the bulk action bar (conditionally) between the filter row and the product `Card`.
-- Wire bulk delete through a confirmation `AlertDialog`, and bulk category change through a small `Dialog` containing a category `Select` (reusing `categoriesData` already fetched, plus a "Non catégorisé" entry that sets `category_id` to `null`).
-- Guard all bulk actions behind `!isEmployee && !isLocked`, consistent with current row actions.
-- Update the empty-state `colSpan` to account for the new checkbox column.
+## 2. Data hooks (`src/hooks/useCategories.ts`)
 
-No database schema or migration changes are required — this only adds delete/update operations against the existing `products` table, which already has the needed RLS policies.
+Add new hooks alongside the existing ones, scoped with `useEffectiveUserId()` (matching the project's multi-tenant pattern):
+
+- `useSubcategories(categoryId?)` — fetch subcategories (optionally for one parent), ordered by name.
+- `useCreateSubcategory()` — insert `{ name, category_id, user_id: effectiveUserId }`, invalidate `["subcategories"]`, toast success.
+- `useDeleteSubcategory()` — delete by id, invalidate `["subcategories"]`, toast success.
+
+Deleting a main category already calls `useDeleteCategory`; the DB cascade removes children, and we'll also invalidate `["subcategories"]` there so the UI clears instantly.
+
+## 3. UI — `src/components/settings/CategoriesSettings.tsx`
+
+The `CategorySection` component is reused for both repair and product lists. Add an optional `nested` flag. Only the product (stock) section passes `nested`, so repair stays a flat list.
+
+When `nested` is on, render the stock categories as a shadcn **Accordion** instead of the flat row list:
+
+- **Accordion header (per main category):** category name on the left, existing red trash icon on the far right (deletes the main category). The trash button uses `e.stopPropagation()` so clicking it doesn't toggle the accordion.
+- **Accordion content (expanded):** an indented, visually distinct (`bg-muted/30`, left border) list of that category's subcategories — each with its own red trash icon.
+  - Below the list, a small input (`placeholder="Nouvelle sous-catégorie..."`) plus a small `+ Ajouter` button that adds a subcategory to that specific parent.
+  - Empty state: "Aucune sous-catégorie."
+- **Global add (unchanged):** the bottom input + "Ajouter" button for creating new main categories stays in place.
+
+A small child component (e.g. `SubcategoryList`) handles per-parent state (input value, create/delete) so each accordion item manages its own subcategory input independently.
+
+## 4. Deletion warning
+
+Update the main-category delete confirmation dialog (only for the nested/stock section) to read:
+
+> La suppression de cette catégorie supprimera également toutes ses sous-catégories. Continuer ?
+
+Repair/expense deletion keeps its current wording.
+
+## 5. State freshness
+
+All add/delete mutations invalidate React Query caches (`["categories"]`, `["subcategories"]`), so the accordion updates instantly with no page refresh.
+
+## Technical notes
+
+- New table accessed via the standard `supabase` client; types regenerate after the migration runs.
+- Subcategory fetch is keyed `["subcategories", effectiveUserId]`; filtering per parent is done client-side (or via an optional `categoryId` arg) to avoid N queries.
+- No POS code is touched in this change — this only prepares the category structure.
