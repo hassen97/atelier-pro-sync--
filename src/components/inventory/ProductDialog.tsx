@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { Loader2 } from "lucide-react";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategories, useSubcategories } from "@/hooks/useCategories";
 import { useCurrency } from "@/hooks/useCurrency";
 
 const productSchema = z.object({
@@ -31,6 +31,7 @@ const productSchema = z.object({
   sku: z.string().optional(),
   description: z.string().optional(),
   category_id: z.string().optional(),
+  subcategory_id: z.string().optional(),
   cost_price: z.coerce.number().min(0, "Le prix doit être positif"),
   sell_price: z.coerce.number().min(0, "Le prix doit être positif"),
   quantity: z.coerce.number().int().min(0, "La quantité doit être positive"),
