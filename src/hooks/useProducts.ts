@@ -81,7 +81,7 @@ export function useAllProducts() {
       while (hasMore) {
         const { data, error } = await supabase
           .from("products")
-          .select("id, name, sku, barcodes, sell_price, cost_price, quantity, min_quantity, category_id, category:categories(id, name)")
+          .select("id, name, sku, barcodes, sell_price, cost_price, quantity, min_quantity, category_id, subcategory_id, category:categories(id, name), subcategory:subcategories(id, name)")
           .eq("user_id", effectiveUserId)
           .order("name")
           .range(from, from + PAGE - 1);
