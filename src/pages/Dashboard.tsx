@@ -147,6 +147,9 @@ export default function Dashboard() {
         </Button>
       </PageHeader>
 
+      {/* Current register session */}
+      <CurrentRegisterPanel />
+
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
