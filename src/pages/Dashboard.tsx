@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useDashboardStats, useRecentRepairs, useLowStockAlerts } from "@/hooks/useDashboard";
+import { CurrentRegisterPanel } from "@/components/dashboard/CurrentRegisterPanel";
 import { useCreateRepair } from "@/hooks/useRepairs";
 import { useDashboardRealtime } from "@/hooks/useRealtimeSubscription";
 import { useCurrency } from "@/hooks/useCurrency";
@@ -145,6 +146,9 @@ export default function Dashboard() {
           + Nouvelle réparation
         </Button>
       </PageHeader>
+
+      {/* Current register session */}
+      <CurrentRegisterPanel />
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

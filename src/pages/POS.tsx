@@ -24,6 +24,8 @@ import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { useInventoryAccess } from "@/hooks/useInventoryAccess";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { LoyaltyRedeemCard } from "@/components/pos/LoyaltyRedeemCard";
+import { CloseRegisterDialog } from "@/components/pos/CloseRegisterDialog";
+import { useCanCloseRegister } from "@/hooks/useRegisterSession";
 import { toast } from "sonner";
 
 interface CartItem {
@@ -53,6 +55,8 @@ export default function POS() {
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
   const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [closeRegisterOpen, setCloseRegisterOpen] = useState(false);
+  const canCloseRegister = useCanCloseRegister();
   const scanRef = useRef<HTMLInputElement>(null);
   const beepRef = useRef<AudioContext | null>(null);
 
@@ -385,7 +389,20 @@ export default function POS() {
 
   return (
     <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] animate-fade-in pb-24 lg:pb-0">
-      <PageHeader title="Point de Vente" description="Encaissement et ventes" />
+      <PageHeader title="Point de Vente" description="Encaissement et ventes">
+        {canCloseRegister && (
+          <Button
+            variant="outline"
+            className="border-primary/40 text-primary hover:bg-primary/10"
+            onClick={() => setCloseRegisterOpen(true)}
+          >
+            <Receipt className="h-4 w-4 mr-2" />
+            Clôture de Caisse
+          </Button>
+        )}
+      </PageHeader>
+
+      <CloseRegisterDialog open={closeRegisterOpen} onOpenChange={setCloseRegisterOpen} />
 
       <div className="grid gap-6 lg:grid-cols-4 lg:h-[calc(100%-5rem)]">
         {/* Products & Repairs Section - Full Width */}
