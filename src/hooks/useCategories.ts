@@ -86,6 +86,7 @@ export function useDeleteCategory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["repairs"] });
       toast.success("Catégorie supprimée");
