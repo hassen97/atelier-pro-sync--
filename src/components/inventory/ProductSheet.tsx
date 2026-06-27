@@ -194,7 +194,15 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
 
     const handleSubmit = async (data: ProductSheetFormValues) => {
       // Convert empty string category_id to undefined so DB receives NULL
-      const cleanData = { ...data, category_id: data.category_id || undefined };
+      const cleanData = {
+        ...data,
+        category_id: data.category_id || undefined,
+        subcategory_id:
+          data.subcategory_id &&
+          subcategoryOptions.some((o) => o.value === data.subcategory_id)
+            ? data.subcategory_id
+            : undefined,
+      };
       await onSubmit(cleanData);
 
       // Handle credit purchase
