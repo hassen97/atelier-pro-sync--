@@ -75,9 +75,11 @@ export default function Inventory() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
   const [bulkCategoryValue, setBulkCategoryValue] = useState<string>("__none__");
+  const [bulkSubcategoryValue, setBulkSubcategoryValue] = useState<string>("__none__");
 
   // Fetch categories for the filter dropdown
   const { data: categoriesData = [] } = useCategories("product");
+  const { data: subcategoriesData = [] } = useSubcategories();
 
   // Reset to page 0 when search or category changes
   const handleSearchChange = (val: string) => { setSearchQuery(val); setCurrentPage(0); };
