@@ -19,7 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { cn, useDebounce } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useUpdateProductStock, useInventoryStats, useBulkDeleteProducts, useBulkUpdateCategory, PRODUCTS_PAGE_SIZE } from "@/hooks/useProducts";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategories, useSubcategories } from "@/hooks/useCategories";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { ProductDialog } from "@/components/inventory/ProductDialog";
 import { ProductSheet, ProductSheetRef } from "@/components/inventory/ProductSheet";
