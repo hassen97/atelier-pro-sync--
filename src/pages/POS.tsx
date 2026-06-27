@@ -84,11 +84,24 @@ export default function POS() {
 
   const categories = [...new Set(products.map((p: any) => p.category?.name).filter(Boolean))];
 
+  // Subcategories available for the currently selected main category
+  const subcategories = selectedCategory
+    ? [
+        ...new Set(
+          products
+            .filter((p: any) => p.category?.name === selectedCategory)
+            .map((p: any) => p.subcategory?.name)
+            .filter(Boolean)
+        ),
+      ]
+    : [];
+
   const filteredProducts = products.filter((p: any) => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = !selectedCategory || p.category?.name === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesSubcategory = !selectedSubcategory || p.subcategory?.name === selectedSubcategory;
+    return matchesSearch && matchesCategory && matchesSubcategory;
   });
 
   const playBeep = useCallback(() => {
