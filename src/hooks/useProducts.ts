@@ -32,8 +32,9 @@ export function useProducts({ page = 0, search = "", categoryId }: UseProductsOp
         .from("products")
         .select(
           `id, name, sku, barcodes, description, cost_price, sell_price,
-           quantity, min_quantity, category_id,
-           category:categories(id, name)`,
+           quantity, min_quantity, category_id, subcategory_id,
+           category:categories(id, name),
+           subcategory:subcategories(id, name)`,
           { count: "exact" }
         )
         .eq("user_id", effectiveUserId)
