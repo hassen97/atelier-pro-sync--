@@ -109,7 +109,7 @@ export function useProduct(id: string | undefined) {
 
       const { data, error } = await supabase
         .from("products")
-        .select(`*, category:categories(id, name)`)
+        .select(`*, category:categories(id, name), subcategory:subcategories(id, name)`)
         .eq("id", id)
         .maybeSingle();
 
