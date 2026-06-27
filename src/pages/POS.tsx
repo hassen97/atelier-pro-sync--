@@ -42,6 +42,7 @@ export default function POS() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [scanInput, setScanInput] = useState("");
