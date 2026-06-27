@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Loader2, X, Wand2, Printer, Zap, CreditCard } from "lucide-react";
-import { useCategories } from "@/hooks/useCategories";
+import { useCategories, useSubcategories } from "@/hooks/useCategories";
 import { useCurrency } from "@/hooks/useCurrency";
 import { LabelPrintDialog } from "./LabelPrintDialog";
 import { useSuppliers, useCreateSupplierTransaction, useCreateSupplierPurchase, useUpdateSupplierBalance } from "@/hooks/useSuppliers";
@@ -36,6 +36,7 @@ const productSchema = z.object({
   barcodes: z.array(z.string()).default([]),
   description: z.string().optional(),
   category_id: z.string().optional(),
+  subcategory_id: z.string().optional(),
   cost_price: z.coerce.number().min(0),
   sell_price: z.coerce.number().min(0),
   quantity: z.coerce.number().int().min(0),
