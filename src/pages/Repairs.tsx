@@ -359,6 +359,11 @@ export default function Repairs() {
           : `Paiement de ${data.paymentAmount.toFixed(3)} DT enregistré`,
       });
 
+      queryClient.invalidateQueries({ queryKey: ["session-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+
+
+
       // Reset state
       setPaymentConfirmOpen(false);
       setPaymentConfirmRepair(null);
