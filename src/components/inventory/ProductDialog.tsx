@@ -140,7 +140,17 @@ export function ProductDialog({
   }, [product, form]);
 
   const handleSubmit = async (data: ProductFormValues) => {
-    await onSubmit(data);
+    const cleanData = {
+      ...data,
+      category_id: data.category_id || undefined,
+      // Drop the subcategory if it doesn't belong to the chosen category
+      subcategory_id:
+        data.subcategory_id &&
+        subcategoryOptions.some((o) => o.value === data.subcategory_id)
+          ? data.subcategory_id
+          : undefined,
+    };
+    await onSubmit(cleanData);
     clearDraft();
     form.reset();
   };
