@@ -24,6 +24,8 @@ import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { useInventoryAccess } from "@/hooks/useInventoryAccess";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { LoyaltyRedeemCard } from "@/components/pos/LoyaltyRedeemCard";
+import { CloseRegisterDialog } from "@/components/pos/CloseRegisterDialog";
+import { useCanCloseRegister } from "@/hooks/useRegisterSession";
 import { toast } from "sonner";
 
 interface CartItem {
