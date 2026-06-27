@@ -76,6 +76,7 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
     const isEditing = !!product;
     const { currencyCode } = useCurrency();
     const { data: productCategories = [] } = useCategories("product");
+    const { data: allSubcategories = [] } = useSubcategories();
     const categoryOptions = useMemo(
       () => productCategories.map((c) => ({ value: c.id, label: c.name })),
       [productCategories]
