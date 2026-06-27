@@ -69,6 +69,7 @@ export function ProductDialog({
   const isEditing = !!product;
   const { currencyCode } = useCurrency();
   const { data: productCategories = [] } = useCategories("product");
+  const { data: allSubcategories = [] } = useSubcategories();
   const categoryOptions = useMemo(
     () => productCategories.map((c) => ({ value: c.id, label: c.name })),
     [productCategories]
@@ -81,6 +82,7 @@ export function ProductDialog({
       sku: "",
       description: "",
       category_id: "",
+      subcategory_id: "",
       cost_price: 0,
       sell_price: 0,
       quantity: 0,
@@ -88,8 +90,17 @@ export function ProductDialog({
     },
   });
 
+  const selectedCategoryId = form.watch("category_id");
+  const subcategoryOptions = useMemo(
+    () =>
+      (allSubcategories as { id: string; name: string; category_id: string }[])
+        .filter((s) => s.category_id === selectedCategoryId)
+        .map((s) => ({ value: s.id, label: s.name })),
+    [allSubcategories, selectedCategoryId]
+  );
+
   const defaultDraftValues = {
-    name: "", sku: "", description: "", category_id: "",
+    name: "", sku: "", description: "", category_id: "", subcategory_id: "",
     cost_price: 0, sell_price: 0, quantity: 0, min_quantity: 5,
   };
 
