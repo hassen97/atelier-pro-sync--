@@ -49,6 +49,7 @@ interface ProductDialogProps {
     sku?: string | null;
     description?: string | null;
     category_id?: string | null;
+    subcategory_id?: string | null;
     cost_price: number;
     sell_price: number;
     quantity: number;
