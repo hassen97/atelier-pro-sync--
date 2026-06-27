@@ -490,3 +490,59 @@ ${data.phone ? `<p class="field"><span class="bold">Tél:</span> ${escHtml(data.
 
   printThermalHtml(html, "width=350,height=450");
 }
+
+// ── Register Z-Report (Clôture de caisse / end-of-day closing) ──
+
+export interface RegisterZReportData {
+  shopName: string;
+  dateTime: string; // formatted date & time
+  sales: string; // pre-formatted currency strings
+  repairs: string;
+  expenses: string;
+  net: string;
+}
+
+export function printRegisterZReport(
+  data: RegisterZReportData,
+  printerWidth: "80mm" | "58mm" = "80mm"
+) {
+  const pageW = printerWidth === "80mm" ? "72mm" : "48mm";
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Rapport de clôture</title>
+<style>
+  ${getThermalPrintCss(pageW, "12px")}
+  .z-shop { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 2px; }
+  .z-title { font-size: 15px; font-weight: bold; text-align: center; letter-spacing: 1px; margin: 2px 0; }
+  .z-meta { font-size: 11px; text-align: center; margin: 1px 0; }
+  .z-row { display: flex; justify-content: space-between; font-size: 13px; margin: 2px 0; gap: 3mm; }
+  .z-row .val { text-align: right; white-space: nowrap; }
+  .z-total { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; margin: 3px 0; gap: 3mm; }
+  .z-status { font-size: 13px; font-weight: bold; text-align: center; margin: 3px 0; }
+</style>
+</head>
+<body class="thermal-print-root"><main class="thermal-print-container">
+
+<div class="sep-bold"></div>
+<p class="z-title">RAPPORT DE CLÔTURE</p>
+<div class="sep-bold"></div>
+<p class="z-shop">${escHtml(data.shopName)}</p>
+<p class="z-meta">${escHtml(data.dateTime)}</p>
+<div class="sep"></div>
+<div class="z-row"><span>VENTES:</span><span class="val">${escHtml(data.sales)}</span></div>
+<div class="z-row"><span>RÉPARATIONS:</span><span class="val">${escHtml(data.repairs)}</span></div>
+<div class="z-row"><span>DÉPENSES:</span><span class="val">-${escHtml(data.expenses)}</span></div>
+<div class="sep"></div>
+<div class="z-total"><span>TOTAL EN CAISSE:</span><span class="val">${escHtml(data.net)}</span></div>
+<div class="sep-bold"></div>
+<p class="z-status">Statut: Clôturé</p>
+<div class="sep-bold"></div>
+
+</main></body>
+</html>`;
+
+  printThermalHtml(html, "width=380,height=560");
+}
