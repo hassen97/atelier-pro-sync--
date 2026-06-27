@@ -481,7 +481,7 @@ export default function Inventory() {
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  onClick={() => { setBulkCategoryValue("__none__"); setBulkCategoryOpen(true); }}
+                  onClick={() => { setBulkCategoryValue("__none__"); setBulkSubcategoryValue("__none__"); setBulkCategoryOpen(true); }}
                 >
                   <FolderInput className="h-4 w-4" />
                   Changer la catégorie
