@@ -106,6 +106,7 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
         barcodes: [],
         description: "",
         category_id: "",
+        subcategory_id: "",
         cost_price: 0,
         sell_price: 0,
         quantity: 0,
@@ -118,6 +119,14 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
     const sellPrice = useWatch({ control: form.control, name: "sell_price" }) || 0;
     const margin = sellPrice > 0 ? ((sellPrice - costPrice) / sellPrice) * 100 : 0;
     const productName = useWatch({ control: form.control, name: "name" }) || "";
+    const selectedCategoryId = useWatch({ control: form.control, name: "category_id" }) || "";
+    const subcategoryOptions = useMemo(
+      () =>
+        (allSubcategories as { id: string; name: string; category_id: string }[])
+          .filter((s) => s.category_id === selectedCategoryId)
+          .map((s) => ({ value: s.id, label: s.name })),
+      [allSubcategories, selectedCategoryId]
+    );
 
     useImperativeHandle(ref, () => ({
       addBarcode: (code: string) => {
