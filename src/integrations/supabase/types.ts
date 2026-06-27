@@ -512,6 +512,7 @@ export type Database = {
           description: string | null
           expense_date: string
           id: string
+          session_id: string | null
           supplier_id: string | null
           user_id: string
         }
@@ -522,6 +523,7 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          session_id?: string | null
           supplier_id?: string | null
           user_id: string
         }
@@ -532,10 +534,18 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          session_id?: string | null
           supplier_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "register_sessions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_supplier_id_fkey"
             columns: ["supplier_id"]
@@ -1171,6 +1181,33 @@ export type Database = {
         }
         Relationships: []
       }
+      register_sessions: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          id: string
+          opened_at: string
+          shop_id: string
+          status: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          shop_id: string
+          status?: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          shop_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       repair_parts: {
         Row: {
           created_at: string
@@ -1223,6 +1260,7 @@ export type Database = {
           payment_type: string
           recorded_by: string | null
           repair_id: string
+          session_id: string | null
           user_id: string
         }
         Insert: {
@@ -1234,6 +1272,7 @@ export type Database = {
           payment_type?: string
           recorded_by?: string | null
           repair_id: string
+          session_id?: string | null
           user_id: string
         }
         Update: {
@@ -1245,9 +1284,18 @@ export type Database = {
           payment_type?: string
           recorded_by?: string | null
           repair_id?: string
+          session_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "repair_payments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "register_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       repair_status_history: {
         Row: {
@@ -1449,6 +1497,7 @@ export type Database = {
           id: string
           notes: string | null
           payment_method: string
+          session_id: string | null
           total_amount: number
           user_id: string
         }
@@ -1459,6 +1508,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: string
+          session_id?: string | null
           total_amount?: number
           user_id: string
         }
@@ -1469,6 +1519,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: string
+          session_id?: string | null
           total_amount?: number
           user_id?: string
         }
@@ -1478,6 +1529,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "register_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -2250,6 +2308,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      close_register_session: { Args: { _shop_id: string }; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -2257,6 +2316,10 @@ export type Database = {
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
+      }
+      get_or_create_open_session: {
+        Args: { _shop_id: string }
+        Returns: string
       }
       get_repair_by_token: { Args: { p_token: string }; Returns: Json }
       get_team_owner_id: { Args: { _member_id: string }; Returns: string }
