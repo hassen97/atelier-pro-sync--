@@ -748,16 +748,37 @@ export default function Inventory() {
               Affecter une catégorie aux {selectedCount} produit{selectedCount > 1 ? "s" : ""} sélectionné{selectedCount > 1 ? "s" : ""}.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-2">
-            <Select value={bulkCategoryValue} onValueChange={setBulkCategoryValue}>
-              <SelectTrigger><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Non catégorisé</SelectItem>
-                {categoriesData.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Catégorie</label>
+              <Select value={bulkCategoryValue} onValueChange={handleBulkCategoryValueChange}>
+                <SelectTrigger><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Non catégorisé</SelectItem>
+                  {categoriesData.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Sous-catégorie</label>
+              <Select
+                value={bulkSubcategoryValue}
+                onValueChange={setBulkSubcategoryValue}
+                disabled={bulkCategoryValue === "__none__"}
+              >
+                <SelectTrigger><SelectValue placeholder="Choisir une sous-catégorie" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Aucune sous-catégorie</SelectItem>
+                  {subcategoriesData
+                    .filter((s) => s.category_id === bulkCategoryValue)
+                    .map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkCategoryOpen(false)} disabled={bulkUpdateCategory.isPending}>Annuler</Button>
