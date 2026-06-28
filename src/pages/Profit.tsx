@@ -33,6 +33,9 @@ import { useProfit } from "@/hooks/useProfit";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { useCurrency } from "@/hooks/useCurrency";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCanCloseRegister } from "@/hooks/useRegisterSession";
+import { RegisterHistoryTab } from "@/components/reports/RegisterHistoryTab";
 
 const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
