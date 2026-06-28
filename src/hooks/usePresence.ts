@@ -11,8 +11,8 @@ export function usePresence(userId: string | undefined) {
 
     const updatePresence = async () => {
       const now = Date.now();
-      // Throttle: skip if updated less than 30s ago
-      if (now - lastUpdate.current < 30000) return;
+      // Throttle: skip if updated less than 2 min ago
+      if (now - lastUpdate.current < 120000) return;
       lastUpdate.current = now;
 
       await supabase
