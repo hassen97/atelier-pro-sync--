@@ -1,46 +1,42 @@
-# Robust Cache-Busting for RepairPro
+# Dashboard Redesign — Bento Grid
 
-## Goal
-Users currently must clear browser cache to see new deployments. We'll make new versions load automatically without interrupting active data entry (POS, repairs forms).
+Reorganize `src/pages/Dashboard.tsx` into a professional, data-dense bento layout. Data hooks stay the same except one small addition for the month-over-month trend. No new fonts or colors — uses existing semantic tokens.
 
-## What's already correct (no change needed)
-- **File hashing (your point 2):** Vite already fingerprints every JS/CSS output (`main-[hash].js`) by default. Confirmed in build output — nothing to add.
-- **Service worker shell:** `vite.config.ts` already uses `NetworkFirst` for HTML, `skipWaiting`, `clientsClaim`, and `cleanupOutdatedCaches: true`. The SW correctly fetches fresh HTML.
+## 1. Quick Action Bar (top, full width)
+A responsive button row directly under the page header:
+- **Nouvelle Réparation** — primary gradient, opens the existing `RepairDialog`.
+- **Nouvelle Vente** — navigates to `/pos`.
+- **Entrée Stock** — navigates to `/inventory`.
+- **Exporter** — runs the existing `handleExport` CSV logic.
 
-## The actual root cause
-`src/main.tsx` registers the service worker but never **listens for an updated worker**. So even when a new version is downloaded in the background, the open tab keeps running the old JS until a manual hard-refresh. We fix this with proper update detection plus a safe reload strategy.
+Layout: `grid grid-cols-2 md:grid-cols-4 gap-3` so it stacks cleanly on mobile.
 
-## Changes
+## 2. Main Bento Grid (`grid-cols-1 md:grid-cols-3`)
+- **Left (wide, `md:col-span-2`)** — `CurrentRegisterPanel` (Caisse en cours) kept exactly as-is with all stats.
+- **Right (narrow, stacked)**:
+  - **Ventes du mois** — large bold KPI number, muted-grey label, plus a **"vs last month"** indicator (`+12% ↗` green / `-5% ↘` red).
+  - **Alertes stock** — big count with a red badge, and the **top 3 critical items at 0 stock**, each with a **Commander** button that adds it to a thermal order receipt (reusing the existing out-of-stock 80mm print helper). A "Voir l'inventaire" link remains.
 
-### 1. `src/main.tsx` — Update detection + safe auto-reload (core fix)
-Enhance the existing registration block (keep the iframe/preview guard untouched):
-- After `register("/sw.js")`, attach an `updatefound` listener. When the new worker reaches `installed` (and a controller already exists, meaning it's an update not first install), mark "update ready".
-- Add a single `navigator.serviceWorker.addEventListener("controllerchange", ...)` listener that reloads **once** (guarded by a flag to prevent reload loops).
-- **Safe-reload policy** (your chosen behavior):
-  - If the page is hidden (`document.visibilityState === "hidden"`) or the user is idle → reload immediately.
-  - Otherwise show a non-blocking toast: **"Nouvelle version disponible"** with a **"Actualiser"** button (via `sonner`, already wired globally). Clicking it reloads.
-  - Also reload automatically on the next tab focus/visibility change if an update is pending and no unsaved-form interaction is in progress.
-- Poll for updates: call `reg.update()` on initial load and on `visibilitychange` to `visible`, so a returning tab promptly discovers new deploys.
+## 3. Secondary Stats Row
+The four cards not covered above (Réparations en cours, Total produits, Dettes clients, Dettes fournisseurs) move into a compact, muted secondary row: `grid grid-cols-2 lg:grid-cols-4`, subtle `bg-muted/30` tiles, small muted labels, bold numbers — no heavy borders/shadows.
 
-### 2. `index.html` — Reinforce no-cache on the root document (your point 1)
-Add to `<head>`:
-```html
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-<meta http-equiv="Pragma" content="no-cache" />
-<meta http-equiv="Expires" content="0" />
-```
-Note: these meta tags are a belt-and-suspenders measure (browsers largely rely on HTTP headers, which Lovable hosting already sends with revalidation). They don't hurt and document intent. The SW `NetworkFirst` HTML strategy is what actually guarantees fresh HTML.
+## 4. Réparations récentes — Compact Table
+Replace the list with a shadcn `Table`, no extra card padding:
+- Columns: **Client · Device · Status (colored badge) · Prix**.
+- Reuses the existing `statusConfig` badge styling.
+- "Voir tout →" link to `/repairs` in a slim header.
 
-### 3. Version stamp for the toast (lightweight, your point 4)
-- Inject a build-time version constant via Vite `define` (e.g. `__APP_VERSION__` = build timestamp) in `vite.config.ts`.
-- Use it only to label the update toast and for an optional `localStorage` comparison fallback — **not** a forced `location.reload(true)` loop (that pattern is fragile and the SW path is more reliable). No aggressive reload loops.
+## 5. Visual Styling
+- Remove heavy borders/drop shadows; group with subtle `bg-muted/30` / `bg-muted/50` shading.
+- Primary KPIs: larger size + heavier weight (e.g. `text-3xl font-bold`).
+- All labels: `text-muted-foreground`, smaller, to reduce noise.
+- Keep `animate-fade-in` and the existing loading skeleton (re-shaped to match the new grid).
 
-## Explicitly NOT doing
-- No `selfDestroying` SW, no cache-busting reload loops, no version-polling hacks — these break Lovable preview and risk infinite reloads.
-- No changes to `public/sw-custom.js` (push-notification worker stays as-is).
-- No forced reload that could wipe an in-progress POS sale or repair form.
+## Technical Details
+- **Trend data**: extend `useDashboardStats` in `src/hooks/useDashboard.ts` to also compute current-month vs previous-month sales totals (filtered by `created_at` on `sales`, net of refunds), returning `salesTrendPct`. This is the only data-fetching change.
+- **Commander / order receipt**: reuse the existing thermal-print helper used by the Inventory "Rupture" out-of-stock flow (`src/lib/receiptPdf.ts`) to print an 80mm supplier order ticket for the selected 0-stock item(s).
+- Quick actions reuse existing routes (`/pos`, `/inventory`, `/repairs`) and the already-wired `RepairDialog` + `handleExport`.
+- Banners (`WaitlistTrialBanner`, onboarding reminders), `SubscriptionBadge`, `MyTasks`, and the `RepairDialog` submit logic are preserved untouched.
+- Layout stays fluid mobile→desktop via `grid-cols-1 md:grid-cols-3`.
 
-## Verification
-- Build and confirm hashed filenames + that the generated `/sw.js` still includes the custom push importScript.
-- Simulate an update (rebuild) and confirm: background download → toast appears → clicking "Actualiser" loads new chunks; hidden-tab path reloads silently; no reload loop.
-- Confirm SW still never registers in the Lovable preview iframe.
+No backend/schema changes.
