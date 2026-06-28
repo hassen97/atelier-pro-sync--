@@ -195,10 +195,49 @@ export default function Repairs() {
     pending: repairs.filter((r) => r.status === "pending").length,
     in_progress: repairs.filter((r) => r.status === "in_progress").length,
     completed: repairs.filter((r) => r.status === "completed").length,
+    rejected: repairs.filter((r) => r.status === "rejected").length,
     warranty: repairs.filter((r) => r.is_warranty).length,
   });
 
   const counts = getStatusCounts();
+
+  // ----- Multi-selection helpers -----
+  const selectedCount = selectedIds.size;
+  const allFilteredSelected = filteredRepairs.length > 0 && filteredRepairs.every((r) => selectedIds.has(r.id));
+
+  const handleSelectChange = (repair: ReturnType<typeof transformRepair>, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(repair.id);
+      else next.delete(repair.id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (allFilteredSelected) return new Set();
+      return new Set(filteredRepairs.map((r) => r.id));
+    });
+  };
+
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkStatus = (status: RepairStatus) => {
+    if (selectedCount === 0) return;
+    bulkUpdateStatus.mutate(
+      { ids: Array.from(selectedIds), status },
+      { onSuccess: () => exitSelection() }
+    );
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedCount === 0) return;
+    bulkDelete.mutate(Array.from(selectedIds), { onSuccess: () => exitSelection() });
+  };
 
   const handleNewRepair = () => {
     setEditingRepair(null);
