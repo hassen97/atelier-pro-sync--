@@ -1,49 +1,46 @@
+# Robust Cache-Busting for RepairPro
+
 ## Goal
+Users currently must clear browser cache to see new deployments. We'll make new versions load automatically without interrupting active data entry (POS, repairs forms).
 
-Revert the landing page from the new "Emerald Prestige" design back to the previous **Premium Dark SaaS** look (dark navy/blue), then apply small UI polish, performance optimizations, an OG social image, and SEO fixes. All waitlist, pricing, and navigation logic stays unchanged.
+## What's already correct (no change needed)
+- **File hashing (your point 2):** Vite already fingerprints every JS/CSS output (`main-[hash].js`) by default. Confirmed in build output — nothing to add.
+- **Service worker shell:** `vite.config.ts` already uses `NetworkFirst` for HTML, `skipWaiting`, `clientsClaim`, and `cleanupOutdatedCaches: true`. The SW correctly fetches fresh HTML.
 
-## 1. Restore the old design (faithful, from version history)
+## The actual root cause
+`src/main.tsx` registers the service worker but never **listens for an updated worker**. So even when a new version is downloaded in the background, the open tab keeps running the old JS until a manual hard-refresh. We fix this with proper update detection plus a safe reload strategy.
 
-The previous design is recoverable verbatim from commit `d5dd9e8` (the last version before the redesign), so this is an exact restore — not a re-code from memory.
+## Changes
 
-- **`src/pages/LandingPage.tsx`** → restore the dark version (blue `hsl(217 91% 60%)` accents, dark `240 10% 4%` background, glass cards, CSS dashboard mockup).
-- **`src/index.css`** → restore the `.landing-page` + `lp-*` block to the **Premium Dark SaaS** tokens (replacing the cream/emerald/gold block). The rest of the app theme is untouched.
-- Fonts: the old design uses **Inter** (already loaded). The `@fontsource/archivo-black` / `@fontsource/hind` imports added for the redesign are no longer needed by the page; they'll be removed from `src/main.tsx` so they don't ship unused (small perf win).
+### 1. `src/main.tsx` — Update detection + safe auto-reload (core fix)
+Enhance the existing registration block (keep the iframe/preview guard untouched):
+- After `register("/sw.js")`, attach an `updatefound` listener. When the new worker reaches `installed` (and a controller already exists, meaning it's an update not first install), mark "update ready".
+- Add a single `navigator.serviceWorker.addEventListener("controllerchange", ...)` listener that reloads **once** (guarded by a flag to prevent reload loops).
+- **Safe-reload policy** (your chosen behavior):
+  - If the page is hidden (`document.visibilityState === "hidden"`) or the user is idle → reload immediately.
+  - Otherwise show a non-blocking toast: **"Nouvelle version disponible"** with a **"Actualiser"** button (via `sonner`, already wired globally). Clicking it reloads.
+  - Also reload automatically on the next tab focus/visibility change if an update is pending and no unsaved-form interaction is in progress.
+- Poll for updates: call `reg.update()` on initial load and on `visibilitychange` to `visible`, so a returning tab promptly discovers new deploys.
 
-## 2. Small UI changes (on the restored dark design)
+### 2. `index.html` — Reinforce no-cache on the root document (your point 1)
+Add to `<head>`:
+```html
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+```
+Note: these meta tags are a belt-and-suspenders measure (browsers largely rely on HTTP headers, which Lovable hosting already sends with revalidation). They don't hurt and document intent. The SW `NetworkFirst` HTML strategy is what actually guarantees fresh HTML.
 
-- **Spacing & typography**: tighten section vertical rhythm, normalize heading sizes/line-heights, and balance padding on the hero, feature cards, and pricing for a cleaner, less cramped layout.
-- **Buttons & CTAs**: refine the primary button (consistent radius, hover/active states, clearer focus ring), make the main "Rejoindre la liste" CTA more prominent, and tidy secondary/ghost buttons for consistency.
-- No layout restructuring — same sections, same content.
+### 3. Version stamp for the toast (lightweight, your point 4)
+- Inject a build-time version constant via Vite `define` (e.g. `__APP_VERSION__` = build timestamp) in `vite.config.ts`.
+- Use it only to label the update toast and for an optional `localStorage` comparison fallback — **not** a forced `location.reload(true)` loop (that pattern is fragile and the SW path is more reliable). No aggressive reload loops.
 
-## 3. Performance optimization
-
-Note: the landing page has **no image files** — the hero "dashboard" is pure CSS/HTML, so there are no hero images to compress. Work focuses on what actually affects this page:
-
-- **Fonts**: drop the unused Archivo/Hind font imports; keep the existing Inter load. Add `rel="preconnect"` is already present; ensure font CSS uses `display=swap` (already set).
-- **Preloads**: the real LCP element is text/CSS, so no image preload is needed. Confirm no render-blocking work is added.
-- **Code-splitting**: the landing route already benefits from the earlier `manualChunks` work; verify `framer-motion` isn't pulling unnecessary weight on first paint (lazy/animate-on-view already in place).
-- **Lighthouse check**: after changes, run the page in the sandbox (Playwright + Lighthouse/manual metrics) to capture before/after and confirm no regressions in performance/accessibility/SEO/best-practices.
-
-## 4. OG / social preview image
-
-- Generate a branded **1200x630** OG image matching the dark SaaS look (RepairPro wordmark + tagline).
-- Save it to `public/og-image.jpg` and wire `og:image` / `twitter:image` in `index.html` to the project URL.
-
-## 5. SEO optimization
-
-- Update `index.html` `og:url`, `twitter` and canonical/sitemap references from the stale `getheavencoin.com` domain to the live project domain **https://atelier-pro-sync.lovable.app** (also update `public/sitemap.xml` and `public/robots.txt` `Sitemap:` line).
-- Verify a single `<h1>`, descriptive headings, image `alt`/`aria-label`s, and that title (<60 chars) and meta description (<160 chars) are accurate.
-- Run the SEO review afterward and mark addressed findings fixed.
+## Explicitly NOT doing
+- No `selfDestroying` SW, no cache-busting reload loops, no version-polling hacks — these break Lovable preview and risk infinite reloads.
+- No changes to `public/sw-custom.js` (push-notification worker stays as-is).
+- No forced reload that could wipe an in-progress POS sale or repair form.
 
 ## Verification
-
-- Typecheck.
-- Capture desktop + mobile screenshots of the restored page to confirm the dark design and UI polish render correctly.
-- Capture Lighthouse/metrics before/after.
-
-## Notes / technical details
-
-- Restore source: `git show d5dd9e8:src/pages/LandingPage.tsx` and the `.landing-page`/`lp-*` block from `git show d5dd9e8:src/index.css`.
-- No backend, schema, routing, or business-logic changes.
-- Social-preview crawlers cache aggressively; the new OG image may take time to appear in shared links until platforms re-fetch.
+- Build and confirm hashed filenames + that the generated `/sw.js` still includes the custom push importScript.
+- Simulate an update (rebuild) and confirm: background download → toast appears → clicking "Actualiser" loads new chunks; hidden-tab path reloads silently; no reload loop.
+- Confirm SW still never registers in the Lovable preview iframe.

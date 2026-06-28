@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Prevent the browser from caching the root HTML document so new
+         deployments are picked up immediately (belt-and-suspenders alongside
+         the NetworkFirst service-worker strategy). -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
     <!-- Canonical URL is set per-route via react-helmet-async (see src/components/seo/SEO.tsx) -->
 
 
