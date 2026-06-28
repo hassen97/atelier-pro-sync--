@@ -1,47 +1,49 @@
 ## Goal
 
-Replace the generic dark-blue "AI SaaS" landing page with a distinctive, professional **Emerald Prestige** launch design based on the direction you picked: light cream canvas, full nav, bold Archivo Black headlines, gold accents, and a live dashboard mockup in a split-screen hero.
+Revert the landing page from the new "Emerald Prestige" design back to the previous **Premium Dark SaaS** look (dark navy/blue), then apply small UI polish, performance optimizations, an OG social image, and SEO fixes. All waitlist, pricing, and navigation logic stays unchanged.
 
-All existing behavior stays exactly the same — only the look changes.
+## 1. Restore the old design (faithful, from version history)
 
-## What stays (no logic changes)
+The previous design is recoverable verbatim from commit `d5dd9e8` (the last version before the redesign), so this is an exact restore — not a re-code from memory.
 
-- Waitlist email capture → derives username → redirects to `/auth` (success + duplicate)
-- Dynamic pricing from `usePublicPlans`, plan selection / checkout routing
-- Auth-aware CTAs (`/dashboard` vs `/auth`), login link
-- SEO tags, mobile menu, scroll-aware navbar
+- **`src/pages/LandingPage.tsx`** → restore the dark version (blue `hsl(217 91% 60%)` accents, dark `240 10% 4%` background, glass cards, CSS dashboard mockup).
+- **`src/index.css`** → restore the `.landing-page` + `lp-*` block to the **Premium Dark SaaS** tokens (replacing the cream/emerald/gold block). The rest of the app theme is untouched.
+- Fonts: the old design uses **Inter** (already loaded). The `@fontsource/archivo-black` / `@fontsource/hind` imports added for the redesign are no longer needed by the page; they'll be removed from `src/main.tsx` so they don't ship unused (small perf win).
 
-## Design direction (locked)
+## 2. Small UI changes (on the restored dark design)
 
-- **Palette — Emerald Prestige:** deep emerald `#064e3b`, emerald `#0d7a5f`, gold `#c9a84c`, cream `#f5f0e0`
-- **Type:** Archivo Black (headings, uppercase, tight), Hind (body)
-- **Layout:** split-screen hero — copy + waitlist on the left, live dashboard mockup on the right
-- **Tone:** fast & powerful, premium, confident
+- **Spacing & typography**: tighten section vertical rhythm, normalize heading sizes/line-heights, and balance padding on the hero, feature cards, and pricing for a cleaner, less cramped layout.
+- **Buttons & CTAs**: refine the primary button (consistent radius, hover/active states, clearer focus ring), make the main "Rejoindre la liste" CTA more prominent, and tidy secondary/ghost buttons for consistency.
+- No layout restructuring — same sections, same content.
 
-## Implementation
+## 3. Performance optimization
 
-### 1. Fonts
-- `bun add @fontsource/archivo-black @fontsource/hind`
-- Import both in `src/main.tsx`
-- Add `display`, `sans` (Hind) families to `tailwind.config.ts` so `font-display`/`font-sans` work
+Note: the landing page has **no image files** — the hero "dashboard" is pure CSS/HTML, so there are no hero images to compress. Work focuses on what actually affects this page:
 
-### 2. Theme tokens
-- Add a scoped `.landing-page` token override block in `index.css` for the Emerald Prestige palette (cream background, emerald/gold accents), plus light-canvas variants of the helper classes the page uses (mesh gradient, glass cards, gradient text, navbar-scrolled, dashboard mockup). This keeps the rest of the app's dark theme untouched.
+- **Fonts**: drop the unused Archivo/Hind font imports; keep the existing Inter load. Add `rel="preconnect"` is already present; ensure font CSS uses `display=swap` (already set).
+- **Preloads**: the real LCP element is text/CSS, so no image preload is needed. Confirm no render-blocking work is added.
+- **Code-splitting**: the landing route already benefits from the earlier `manualChunks` work; verify `framer-motion` isn't pulling unnecessary weight on first paint (lazy/animate-on-view already in place).
+- **Lighthouse check**: after changes, run the page in the sandbox (Playwright + Lighthouse/manual metrics) to capture before/after and confirm no regressions in performance/accessibility/SEO/best-practices.
 
-### 3. Rebuild `src/pages/LandingPage.tsx`
-Rebuild the markup against the chosen prototype while reusing the existing handlers/data:
-- **Navbar:** cream/transparent → emerald on scroll; Archivo Black "REPAIRPRO" wordmark with gold-accented logo mark; nav links + gold "Rejoindre la liste" CTA; mobile menu restyled.
-- **Hero (split-screen):** left = live "Nouveau" pill, oversized Archivo Black headline with gold/emerald emphasis, Hind subcopy, waitlist form (gold button), reassurance line; right = white dashboard mockup (stat cards, weekly activity bar chart with gold highlight bar, repair-status panel) with soft emerald/gold glow accents.
-- **Stats band:** 4 trust stats in gold/emerald.
-- **Features:** keep the 6 features, restyle cards to cream/white with emerald icons + gold hover edges (bento or even grid).
-- **Value props:** Sécurisé / Ultra Rapide / Mobile First restyled.
-- **Pricing:** dynamic plans restyled — highlighted plan gets the gold/emerald popular treatment.
-- **Final CTA + footer:** emerald CTA band with gold button; restyled footer.
-- Keep Framer Motion entrances but tune to snappier timing.
+## 4. OG / social preview image
 
-### 4. Verify
-- Typecheck, then capture the rendered page (desktop + mobile) via the preview to confirm spacing, contrast, and that nothing overlaps before finishing.
+- Generate a branded **1200x630** OG image matching the dark SaaS look (RepairPro wordmark + tagline).
+- Save it to `public/og-image.jpg` and wire `og:image` / `twitter:image` in `index.html` to the project URL.
 
-## Notes
-- Color values applied through the scoped `.landing-page` tokens / inline styles already used on this page, so the global design system and app theme are unaffected.
-- No backend, schema, or routing changes.
+## 5. SEO optimization
+
+- Update `index.html` `og:url`, `twitter` and canonical/sitemap references from the stale `getheavencoin.com` domain to the live project domain **https://atelier-pro-sync.lovable.app** (also update `public/sitemap.xml` and `public/robots.txt` `Sitemap:` line).
+- Verify a single `<h1>`, descriptive headings, image `alt`/`aria-label`s, and that title (<60 chars) and meta description (<160 chars) are accurate.
+- Run the SEO review afterward and mark addressed findings fixed.
+
+## Verification
+
+- Typecheck.
+- Capture desktop + mobile screenshots of the restored page to confirm the dark design and UI polish render correctly.
+- Capture Lighthouse/metrics before/after.
+
+## Notes / technical details
+
+- Restore source: `git show d5dd9e8:src/pages/LandingPage.tsx` and the `.landing-page`/`lp-*` block from `git show d5dd9e8:src/index.css`.
+- No backend, schema, routing, or business-logic changes.
+- Social-preview crawlers cache aggressively; the new OG image may take time to appear in shared links until platforms re-fetch.
