@@ -1,42 +1,92 @@
-# Fix Category Mapping in Excel/CSV Stock Import
+## Objectif
 
-## Problem
-The importer in `src/components/inventory/ExcelImportDialog.tsx` parses the category text from the file (the `category` field is already extracted by the parser), but the `handleImport` insert builds product rows **without** `category_id`. So imported products land uncategorized in the POS view. Categories live in their own `categories` table (type `product`) and products reference them via a `category_id` UUID foreign key.
+Mettre en place une vraie infrastructure i18n avec **react-i18next** pour Français, **Arabe (RTL)** et Anglais. On installe la librairie, on crée les fichiers de traduction de base, on persiste le choix dans la table `profiles`, on ajoute un sélecteur de langue, un popup de premier choix, et la gestion automatique du RTL. On **remplace** l'ancien système maison (`I18nContext` FR/EN lié à `shop_settings`).
 
-## Fix Overview
-Add a category-resolution step before inserting product batches, then attach the resolved `category_id` to each product row. All work stays inside `ExcelImportDialog.tsx`; no database schema change is needed (the `category_id` column and `categories` table already exist).
+Note: cette étape couvre **l'infrastructure uniquement** — les libellés de base (navigation, boutons communs). La traduction complète de chaque page sera faite plus tard.
 
-## Implementation Steps
+---
 
-### 1. Category resolution helper (before batch insert)
-Inside `handleImport`, before the insert loop:
-- Collect every distinct non-empty category name from the valid rows (trimmed).
-- Always include the fallback name `"Non classé"`.
-- Fetch all existing product categories for this shop: `select id, name from categories where user_id = effectiveUserId and type = 'product'`.
-- Build a case-insensitive lookup map (`name.toLowerCase() -> id`).
-- For each file category name not already present, insert it into `categories` (`{ name, type: 'product', user_id: effectiveUserId }`), returning its new `id`, and add it to the map.
-- Result: a `Map<string (lowercased name), string (uuid)>` covering every category referenced by the import plus the default.
+## 1. Base de données
 
-### 2. Product mapping
-When building each batch row in the insert loop:
-- Resolve `category_id` from the map using the row's `category` (lowercased/trimmed).
-- If the row has a blank/missing category, use the `"Non classé"` category id.
-- Add `category_id` to the inserted object (never insert the raw text string).
-- `subcategory_id` is left untouched (out of scope; no subcategory column in template).
+Ajouter une colonne `language` à la table `profiles` pour persister le choix par utilisateur :
+- `language` : texte, peut être vide (`null` = l'utilisateur n'a pas encore choisi → déclenche le popup).
+- Valeurs attendues : `fr`, `ar`, `en`.
 
-### 3. Fallback / default category
-- A blank category cell resolves to the auto-created/looked-up `"Non classé"` category. The product is still imported, never dropped.
+C'est volontairement `null` par défaut pour que le `LanguageModal` ne s'affiche qu'au premier passage.
 
-### 4. Template column
-- The downloadable template already emits a `catégorie` header (column 8). Keep it, and ensure the example row clearly shows a value (e.g. "Écrans") so users know where to type it. The parser already maps `catégorie`, `categorie`, and `category` to the internal `category` key, so no alias change is required.
+## 2. Installation
 
-### 5. Cache invalidation
-After a successful import, also invalidate the `["categories"]` query so newly created categories appear immediately in the POS / inventory filters (alongside the existing `products`, `dashboard-stats`, `low-stock-alerts` invalidations).
+- `i18next`
+- `react-i18next`
+- `i18next-browser-languagedetector` (détection de la langue du navigateur comme valeur initiale par défaut)
 
-## Technical Notes
-- The resolution runs once up front (one select + at most a few inserts), not per-row, so performance stays fine with the existing 20-row batch insert.
-- Category matching is case-insensitive per the requirement; stored name keeps the original casing from the file (or the first occurrence).
-- If category fetch/insert fails, surface a toast error and abort before importing products, so we never silently drop categorization.
+## 3. Structure des fichiers de traduction
 
-## Files Changed
-- `src/components/inventory/ExcelImportDialog.tsx` — add category resolution, attach `category_id` to product rows, invalidate categories query, tidy template example.
+```text
+src/i18n/
+  index.ts                 # init i18next + détection + export
+  locales/
+    fr/common.json
+    ar/common.json
+    en/common.json
+```
+
+Chaque `common.json` contiendra les libellés de base déjà présents dans l'ancien système (navigation sidebar, boutons communs : Enregistrer, Annuler, Supprimer, Rechercher…), structurés par namespaces logiques (`nav.*`, `common.*`, `language.*`). Les traductions **arabes seront réelles** (rédigées correctement), pas des placeholders.
+
+## 4. Initialisation
+
+- `src/i18n/index.ts` initialise i18next avec les 3 langues, `fallbackLng: 'fr'`, et le détecteur de langue navigateur.
+- Import de `./i18n` dans `src/main.tsx` pour que l'instance soit disponible **partout** (y compris pages publiques, auth, et le modal) — pas seulement dans les routes protégées.
+
+## 5. Persistance + synchronisation (`useLanguage` hook)
+
+Créer `src/hooks/useLanguage.ts` :
+- Lit `profiles.language` de l'utilisateur connecté.
+- `changeLanguage(lang)` : appelle `i18n.changeLanguage(lang)`, met à jour `document.documentElement` (`lang` + `dir`), et **écrit la valeur dans `profiles.language`** via Supabase.
+- Au chargement, si `profiles.language` est défini, on applique cette langue ; sinon on laisse la langue détectée et on signale que le modal doit s'afficher.
+
+## 6. Gestion RTL (Tailwind)
+
+- Tailwind v3 supporte nativement les variantes `rtl:` / `ltr:` basées sur l'attribut `dir` du `<html>` — **aucun plugin nécessaire**.
+- Un utilitaire applique sur `<html>` : `dir="rtl"` + `lang="ar"` quand la langue est arabe, sinon `dir="ltr"`.
+- Appliqué à chaque changement de langue ET au démarrage de l'app, dans le hook `useLanguage`/init i18n.
+
+## 7. Composant `LanguageSwitcher`
+
+`src/components/i18n/LanguageSwitcher.tsx` :
+- Dropdown (shadcn `DropdownMenu`) avec les 3 langues (drapeau/label : Français, العربية, English).
+- Au clic → `changeLanguage()` (met à jour i18n, le `dir`, et la base de données).
+- Intégré dans le header de `MainLayout.tsx` (à côté du bouton thème/notifications).
+
+## 8. Composant `LanguageModal`
+
+`src/components/i18n/LanguageModal.tsx` :
+- S'affiche **uniquement si `profiles.language` est `null`** (premier passage).
+- Dialog shadcn non-fermable au clic extérieur, propose les 3 langues.
+- Au choix → enregistre dans `profiles.language`, applique la langue + le `dir`, puis se ferme.
+- Monté dans `MainLayout.tsx` (zone authentifiée).
+
+## 9. Remplacement de l'ancien système
+
+- Migrer les 3 fichiers utilisant `useI18n` vers `useTranslation` de react-i18next :
+  - `src/pages/Settings.tsx`
+  - `src/components/layout/AppSidebar.tsx`
+  - (`src/contexts/I18nContext.tsx` supprimé)
+- Retirer `<I18nProvider>` de `src/App.tsx`.
+- Supprimer `src/contexts/I18nContext.tsx`.
+- Le sélecteur de langue dans **Settings** pointera désormais vers `useLanguage` (profiles) au lieu de `shop_settings.language`.
+
+---
+
+## Détails techniques
+
+- **Source de vérité unique** : `profiles.language` (par utilisateur). `shop_settings.language` n'est plus utilisé pour l'UI.
+- **Clés de traduction** : on réutilise les clés existantes de l'ancien `I18nContext` (`nav.*`, `common.*`, etc.) pour limiter les changements dans les composants déjà branchés.
+- **Ordre de priorité de la langue au démarrage** : `profiles.language` → langue détectée navigateur → `fr`.
+- **RTL** : variantes Tailwind `rtl:`/`ltr:` natives ; le `dir` est posé sur `<html>`. Les composants existants restent compatibles ; des ajustements RTL fins par page pourront être ajoutés lors de la traduction complète ultérieure.
+- **Aucune modification** de `src/integrations/supabase/client.ts` ni des fichiers auto-générés.
+
+## Hors périmètre (à faire plus tard)
+
+- Traduction de tout le contenu de chaque page (seuls les libellés de base sont couverts ici).
+- Ajustements RTL détaillés page par page.

@@ -1083,6 +1083,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_locked: boolean
+          language: string | null
           last_online_at: string | null
           last_verification_reminder_sent_at: string | null
           phone: string | null
@@ -1107,6 +1108,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_locked?: boolean
+          language?: string | null
           last_online_at?: string | null
           last_verification_reminder_sent_at?: string | null
           phone?: string | null
@@ -1131,6 +1133,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_locked?: boolean
+          language?: string | null
           last_online_at?: string | null
           last_verification_reminder_sent_at?: string | null
           phone?: string | null
