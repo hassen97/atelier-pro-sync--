@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-const UPDATE_INTERVAL = 2 * 60 * 1000; // 2 minutes
+const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 export function usePresence(userId: string | undefined) {
   const lastUpdate = useRef<number>(0);
