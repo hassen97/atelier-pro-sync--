@@ -124,6 +124,11 @@ export default function Repairs() {
   const [assignRepair, setAssignRepair] = useState<ReturnType<typeof transformRepair> | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
+  // Multi-selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkConfirm, setBulkConfirm] = useState<null | "delete" | "rejected">(null);
+
   const queryClient = useQueryClient();
   const { data: repairsResult = { data: [], count: 0 }, isLoading } = useRepairs(page);
   const rawRepairs = repairsResult.data;
@@ -136,6 +141,8 @@ export default function Repairs() {
   const updateRepair = useUpdateRepair();
   const updateStatus = useUpdateRepairStatus();
   const deleteRepair = useDeleteRepair();
+  const bulkUpdateStatus = useBulkUpdateRepairStatus();
+  const bulkDelete = useBulkDeleteRepair();
   const updateCustomer = useUpdateCustomer();
 
   // Enable realtime updates for repairs
