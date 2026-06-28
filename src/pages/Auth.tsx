@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { SEO } from "@/components/seo/SEO";
+import repairProLogo from "@/assets/repairpro-logo.png";
 
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY || "";
 const REMEMBER_ME_KEY = "repairpro_remember_me";
