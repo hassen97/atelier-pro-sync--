@@ -26,6 +26,9 @@ export function useDashboardStats() {
       if (!user) {
         return {
           salesTotal: 0,
+          salesThisMonth: 0,
+          salesLastMonth: 0,
+          salesTrendPct: null,
           repairsInProgress: 0,
           repairsCompleted: 0,
           repairsPending: 0,
