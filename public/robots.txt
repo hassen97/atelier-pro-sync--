@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://atelier-pro-sync.lovable.app/sitemap.xml
+Sitemap: https://www.getheavencoin.com/sitemap.xml

@@ -1,6 +1,6 @@
 import { Helmet } from "react-helmet-async";
 
-const SITE_URL = "https://atelier-pro-sync.lovable.app";
+const SITE_URL = "https://www.getheavencoin.com";
 
 export function SEO({
   title,
