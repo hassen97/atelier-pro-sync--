@@ -67,7 +67,7 @@ export function useDashboardStats() {
           .eq("user_id", user.id),
         supabase
           .from("sales")
-          .select("id, total_amount")
+          .select("id, total_amount, created_at")
           .eq("user_id", user.id),
         supabase
           .from("product_returns")
