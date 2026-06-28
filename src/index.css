@@ -499,6 +499,35 @@
     inset 0 1px 0 hsla(0, 0%, 100%, 0.05);
 }
 
+/* Landing UI polish: interactive CTAs, focus rings, balanced headings */
+.landing-page .lp-glow-btn {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease;
+  will-change: transform;
+}
+.landing-page .lp-glow-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+.landing-page .lp-glow-btn:active {
+  transform: scale(0.98);
+}
+.landing-page a:focus-visible,
+.landing-page button:focus-visible,
+.landing-page input:focus-visible {
+  outline: 2px solid hsl(217 91% 65%);
+  outline-offset: 2px;
+}
+.landing-page h1,
+.landing-page h2,
+.landing-page h3 {
+  text-wrap: balance;
+}
+.landing-page p {
+  text-wrap: pretty;
+}
+
+
+
 
 @media print {
   @page { margin: 0; }
