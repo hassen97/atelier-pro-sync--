@@ -1,45 +1,46 @@
-# Fix: Super admin wrongly redirected to shop-owner dashboard
+# Rollback to before the deep scan
 
-## Problem
-After logging in, the super ultra admin (`hassen`, role `platform_admin`) lands on the normal shop-owner dashboard instead of `/admin`.
+## What's happening now
+After the deep scan, the super admin login no longer redirects at all — it's **stuck on the loading screen**. This is a direct side effect of the last hardening change in `ProtectedRoute.tsx`:
 
-The database and RLS are correct (one `platform_admin` role, readable by the user). The routing in `ProtectedRoute.tsx` correctly redirects a `platform_admin` to `/admin`. The fault is in how the admin role is detected.
-
-## Root cause
-`useIsPlatformAdmin()` in `src/hooks/useAdmin.ts`:
-
-```ts
-const { data } = await supabase
-  .from("user_roles").select("role").eq("user_id", user.id).single();
-return data?.role === "platform_admin";
+```text
+if (loading || ... || (adminError && !!user) || ...) { show loader }
 ```
 
-- It uses `.single()` and **discards the `error`**. Any transient failure (flaky mobile network, a stale cached JS chunk from the failed publishes) makes `data` `undefined`, so the hook returns `false`.
-- When it returns `false`, `ProtectedRoute` skips the `/admin` redirect and renders the shop-owner dashboard — with no error surfaced.
-- Every other role hook (`useIsOwner`, `useMyTeamInfo`) was already hardened with `.maybeSingle()` + error handling; this one was not.
+The admin-role query is failing/erroring for your account, and because the guard now keeps the loader visible on `adminError`, you never leave "Chargement...". Before the deep scan this code didn't exist, so login worked.
 
-The mobile screenshot and "works sometimes / intermittent" nature both point to this fragile query silently failing.
+## Recommended rollback: use History (safest, one click)
+The cleanest way to get back to the exact state **before the deep scan** is the built-in History — no risk, no "undo code", and it restores every touched file at once (`useAdmin.ts`, `ProtectedRoute.tsx`, `Auth.tsx`, `useProfit.ts`, `usePresence.ts`, `vite.config.ts`, etc.).
 
-## Fix
+Steps:
+1. Open History (button below).
+2. Find the version **just before** the "deep scan / db indexes" turn.
+3. Click Restore on that version.
 
-### 1. Harden `useIsPlatformAdmin` (`src/hooks/useAdmin.ts`)
-- Switch `.single()` → `.maybeSingle()`.
-- **Throw on a real query error** instead of returning `false`. This is the key change: on error, React Query keeps the result in a loading/error state and retries, so `ProtectedRoute` shows the loader and retries rather than wrongly concluding "not an admin" and dropping the user into the shop dashboard.
-- Add `retry: 2` and a short `staleTime` (e.g. 60s) so the admin status is resilient on mobile networks and isn't re-fetched on every navigation.
+Everything after stays archived in chat and can be reapplied later if you ever want it.
 
-### 2. Make the route guard fail safe (`src/components/auth/ProtectedRoute.tsx`)
-- Pull `isError`/`isLoading` from `useIsPlatformAdmin()` and keep the loading screen visible while the admin check is still loading or errored, so a failed admin check never falls through to rendering the shop owner UI. (The funnel guard already skips `platform_admin`, so this only tightens the admin path.)
+```text
+Before deep scan  ──►  [RESTORE HERE]  ──►  deep scan  ──►  admin hardening (broken)
+```
 
-### 3. Align the login-time role check (`src/pages/Auth.tsx`)
-- The post-login role lookup (around line 144) also uses `.single()`. Switch it to `.maybeSingle()` for consistency so a hiccup there doesn't misclassify the account. This is secondary (navigation still goes through `ProtectedRoute`), but keeps the behavior consistent.
+## What rollback does and does not touch
+- **Code**: fully reverted to the pre-deep-scan state. This removes the `adminError`-based loader trap, so the super admin login behaves as it did before.
+- **Database indexes**: the indexes added during the deep scan are **not removed** by a code revert. That's fine — indexes only make reads faster, they never change data or behavior, and they are not what broke login. Leaving them in place is safe and recommended.
+- **Data**: untouched. No customer, repair, sales, or session data is affected.
 
-## After the fix
-- Publish is required for this to reach the live site. Because earlier publishes failed, I'll confirm the build succeeds and recommend a fresh publish. If you're using the installed PWA, a hard refresh (or reopening the app) clears the old cached bundle so the corrected admin redirect loads.
+## Alternative: I revert only the 3 admin files for you
+If you'd rather keep the other deep-scan improvements (chunking, PWA precache, profit-day fix) and only undo the part that broke admin login, I can instead restore just these to their pre-deep-scan versions:
+- `src/hooks/useAdmin.ts`
+- `src/components/auth/ProtectedRoute.tsx`
+- `src/pages/Auth.tsx`
 
-## Verification
-- Type-check / build passes.
-- Trace the logic: a `platform_admin` whose role query succeeds → redirected to `/admin`; whose role query errors → stays on the loader and retries, never the shop dashboard.
+Tell me which you prefer:
+- **A)** Full rollback to before the deep scan (via History — recommended), or
+- **B)** I surgically revert only the admin-login changes and keep the rest.
 
-## Technical notes
-- No database or RLS changes are needed — the data is already correct.
-- Files touched: `src/hooks/useAdmin.ts`, `src/components/auth/ProtectedRoute.tsx`, `src/pages/Auth.tsx`.
+## Note on the live site
+Code rollbacks only reach your live customers after a successful **Publish**. Once you've rolled back (or I revert the admin files), we should retry publishing so the working version goes live.
+
+<presentation-actions>
+<presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
