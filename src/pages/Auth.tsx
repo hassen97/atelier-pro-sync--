@@ -140,27 +140,34 @@ export default function Auth() {
       if (sessionData.session?.user) {
         const userId = sessionData.session.user.id;
 
-        // Role matching: check user role vs selected tab
-        const { data: roleData } = await supabase
+        // Role matching: a user can have multiple rows in user_roles
+        // (e.g. platform_admin + super_admin), so fetch the full set rather
+        // than assuming a single row (which breaks with .single()).
+        const { data: roles } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", userId)
-          .single();
+          .eq("user_id", userId);
 
-        const userRole = roleData?.role;
+        const roleSet = new Set((roles ?? []).map((r) => r.role));
+        const isPlatformAdmin = roleSet.has("platform_admin");
+        const isOwner = roleSet.has("super_admin") || roleSet.has("admin");
+        const isEmployee = roleSet.has("employee") || roleSet.has("manager");
 
-        if (loginRole === "employee" && (userRole === "super_admin" || userRole === "admin")) {
-          await supabase.auth.signOut();
-          setError("Ce compte est un compte propriétaire. Veuillez utiliser l'onglet « Propriétaire ».");
-          setLoading(false);
-          return;
-        }
+        // Platform admins bypass the owner/employee tab guards entirely.
+        if (!isPlatformAdmin) {
+          if (loginRole === "employee" && isOwner) {
+            await supabase.auth.signOut();
+            setError("Ce compte est un compte propriétaire. Veuillez utiliser l'onglet « Propriétaire ».");
+            setLoading(false);
+            return;
+          }
 
-        if (loginRole === "owner" && (userRole === "employee" || userRole === "manager")) {
-          await supabase.auth.signOut();
-          setError("Ce compte est un compte employé. Veuillez utiliser l'onglet « Employé ».");
-          setLoading(false);
-          return;
+          if (loginRole === "owner" && isEmployee) {
+            await supabase.auth.signOut();
+            setError("Ce compte est un compte employé. Veuillez utiliser l'onglet « Employé ».");
+            setLoading(false);
+            return;
+          }
         }
 
         const { data: profile } = await supabase
