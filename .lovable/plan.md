@@ -1,67 +1,38 @@
-# Fix super-admin login (multi-role detection bug)
+## Problem found
 
-## Root cause (confirmed in the database)
-`useIsPlatformAdmin()` and the login role check both assume each user has exactly **one** row in `user_roles`:
+The super-admin account is getting stuck because parts of the app still assume a user has only one role row.
 
-```ts
-.from("user_roles").select("role").eq("user_id", user.id).single()
-```
+Two concrete blockers are visible:
 
-But the super-admin `hassen` (`855c224e-…`) has **two** rows in the test/preview backend:
+1. `useIsOwner()` in `src/hooks/useTeam.ts` uses `.maybeSingle()` without filtering by role. For the super-admin account that has both `platform_admin` and `super_admin`, the backend returns `PGRST116` / “multiple rows returned”.
+2. The `admin-manage-users` edge function checks the caller role with `.single()`, so the same multi-role account is rejected with `403 Forbidden`. The admin page then waits/loads because core admin requests fail.
 
-```text
-user_roles for hassen:
-  platform_admin
-  super_admin
-```
+## Fix plan
 
-`.single()` throws "multiple rows returned" → `data` is null → `isPlatformAdmin` becomes `false` → `ProtectedRoute` redirects to `/dashboard` (shop owner). The earlier `.maybeSingle()` + `throw` version had the same multi-row failure, which is why it got stuck on the loader. In production hassen has only `platform_admin`, which is why it behaved differently there.
+1. **Make role checks multi-role safe**
+   - Update `useIsOwner()` to query specifically for `role = 'super_admin'`.
+   - Add short caching (`staleTime`) so this role check is not refetched constantly while navigating.
+   - Ensure query errors do not keep the UI stuck indefinitely.
 
-A separate admin login page would still call the same broken query, so the real fix is to make role detection **multi-role aware**.
+2. **Fix the admin edge function authorization**
+   - In `supabase/functions/admin-manage-users/index.ts`, replace the `.single()` caller-role lookup with a filtered `role = 'platform_admin'` lookup using `.maybeSingle()`.
+   - This will allow platform admins even when they also have another role.
+   - Keep the security rule strict: only `platform_admin` can access this function.
 
-## Fix
+3. **Prevent normal shop-owner guards from delaying admin users**
+   - Adjust `ProtectedRoute.tsx` so platform admins are redirected to `/admin` before waiting on owner/team/onboarding checks that are only relevant to shop-owner routes.
+   - This avoids unnecessary queries and prevents a broken shop-owner role check from blocking the admin dashboard.
 
-### 1. `src/hooks/useAdmin.ts` — `useIsPlatformAdmin`
-Stop assuming one role row. Query specifically for the admin role so the number of other roles is irrelevant:
+4. **Optimize admin dashboard startup performance**
+   - Stop loading all heavy admin overview queries at once when the shell first opens where possible.
+   - Add `retry: false` or low retry counts for admin queries that fail with `403`, so the UI does not repeatedly hammer the backend while stuck.
+   - Keep existing `staleTime`/`refetchOnWindowFocus: false` patterns.
 
-```ts
-const { data } = await supabase
-  .from("user_roles")
-  .select("role")
-  .eq("user_id", user.id)
-  .eq("role", "platform_admin")
-  .maybeSingle();
-return !!data;
-```
+5. **Validate**
+   - Run a type-check.
+   - Verify in preview that super-admin reaches `/admin` instead of staying on “Chargement du centre de commande...” or redirecting to `/dashboard`.
+   - Confirm admin API calls no longer return `403 Forbidden` for the platform-admin user.
 
-`maybeSingle()` is safe here because filtering by `role` returns at most one row. This works whether the user has 1 role or several.
+## Expected result
 
-### 2. `src/pages/Auth.tsx` — login role/tab matching
-Replace the `.single()` lookup (line ~144) with a fetch of **all** the user's roles and derive an effective role from the set, so multi-role accounts don't break:
-
-```ts
-const { data: roles } = await supabase
-  .from("user_roles").select("role").eq("user_id", userId);
-const roleSet = new Set((roles ?? []).map(r => r.role));
-const isPlatformAdmin = roleSet.has("platform_admin");
-const isOwner = roleSet.has("super_admin") || roleSet.has("admin");
-const isEmployee = roleSet.has("employee") || roleSet.has("manager");
-```
-
-- If `isPlatformAdmin` → allow login regardless of selected tab; `ProtectedRoute` then routes to `/admin`.
-- Keep the existing employee/owner tab-mismatch guards, but base them on `isOwner` / `isEmployee` (a platform admin bypasses these checks).
-
-### 3. No change needed in `ProtectedRoute.tsx`
-Once `useIsPlatformAdmin` returns `true` again, the existing redirect (`isPlatformAdmin && pathname !== "/admin" → /admin`) sends you to the admin dashboard correctly.
-
-## About the suggested separate admin login page
-Not required to fix this, and it adds a second auth surface to maintain. The multi-role fix restores correct routing from the single existing login. If you still want a dedicated `/admin-login` for convenience/branding afterward, we can add it as a follow-up — but it's optional, not the fix.
-
-## Optional data cleanup (separate step, with your OK)
-The duplicate `super_admin` row on `hassen` is harmless once the code is multi-role aware, but if you want a clean state I can remove the extra `super_admin` row from platform-admin accounts via an `insert`/`delete` data operation. I'll only do this if you confirm.
-
-## Verification
-1. Type-check passes.
-2. Log in as `hassen` in the preview → lands on `/admin`, not the shop dashboard.
-3. Log in as a normal shop owner → still lands on `/dashboard`.
-4. Publish so the fix reaches the live site.
+The super-admin login should open the admin dashboard reliably, even if the account has multiple roles, and the admin page should make fewer unnecessary role/onboarding requests during startup.

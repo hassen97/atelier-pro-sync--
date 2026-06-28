@@ -56,16 +56,20 @@ export const ALL_PAGES = [
 ] as const;
 
 // Check if current user is a super_admin (owner)
-export function useIsOwner() {
+export function useIsOwner(options: { enabled?: boolean } = {}) {
   const { user } = useAuth();
+  const enabled = options.enabled ?? true;
   return useQuery({
     queryKey: ["user-role", user?.id],
     queryFn: async () => {
       if (!user) return false;
+      // A platform admin may also have a shop-owner role row. Filter by the
+      // exact role so multi-role accounts never trigger a "multiple rows" error.
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
+        .eq("role", "super_admin")
         .maybeSingle();
       if (error) {
         console.error("useIsOwner error:", error);
@@ -73,13 +77,16 @@ export function useIsOwner() {
       }
       return data?.role === "super_admin";
     },
-    enabled: !!user,
+    enabled: enabled && !!user,
+    staleTime: 60_000,
+    retry: 1,
   });
 }
 
 // Get team membership info for the current user (as employee)
-export function useMyTeamInfo() {
+export function useMyTeamInfo(options: { enabled?: boolean } = {}) {
   const { user } = useAuth();
+  const enabled = options.enabled ?? true;
   return useQuery({
     queryKey: ["my-team-info", user?.id],
     queryFn: async () => {
@@ -96,7 +103,8 @@ export function useMyTeamInfo() {
       }
       return data as TeamMember | null;
     },
-    enabled: !!user,
+    enabled: enabled && !!user,
+    staleTime: 60_000,
     retry: 1,
   });
 }
@@ -411,9 +419,12 @@ export function useDeleteTask() {
 }
 
 // Hook for allowed pages (used in sidebar filtering)
-export function useAllowedPages() {
-  const { data: isOwner, isLoading: ownerLoading } = useIsOwner();
-  const { data: teamInfo, isLoading: teamLoading } = useMyTeamInfo();
+export function useAllowedPages(options: { enabled?: boolean } = {}) {
+  const enabled = options.enabled ?? true;
+  const { data: isOwner, isLoading: ownerLoading } = useIsOwner({ enabled });
+  const { data: teamInfo, isLoading: teamLoading } = useMyTeamInfo({ enabled });
+
+  if (!enabled) return { allowedPages: null, isLoading: false, isTeamMember: false };
 
   const isLoading = ownerLoading || teamLoading;
 

@@ -90,9 +90,10 @@ serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", callerId)
-      .single();
+      .eq("role", "platform_admin")
+      .maybeSingle();
 
-    if (roleData?.role !== "platform_admin") {
+    if (!roleData) {
       return jsonResp({ error: "Forbidden" }, 403);
     }
 
