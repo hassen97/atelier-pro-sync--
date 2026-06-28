@@ -1188,6 +1188,10 @@ export type Database = {
           id: string
           opened_at: string
           shop_id: string
+          snapshot_depenses: number
+          snapshot_net: number
+          snapshot_reparations: number
+          snapshot_ventes: number
           status: string
         }
         Insert: {
@@ -1196,6 +1200,10 @@ export type Database = {
           id?: string
           opened_at?: string
           shop_id: string
+          snapshot_depenses?: number
+          snapshot_net?: number
+          snapshot_reparations?: number
+          snapshot_ventes?: number
           status?: string
         }
         Update: {
@@ -1204,6 +1212,10 @@ export type Database = {
           id?: string
           opened_at?: string
           shop_id?: string
+          snapshot_depenses?: number
+          snapshot_net?: number
+          snapshot_reparations?: number
+          snapshot_ventes?: number
           status?: string
         }
         Relationships: []

@@ -500,6 +500,7 @@ export interface RegisterZReportData {
   repairs: string;
   expenses: string;
   net: string;
+  isReprint?: boolean; // when true, prints a duplicate marker
 }
 
 export function printRegisterZReport(
@@ -507,6 +508,10 @@ export function printRegisterZReport(
   printerWidth: "80mm" | "58mm" = "80mm"
 ) {
   const pageW = printerWidth === "80mm" ? "72mm" : "48mm";
+
+  const title = data.isReprint
+    ? "RAPPORT DE CLÔTURE (DUPLICATA)"
+    : "RAPPORT DE CLÔTURE";
 
   const html = `<!DOCTYPE html>
 <html>
@@ -527,7 +532,7 @@ export function printRegisterZReport(
 <body class="thermal-print-root"><main class="thermal-print-container">
 
 <div class="sep-bold"></div>
-<p class="z-title">RAPPORT DE CLÔTURE</p>
+<p class="z-title">${escHtml(title)}</p>
 <div class="sep-bold"></div>
 <p class="z-shop">${escHtml(data.shopName)}</p>
 <p class="z-meta">${escHtml(data.dateTime)}</p>

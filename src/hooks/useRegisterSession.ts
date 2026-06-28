@@ -120,6 +120,7 @@ export function useCloseSession() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["register-session"] });
       queryClient.invalidateQueries({ queryKey: ["session-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["register-history"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["sales"] });
       queryClient.invalidateQueries({ queryKey: ["profit"] });
@@ -139,4 +140,51 @@ export function useCanCloseRegister(): boolean {
   const { data: isOwner } = useIsOwner();
   const { data: teamInfo } = useMyTeamInfo();
   return Boolean(isOwner) || teamInfo?.role === "admin";
+}
+
+export interface RegisterHistoryRow {
+  id: string;
+  closed_at: string | null;
+  snapshot_ventes: number;
+  snapshot_reparations: number;
+  snapshot_depenses: number;
+  snapshot_net: number;
+}
+
+/**
+ * Lists all closed register sessions for the shop, newest first. The four
+ * snapshot_* columns hold the totals locked in at closing time, so reprinted
+ * Z-Reports never change even if past transactions are edited. RLS scopes
+ * rows to the shop; we also filter on shop_id for consistency.
+ */
+export function useRegisterHistory() {
+  const effectiveUserId = useEffectiveUserId();
+
+  return useQuery({
+    queryKey: ["register-history", effectiveUserId],
+    queryFn: async (): Promise<RegisterHistoryRow[]> => {
+      if (!effectiveUserId) return [];
+
+      const { data, error } = await supabase
+        .from("register_sessions")
+        .select(
+          "id, closed_at, snapshot_ventes, snapshot_reparations, snapshot_depenses, snapshot_net"
+        )
+        .eq("shop_id", effectiveUserId)
+        .eq("status", "closed")
+        .order("closed_at", { ascending: false });
+
+      if (error) throw error;
+      return (data || []).map((r) => ({
+        id: r.id as string,
+        closed_at: r.closed_at as string | null,
+        snapshot_ventes: Number(r.snapshot_ventes || 0),
+        snapshot_reparations: Number(r.snapshot_reparations || 0),
+        snapshot_depenses: Number(r.snapshot_depenses || 0),
+        snapshot_net: Number(r.snapshot_net || 0),
+      }));
+    },
+    enabled: !!effectiveUserId,
+    staleTime: 30_000,
+  });
 }

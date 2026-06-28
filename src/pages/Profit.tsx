@@ -33,6 +33,9 @@ import { useProfit } from "@/hooks/useProfit";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { useCurrency } from "@/hooks/useCurrency";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCanCloseRegister } from "@/hooks/useRegisterSession";
+import { RegisterHistoryTab } from "@/components/reports/RegisterHistoryTab";
 
 const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
@@ -59,6 +62,7 @@ export default function Profit() {
   const { data: profitData, isLoading } = useProfit(profitParam as any);
   const { settings } = useShopSettingsContext();
   const { format } = useCurrency();
+  const canViewHistory = useCanCloseRegister();
 
   const periodLabel = useMemo(() => {
     switch (period) {
@@ -176,8 +180,9 @@ Généré le ${new Date().toLocaleString("fr-TN")}
     repairMargins: [],
   };
 
-  return (
-    <div className="space-y-6 animate-fade-in">
+  const analyseContent = (
+    <>
+
       <PageHeader
         title="Profit & Comptabilité"
         description={referenceLabel ? `${periodLabel} · ${referenceLabel}` : "Analyse des revenus, dépenses et marges"}
@@ -469,6 +474,27 @@ Généré le ${new Date().toLocaleString("fr-TN")}
           </CardContent>
         </Card>
       </div>
+    </>
+  );
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {canViewHistory ? (
+        <Tabs defaultValue="analyse" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="analyse">Analyse</TabsTrigger>
+            <TabsTrigger value="history">Historique des Caisses</TabsTrigger>
+          </TabsList>
+          <TabsContent value="analyse" className="space-y-6 mt-0">
+            {analyseContent}
+          </TabsContent>
+          <TabsContent value="history">
+            <RegisterHistoryTab />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        analyseContent
+      )}
     </div>
   );
 }
