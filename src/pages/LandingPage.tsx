@@ -14,6 +14,7 @@ import {
   Sparkles, Mail, Loader2
 } from "lucide-react";
 import { SEO } from "@/components/seo/SEO";
+import repairProLogo from "@/assets/repairpro-logo.png";
 
 /* ── animation variants ── */
 const fadeUp = {
@@ -112,9 +113,8 @@ export default function LandingPage() {
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "lp-navbar-scrolled" : "bg-transparent"}`}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5 relative z-10">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: "linear-gradient(135deg, hsl(217 91% 60%), hsl(187 72% 50%))" }}>
-              <Smartphone className="h-4.5 w-4.5 text-white" />
-            </div>
+            <img src={repairProLogo} alt="RepairPro" className="h-8 w-8 rounded-lg" width={32} height={32} />
+
             <span className="text-lg font-bold tracking-tight" style={{ color: "hsl(0 0% 98%)" }}>RepairPro</span>
           </Link>
 
@@ -442,9 +442,8 @@ export default function LandingPage() {
       <footer className="relative z-10 py-8" style={{ borderTop: "1px solid hsla(0, 0%, 100%, 0.05)" }}>
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 text-center sm:flex-row sm:justify-between sm:px-6">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md" style={{ background: "linear-gradient(135deg, hsl(217 91% 60%), hsl(187 72% 50%))" }}>
-              <Smartphone className="h-3.5 w-3.5 text-white" />
-            </div>
+            <img src={repairProLogo} alt="RepairPro" className="h-6 w-6 rounded-md" width={24} height={24} loading="lazy" />
+
             <span className="font-semibold text-sm" style={{ color: "hsl(0 0% 85%)" }}>RepairPro</span>
           </div>
           <p className="text-xs" style={{ color: "hsl(240 5% 35%)" }}>

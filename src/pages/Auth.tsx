@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { SEO } from "@/components/seo/SEO";
+import repairProLogo from "@/assets/repairpro-logo.png";
 
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY || "";
 const REMEMBER_ME_KEY = "repairpro_remember_me";
@@ -321,8 +322,8 @@ export default function Auth() {
       <div className="relative z-10 w-full max-w-md animate-fade-in">
         {/* Brand */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-primary p-3.5 mb-3 auth-glow">
-            <Wrench className="h-8 w-8 text-white" />
+          <div className="inline-flex items-center justify-center mb-3 auth-glow">
+            <img src={repairProLogo} alt="RepairPro" className="w-16 h-16 rounded-2xl" width={64} height={64} />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Connexion à votre atelier RepairPro</h1>
           <p className="text-zinc-500 mt-1 text-sm">Gestion d'atelier moderne</p>
