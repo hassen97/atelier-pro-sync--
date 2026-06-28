@@ -1,47 +1,41 @@
-# Performance Fix: Login & Tracking-Page Slowdowns
+## Historique des Caisses (Register History)
 
-## What happened this morning
-The backend itself was healthy (low connections, normal memory, no restarts), so this was **not** an outage or a capacity problem. The slowdown came from **database queries doing full-table scans** because the busiest tables have no indexes on the columns every query filters by. During the morning rush (many owners logging in at once + their customers opening tracking links), those scans pile up and requests crawl — exactly the "login is stuck" / "tracking page keeps loading" symptom.
+Add a history view of past closed register sessions with permanently stored totals and the ability to reprint each Z-Report as a duplicate.
 
-This was confirmed against the live database with real query plans:
+### 1. Database — immutable snapshots
 
-```text
-products  WHERE user_id = ...            -> Seq Scan, 81 ms   (no user_id index)
-repair_status_history WHERE repair_id=.. -> Seq Scan          (no repair_id index)
-```
+Migration on `register_sessions`:
+- Add four numeric columns: `snapshot_ventes`, `snapshot_reparations`, `snapshot_depenses`, `snapshot_net` (all `numeric`, default `0`).
+- Rewrite `close_register_session(_shop_id)` so that, before flipping the session to `closed`, it computes the session's final totals (sum of `sales.total_amount`, `repair_payments.amount`, `expenses.amount` filtered by that `session_id`) and writes them into the snapshot columns on the row being closed. Net = ventes + réparations − dépenses. Authorization and the "open a fresh session afterwards" behavior stay exactly as they are now.
+- Backfill existing closed sessions: a one-time UPDATE that fills the snapshot columns from each closed session's linked transactions, so history isn't empty for sessions closed before this change.
 
-The `repair_status_history` scan is the key one for the **public tracking page**: it runs inside the `get_repair_by_token` function, so every customer who opens a tracking link forces a full scan of that table.
+Existing RLS on `register_sessions` already scopes rows to the shop, so the history query inherits proper isolation automatically — no policy changes needed.
 
-## Root cause
-The hot tables only have primary-key indexes. They are missing indexes on the foreign-key / owner columns used in every read:
+### 2. Data hook — `useRegisterHistory()`
 
-| Table | Missing index | Used by |
-|-------|---------------|---------|
-| `repair_status_history` | `repair_id` | Public tracking page (RPC) |
-| `products` | `user_id` | POS, Inventory, Dashboard |
-| `repairs` | `user_id`, `customer_id` | Repairs list, Dashboard |
-| `sales` | `user_id` | POS, Profit, Dashboard |
-| `customers` | `user_id` | Customers, CRM lookups |
-| `expenses` | `user_id` | Expenses, Profit |
-| `shop_subscriptions` | `user_id` | Login funnel guard (ProtectedRoute) |
-| `repair_payments` | `repair_id`, `user_id` | Repairs, Profit |
+New export in `src/hooks/useRegisterSession.ts`:
+- Queries `register_sessions` where `status = 'closed'` for the effective shop id, ordered by `closed_at` descending.
+- Returns rows with `closed_at` and the four snapshot fields.
+- Relies on RLS for isolation (also filters by `shop_id = effectiveUserId` for consistency with other hooks).
 
-## Plan
+### 3. UI — history tab inside the Rapports (Profit) page
 
-### 1. Add the missing indexes (database migration)
-Create btree indexes on each owner/foreign-key column listed above (composite where the query also sorts, e.g. `products(user_id, name)`, `repairs(user_id, created_at desc)`). This turns the sequential scans into index lookups and is the single highest-impact fix. Indexes are additive and safe — no data or behavior changes.
+`/profit` is the existing reports area. Wrap its content in shadcn `Tabs`:
+- **Analyse** — the current Profit content, unchanged.
+- **Historique des Caisses** — the new view, rendered only when the user is owner/admin (reuse `useCanCloseRegister()`); the tab trigger is hidden for other roles.
 
-### 2. Reduce redundant query churn during login
-- `useOnboardingStatus` in `ProtectedRoute.tsx` currently uses `staleTime: 0`, so its three gating queries (`user_roles`, `shop_settings`, `shop_subscriptions`) re-run on **every** navigation. Give it a short `staleTime` (e.g. 30s) so the login funnel check isn't re-fetched on each page change.
-- `usePresence` writes `last_online_at` very frequently (it was the #2 query by total time). Increase the throttle/interval so presence updates don't compete with real reads during the morning rush.
+New component `src/components/reports/RegisterHistoryTab.tsx`:
+- shadcn `Table` listing closed sessions, newest first.
+- Columns: **Date de clôture** (`dd/MM/yyyy HH:mm`, fr locale), **Ventes**, **Réparations**, **Dépenses**, **Net en Caisse** (all via `useCurrency().format`), and **Actions**.
+- Empty state when no closed sessions yet; skeletons while loading.
 
-### 3. Verify
-Re-run the live query plans after the indexes are created to confirm `Index Scan` replaces `Seq Scan` on `products`, `repair_status_history`, and `shop_subscriptions`, and confirm the tracking RPC is fast.
+### 4. Reprint action
 
-## Important note about reaching production
-The live database is currently **behind** on migrations (e.g. the recent `register_sessions` work exists in the test backend but not in Live). That means these index fixes — like all backend changes — **only reach your customers after a successful Publish**. The earlier "Publishing failed" issue must be resolved (the bundle-splitting work we did should help) so this fix actually lands on the live site. I'll flag if publish still fails after these changes.
+- "Actions" column has a "Réimprimer" button with a `Printer` icon.
+- On click it builds `RegisterZReportData` from that row's snapshot values and calls the existing `printRegisterZReport()` from `src/lib/receiptPdf.ts`, passing the shop name and the row's `closed_at` as the date/time.
+- To mark duplicates, `printRegisterZReport` gets an optional `isReprint` flag; when true the report title renders `RAPPORT DE CLÔTURE (DUPLICATA)`. The normal closing flow keeps the plain title.
 
-## Technical details
-- Indexes created with plain `CREATE INDEX IF NOT EXISTS` inside a migration (not `CONCURRENTLY`, which can't run in a migration transaction). Table sizes are small, so creation is instant.
-- No RLS, schema, or app-logic changes beyond the two client-side caching/throttle tweaks in step 2.
-- No changes to the Returns/RMA module or any frozen systems.
+### Technical notes
+- Reuses `useEffectiveUserId`, `useCurrency`, `useShopSettingsContext`, and `useCanCloseRegister` already in the codebase.
+- No sidebar role-filtering needed since the gating lives on the tab; the `/profit` route stays as-is.
+- Snapshot reads make reprints fully immutable — past reports never change even if old transactions are later edited or deleted.
