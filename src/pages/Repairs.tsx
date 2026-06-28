@@ -251,6 +251,7 @@ export default function Repairs() {
               in_progress: "En cours",
               completed: "Terminé",
               delivered: "Livré",
+              rejected: "Rejeté",
             };
             toast.success(`Statut mis à jour`, {
               description: `→ ${statusLabels[newStatus]}`,
