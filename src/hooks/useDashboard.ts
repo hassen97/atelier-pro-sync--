@@ -102,8 +102,30 @@ export function useDashboardStats() {
 
       const salesTotal = sales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0) - totalRefunds;
 
+      // Month-over-month sales comparison
+      const now = new Date();
+      const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+      let salesThisMonth = 0;
+      let salesLastMonth = 0;
+      for (const s of sales) {
+        const ts = s.created_at ? new Date(s.created_at).getTime() : 0;
+        const amount = Number(s.total_amount) || 0;
+        if (ts >= startThisMonth) salesThisMonth += amount;
+        else if (ts >= startLastMonth) salesLastMonth += amount;
+      }
+      const salesTrendPct =
+        salesLastMonth > 0
+          ? ((salesThisMonth - salesLastMonth) / salesLastMonth) * 100
+          : salesThisMonth > 0
+          ? 100
+          : null;
+
       return {
         salesTotal,
+        salesThisMonth,
+        salesLastMonth,
+        salesTrendPct,
         repairsInProgress,
         repairsCompleted,
         repairsPending,
