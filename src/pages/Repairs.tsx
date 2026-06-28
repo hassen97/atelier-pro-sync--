@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Filter, ChevronLeft, ChevronRight, CheckSquare, X, CheckCircle2, XCircle, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { RepairCard } from "@/components/repairs/RepairCard";
 import { type RepairStatus } from "@/components/repairs/RepairStatusSelect";
 import { CancelRepairDialog } from "@/components/repairs/CancelRepairDialog";
@@ -21,6 +25,8 @@ import {
   useUpdateRepair,
   useUpdateRepairStatus,
   useDeleteRepair,
+  useBulkUpdateRepairStatus,
+  useBulkDeleteRepair,
   REPAIRS_PAGE_SIZE,
 } from "@/hooks/useRepairs";
 import { useAllCustomers, useUpdateCustomer } from "@/hooks/useCustomers";
