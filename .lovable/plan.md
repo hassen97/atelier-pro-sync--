@@ -1,38 +1,47 @@
-## Problem found
+## Goal
 
-The super-admin account is getting stuck because parts of the app still assume a user has only one role row.
+Replace the generic dark-blue "AI SaaS" landing page with a distinctive, professional **Emerald Prestige** launch design based on the direction you picked: light cream canvas, full nav, bold Archivo Black headlines, gold accents, and a live dashboard mockup in a split-screen hero.
 
-Two concrete blockers are visible:
+All existing behavior stays exactly the same — only the look changes.
 
-1. `useIsOwner()` in `src/hooks/useTeam.ts` uses `.maybeSingle()` without filtering by role. For the super-admin account that has both `platform_admin` and `super_admin`, the backend returns `PGRST116` / “multiple rows returned”.
-2. The `admin-manage-users` edge function checks the caller role with `.single()`, so the same multi-role account is rejected with `403 Forbidden`. The admin page then waits/loads because core admin requests fail.
+## What stays (no logic changes)
 
-## Fix plan
+- Waitlist email capture → derives username → redirects to `/auth` (success + duplicate)
+- Dynamic pricing from `usePublicPlans`, plan selection / checkout routing
+- Auth-aware CTAs (`/dashboard` vs `/auth`), login link
+- SEO tags, mobile menu, scroll-aware navbar
 
-1. **Make role checks multi-role safe**
-   - Update `useIsOwner()` to query specifically for `role = 'super_admin'`.
-   - Add short caching (`staleTime`) so this role check is not refetched constantly while navigating.
-   - Ensure query errors do not keep the UI stuck indefinitely.
+## Design direction (locked)
 
-2. **Fix the admin edge function authorization**
-   - In `supabase/functions/admin-manage-users/index.ts`, replace the `.single()` caller-role lookup with a filtered `role = 'platform_admin'` lookup using `.maybeSingle()`.
-   - This will allow platform admins even when they also have another role.
-   - Keep the security rule strict: only `platform_admin` can access this function.
+- **Palette — Emerald Prestige:** deep emerald `#064e3b`, emerald `#0d7a5f`, gold `#c9a84c`, cream `#f5f0e0`
+- **Type:** Archivo Black (headings, uppercase, tight), Hind (body)
+- **Layout:** split-screen hero — copy + waitlist on the left, live dashboard mockup on the right
+- **Tone:** fast & powerful, premium, confident
 
-3. **Prevent normal shop-owner guards from delaying admin users**
-   - Adjust `ProtectedRoute.tsx` so platform admins are redirected to `/admin` before waiting on owner/team/onboarding checks that are only relevant to shop-owner routes.
-   - This avoids unnecessary queries and prevents a broken shop-owner role check from blocking the admin dashboard.
+## Implementation
 
-4. **Optimize admin dashboard startup performance**
-   - Stop loading all heavy admin overview queries at once when the shell first opens where possible.
-   - Add `retry: false` or low retry counts for admin queries that fail with `403`, so the UI does not repeatedly hammer the backend while stuck.
-   - Keep existing `staleTime`/`refetchOnWindowFocus: false` patterns.
+### 1. Fonts
+- `bun add @fontsource/archivo-black @fontsource/hind`
+- Import both in `src/main.tsx`
+- Add `display`, `sans` (Hind) families to `tailwind.config.ts` so `font-display`/`font-sans` work
 
-5. **Validate**
-   - Run a type-check.
-   - Verify in preview that super-admin reaches `/admin` instead of staying on “Chargement du centre de commande...” or redirecting to `/dashboard`.
-   - Confirm admin API calls no longer return `403 Forbidden` for the platform-admin user.
+### 2. Theme tokens
+- Add a scoped `.landing-page` token override block in `index.css` for the Emerald Prestige palette (cream background, emerald/gold accents), plus light-canvas variants of the helper classes the page uses (mesh gradient, glass cards, gradient text, navbar-scrolled, dashboard mockup). This keeps the rest of the app's dark theme untouched.
 
-## Expected result
+### 3. Rebuild `src/pages/LandingPage.tsx`
+Rebuild the markup against the chosen prototype while reusing the existing handlers/data:
+- **Navbar:** cream/transparent → emerald on scroll; Archivo Black "REPAIRPRO" wordmark with gold-accented logo mark; nav links + gold "Rejoindre la liste" CTA; mobile menu restyled.
+- **Hero (split-screen):** left = live "Nouveau" pill, oversized Archivo Black headline with gold/emerald emphasis, Hind subcopy, waitlist form (gold button), reassurance line; right = white dashboard mockup (stat cards, weekly activity bar chart with gold highlight bar, repair-status panel) with soft emerald/gold glow accents.
+- **Stats band:** 4 trust stats in gold/emerald.
+- **Features:** keep the 6 features, restyle cards to cream/white with emerald icons + gold hover edges (bento or even grid).
+- **Value props:** Sécurisé / Ultra Rapide / Mobile First restyled.
+- **Pricing:** dynamic plans restyled — highlighted plan gets the gold/emerald popular treatment.
+- **Final CTA + footer:** emerald CTA band with gold button; restyled footer.
+- Keep Framer Motion entrances but tune to snappier timing.
 
-The super-admin login should open the admin dashboard reliably, even if the account has multiple roles, and the admin page should make fewer unnecessary role/onboarding requests during startup.
+### 4. Verify
+- Typecheck, then capture the rendered page (desktop + mobile) via the preview to confirm spacing, contrast, and that nothing overlaps before finishing.
+
+## Notes
+- Color values applied through the scoped `.landing-page` tokens / inline styles already used on this page, so the global design system and app theme are unaffected.
+- No backend, schema, or routing changes.
