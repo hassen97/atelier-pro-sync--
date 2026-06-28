@@ -551,3 +551,87 @@ export function printRegisterZReport(
 
   printThermalHtml(html, "width=380,height=560");
 }
+
+export interface OrderReceiptItem {
+  name: string;
+  sku?: string | null;
+  quantity: number;
+  orderQty: number;
+}
+
+export interface OrderReceiptData {
+  shopName: string;
+  address?: string;
+  phone?: string;
+  dateTime: string;
+  items: OrderReceiptItem[];
+}
+
+/**
+ * 80mm thermal "Bon de commande" for out-of-stock / critical items.
+ * Reuses the same layout as the inventory shortage print flow so a shop
+ * owner can hand the ticket to a supplier.
+ */
+export function printOrderReceipt(data: OrderReceiptData) {
+  const rows = data.items
+    .map(
+      (p) => `
+        <tr>
+          <td class="name">${escHtml(p.name)}${p.sku ? `<br/><span class="sku">${escHtml(p.sku)}</span>` : ""}</td>
+          <td class="center">${p.quantity}</td>
+          <td class="center qty">${p.orderQty}</td>
+        </tr>`
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bon de commande — ${escHtml(data.shopName)}</title>
+<style>
+  @page { size: 80mm auto; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 80mm; }
+  body {
+    padding: 4mm 3mm;
+    font-family: 'Courier New', Courier, monospace;
+    color: #000; background: #fff; font-size: 12px; line-height: 1.4;
+    -webkit-font-smoothing: none; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .shop { text-align: center; font-weight: bold; font-size: 15px; }
+  .meta { text-align: center; font-size: 10.5px; margin-bottom: 1mm; word-break: break-word; }
+  .title { text-align: center; font-weight: bold; font-size: 12.5px; margin: 2mm 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 1.5mm 0; }
+  .date { text-align: center; font-size: 10.5px; margin-bottom: 2mm; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { font-size: 11px; text-align: left; border-bottom: 1px solid #000; padding: 1mm 0.5mm; }
+  th.center, td.center { text-align: center; width: 21%; }
+  td { font-size: 11px; padding: 1.4mm 0.5mm; border-bottom: 1px dotted #999; vertical-align: top; overflow-wrap: break-word; word-break: break-word; }
+  td.name { width: 58%; }
+  .sku { font-size: 9.5px; color: #333; }
+  td.qty { font-weight: bold; }
+  .total { margin-top: 2mm; font-size: 12px; font-weight: bold; text-align: right; }
+  .sign { margin-top: 8mm; font-size: 10.5px; }
+  .sign-line { margin-top: 6mm; border-top: 1px solid #000; width: 50mm; max-width: 100%; padding-top: 1mm; }
+  .footer { text-align: center; font-size: 9.5px; margin-top: 4mm; word-break: break-word; }
+</style>
+</head>
+<body>
+  <div class="shop">${escHtml(data.shopName)}</div>
+  ${data.address ? `<div class="meta">${escHtml(data.address)}</div>` : ""}
+  ${data.phone ? `<div class="meta">Tél: ${escHtml(data.phone)}</div>` : ""}
+  <div class="title">BON DE COMMANDE / RUPTURE</div>
+  <div class="date">${escHtml(data.dateTime)}</div>
+  <table>
+    <thead><tr><th>Produit</th><th class="center">Stock</th><th class="center">À cmd</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="total">Total articles : ${data.items.length}</div>
+  <div class="sign"><div class="sign-line">Signature / Cachet</div></div>
+  <div class="footer">Généré par ${escHtml(data.shopName)}</div>
+</body>
+</html>`;
+
+  printThermalHtml(html, "width=400,height=600");
+}
