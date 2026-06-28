@@ -180,7 +180,7 @@ export function useLowStockAlerts(limit = 5) {
 
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, quantity, min_quantity")
+        .select("id, name, sku, quantity, min_quantity")
         .eq("user_id", user.id)
         .order("quantity", { ascending: true })
         .limit(20);
