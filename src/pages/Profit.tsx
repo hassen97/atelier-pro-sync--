@@ -474,6 +474,27 @@ Généré le ${new Date().toLocaleString("fr-TN")}
           </CardContent>
         </Card>
       </div>
+    </>
+  );
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {canViewHistory ? (
+        <Tabs defaultValue="analyse" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="analyse">Analyse</TabsTrigger>
+            <TabsTrigger value="history">Historique des Caisses</TabsTrigger>
+          </TabsList>
+          <TabsContent value="analyse" className="space-y-6 mt-0">
+            {analyseContent}
+          </TabsContent>
+          <TabsContent value="history">
+            <RegisterHistoryTab />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        analyseContent
+      )}
     </div>
   );
 }
