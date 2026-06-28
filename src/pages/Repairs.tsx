@@ -352,6 +352,7 @@ export default function Repairs() {
         in_progress: "En cours",
         completed: "Terminé",
         delivered: "Livré",
+        rejected: "Rejeté",
       };
 
       toast.success(`Réparation ${statusLabels[pendingStatus].toLowerCase()}`, {
