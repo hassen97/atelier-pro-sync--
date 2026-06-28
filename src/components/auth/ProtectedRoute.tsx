@@ -18,19 +18,21 @@ interface ProtectedRouteProps {
  * Only runs for non-admin, non-employee users (shop owners / super_admin).
  */
 function useOnboardingStatus(userId: string | undefined) {
+  const { data: isPlatformAdmin } = useIsPlatformAdmin();
   return useQuery({
-    queryKey: ["onboarding-status", userId],
+    queryKey: ["onboarding-status", userId, isPlatformAdmin],
     queryFn: async () => {
-      if (!userId) return null;
+      if (!userId || isPlatformAdmin) return { skip: true } as const;
 
       // Check if user is an employee (employees skip the funnel)
       const { data: role } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
-        .maybeSingle();
+        .in("role", ["employee", "manager", "platform_admin"]);
 
-      if (!role || role.role === "employee" || role.role === "platform_admin") {
+      const roleSet = new Set((role ?? []).map((r) => r.role));
+      if (roleSet.has("employee") || roleSet.has("manager") || roleSet.has("platform_admin")) {
         return { skip: true } as const;
       }
 
@@ -73,7 +75,7 @@ function useOnboardingStatus(userId: string | undefined) {
         subscriptionExpired,
       } as const;
     },
-    enabled: !!userId,
+    enabled: !!userId && isPlatformAdmin !== undefined,
     // Cache the funnel-gating check briefly so it isn't re-fetched (3 queries)
     // on every navigation. This sharply reduces DB load during login storms.
     staleTime: 30 * 1000,
@@ -83,8 +85,8 @@ function useOnboardingStatus(userId: string | undefined) {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const location = useLocation();
-  const { allowedPages, isLoading: pagesLoading } = useAllowedPages();
   const { data: isPlatformAdmin, isLoading: adminLoading } = useIsPlatformAdmin();
+  const { allowedPages, isLoading: pagesLoading } = useAllowedPages({ enabled: !!user && isPlatformAdmin === false });
   const { isImpersonating, isVerifying } = useImpersonation();
   const hasShownToast = useRef(false);
   const { data: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus(user?.id);
@@ -110,7 +112,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
   }, [isBlocked]);
 
-  if (loading || pagesLoading || adminLoading || isVerifying || onboardingLoading) {
+  if (loading || adminLoading || isVerifying) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -129,6 +131,18 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (isPlatformAdmin && location.pathname !== "/admin" && !isImpersonating) {
     return <Navigate to="/admin" replace />;
   }
+
+  if (!isPlatformAdmin && (pagesLoading || onboardingLoading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isPlatformAdmin && location.pathname === "/admin") {
     return <Navigate to="/dashboard" replace />;
   }

@@ -62,10 +62,13 @@ export function useIsOwner() {
     queryKey: ["user-role", user?.id],
     queryFn: async () => {
       if (!user) return false;
+      // A platform admin may also have a shop-owner role row. Filter by the
+      // exact role so multi-role accounts never trigger a "multiple rows" error.
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
+        .eq("role", "super_admin")
         .maybeSingle();
       if (error) {
         console.error("useIsOwner error:", error);
@@ -74,6 +77,8 @@ export function useIsOwner() {
       return data?.role === "super_admin";
     },
     enabled: !!user,
+    staleTime: 60_000,
+    retry: 1,
   });
 }
 
@@ -411,9 +416,12 @@ export function useDeleteTask() {
 }
 
 // Hook for allowed pages (used in sidebar filtering)
-export function useAllowedPages() {
+export function useAllowedPages(options: { enabled?: boolean } = {}) {
+  const enabled = options.enabled ?? true;
   const { data: isOwner, isLoading: ownerLoading } = useIsOwner();
   const { data: teamInfo, isLoading: teamLoading } = useMyTeamInfo();
+
+  if (!enabled) return { allowedPages: null, isLoading: false, isTeamMember: false };
 
   const isLoading = ownerLoading || teamLoading;
 
