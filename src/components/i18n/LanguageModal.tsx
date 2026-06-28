@@ -39,10 +39,9 @@ export function LanguageModal() {
   return (
     <Dialog open={needsLanguageChoice}>
       <DialogContent
-        className="sm:max-w-md"
+        className="sm:max-w-md [&>button.absolute]:hidden"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
-        hideClose
       >
         <DialogHeader>
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
