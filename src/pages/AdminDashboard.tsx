@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Menu, Search, Bell, ChevronLeft, ChevronRight, Megaphone } from "lucide-react";
+import { Menu, Search, Bell, ChevronLeft, ChevronRight, Megaphone } from "lucide-react";
 import { QuickChangelogDialog } from "@/components/admin/QuickChangelogDialog";
 import { useAdminData } from "@/hooks/useAdmin";
 import { useAuth } from "@/contexts/AuthContext";
@@ -54,7 +54,7 @@ const viewLabels: Record<AdminView, string> = {
 };
 
 const AdminDashboard = () => {
-  const { data: adminData, isLoading } = useAdminData();
+  const { data: adminData } = useAdminData();
   const { user } = useAuth();
   const activeShopsCount = adminData?.stats?.active_now_count ?? adminData?.stats?.total_owners ?? 0;
   const userInitial = (
@@ -86,27 +86,6 @@ const AdminDashboard = () => {
     setActiveView(view as AdminView);
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[#080E1A]">
-        <div className="flex flex-col items-center gap-5">
-          <div className="relative">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#00D4FF] to-[#0066FF] flex items-center justify-center shadow-[0_0_30px_rgba(0,212,255,0.35)]">
-              <span className="text-2xl">⚡</span>
-            </div>
-            <div className="absolute inset-0 rounded-2xl animate-ping bg-[#00D4FF]/10" />
-          </div>
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-[#00D4FF]" />
-            <p className="text-slate-500 text-xs tracking-widest uppercase">
-              Chargement du centre de commande...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-[#080E1A] via-[#0B1120] to-[#080E1A] text-white overflow-hidden">
