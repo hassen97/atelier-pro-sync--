@@ -85,8 +85,8 @@ export function RepairCard({ repair, onViewDetails, onEdit, onPrint, onCancel, o
             {repair.phone && <p className="text-sm text-muted-foreground mt-0.5">{repair.phone}</p>}
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions sur la réparation"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions sur la réparation"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
               <DropdownMenuItem onClick={() => onViewDetails(repair)}>Voir détails</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(repair)}>Modifier</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onPrint(repair)}>Imprimer fiche</DropdownMenuItem>
@@ -95,6 +95,7 @@ export function RepairCard({ repair, onViewDetails, onEdit, onPrint, onCancel, o
               <DropdownMenuItem disabled={repair.status === "in_progress"} onClick={() => onStatusChange(repair, "in_progress")}>→ En cours</DropdownMenuItem>
               <DropdownMenuItem disabled={repair.status === "completed"} onClick={() => onStatusChange(repair, "completed")}>→ Terminé</DropdownMenuItem>
               <DropdownMenuItem disabled={repair.status === "delivered"} onClick={() => onStatusChange(repair, "delivered")}>→ Livré</DropdownMenuItem>
+              <DropdownMenuItem disabled={repair.status === "rejected"} className="text-destructive" onClick={() => onStatusChange(repair, "rejected")}>→ Rejeté</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onCancel(repair)}>Annuler</DropdownMenuItem>
             </DropdownMenuContent>
