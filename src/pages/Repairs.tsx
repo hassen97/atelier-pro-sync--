@@ -575,7 +575,55 @@ export default function Repairs() {
           <Filter className="h-4 w-4 mr-2" />
           Filtres
         </Button>
+        <Button
+          variant={selectionMode ? "default" : "outline"}
+          onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+        >
+          {selectionMode ? <X className="h-4 w-4 mr-2" /> : <CheckSquare className="h-4 w-4 mr-2" />}
+          {selectionMode ? "Annuler" : "Sélectionner"}
+        </Button>
       </div>
+
+      {/* Bulk action bar */}
+      {selectionMode && (
+        <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card/95 backdrop-blur p-3 shadow-soft">
+          <span className="text-sm font-medium mr-1">
+            {selectedCount} sélectionnée{selectedCount > 1 ? "s" : ""}
+          </span>
+          <Button variant="outline" size="sm" onClick={toggleSelectAll} disabled={filteredRepairs.length === 0}>
+            {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
+          </Button>
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            className="bg-success text-success-foreground hover:bg-success/90"
+            disabled={selectedCount === 0 || bulkUpdateStatus.isPending}
+            onClick={() => handleBulkStatus("completed")}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            Marquer terminé
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-destructive border-destructive/30 hover:bg-destructive/10"
+            disabled={selectedCount === 0 || bulkUpdateStatus.isPending}
+            onClick={() => setBulkConfirm("rejected")}
+          >
+            <XCircle className="h-4 w-4 mr-2" />
+            Marquer rejeté
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={selectedCount === 0 || bulkDelete.isPending}
+            onClick={() => setBulkConfirm("delete")}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Supprimer
+          </Button>
+        </div>
+      )}
 
       {/* Status Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -584,6 +632,11 @@ export default function Repairs() {
           <TabsTrigger value="pending">En attente ({counts.pending})</TabsTrigger>
           <TabsTrigger value="in_progress">En cours ({counts.in_progress})</TabsTrigger>
           <TabsTrigger value="completed">Terminées ({counts.completed})</TabsTrigger>
+          {counts.rejected > 0 && (
+            <TabsTrigger value="rejected" className="text-destructive">
+              Rejetées ({counts.rejected})
+            </TabsTrigger>
+          )}
           {counts.warranty > 0 && (
             <TabsTrigger value="warranty" className="text-orange-500">
               Garantie ({counts.warranty})
@@ -602,6 +655,9 @@ export default function Repairs() {
                 onPrint={handlePrint}
                 onCancel={handleCancel}
                 onStatusChange={handleStatusChange}
+                selectable={selectionMode}
+                selected={selectedIds.has(repair.id)}
+                onSelectChange={handleSelectChange}
               />
             ))}
           </div>
