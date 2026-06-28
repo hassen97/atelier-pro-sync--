@@ -62,6 +62,7 @@ export default function Profit() {
   const { data: profitData, isLoading } = useProfit(profitParam as any);
   const { settings } = useShopSettingsContext();
   const { format } = useCurrency();
+  const canViewHistory = useCanCloseRegister();
 
   const periodLabel = useMemo(() => {
     switch (period) {
