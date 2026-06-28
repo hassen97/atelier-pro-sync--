@@ -120,6 +120,7 @@ export function useCloseSession() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["register-session"] });
       queryClient.invalidateQueries({ queryKey: ["session-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["register-history"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["sales"] });
       queryClient.invalidateQueries({ queryKey: ["profit"] });
