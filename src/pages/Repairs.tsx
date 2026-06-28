@@ -737,6 +737,34 @@ export default function Repairs() {
         onConfirm={handleAssignConfirm}
         isLoading={updateRepair.isPending}
       />
+
+      <AlertDialog open={bulkConfirm !== null} onOpenChange={(o) => !o && setBulkConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkConfirm === "delete" ? "Supprimer les réparations ?" : "Marquer comme rejetées ?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkConfirm === "delete"
+                ? `Cette action supprimera définitivement ${selectedCount} réparation(s). Cette action est irréversible.`
+                : `${selectedCount} réparation(s) seront marquées comme « Rejeté ».`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className={bulkConfirm === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+              onClick={() => {
+                if (bulkConfirm === "delete") handleBulkDelete();
+                else handleBulkStatus("rejected");
+                setBulkConfirm(null);
+              }}
+            >
+              Confirmer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
