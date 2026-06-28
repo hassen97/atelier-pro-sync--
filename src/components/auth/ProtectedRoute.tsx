@@ -110,10 +110,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
   }, [isBlocked]);
 
-  // Keep the loader visible while the admin check is still loading OR errored.
-  // Never fall through to the shop-owner UI on a failed admin check — that is
-  // exactly what wrongly demoted a platform_admin to the shop dashboard.
-  if (loading || pagesLoading || adminLoading || (adminError && !!user) || isVerifying || onboardingLoading) {
+  if (loading || pagesLoading || adminLoading || isVerifying || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
