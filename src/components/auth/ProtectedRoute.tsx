@@ -74,9 +74,7 @@ function useOnboardingStatus(userId: string | undefined) {
       } as const;
     },
     enabled: !!userId,
-    // Cache the funnel-gating check briefly so it isn't re-fetched (3 queries)
-    // on every navigation. This sharply reduces DB load during login storms.
-    staleTime: 30 * 1000,
+    staleTime: 0,
   });
 }
 
