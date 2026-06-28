@@ -4,6 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export interface DashboardStats {
   salesTotal: number;
+  salesThisMonth: number;
+  salesLastMonth: number;
+  salesTrendPct: number | null;
   repairsInProgress: number;
   repairsCompleted: number;
   repairsPending: number;
