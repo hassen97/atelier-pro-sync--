@@ -180,8 +180,9 @@ Généré le ${new Date().toLocaleString("fr-TN")}
     repairMargins: [],
   };
 
-  return (
-    <div className="space-y-6 animate-fade-in">
+  const analyseContent = (
+    <>
+
       <PageHeader
         title="Profit & Comptabilité"
         description={referenceLabel ? `${periodLabel} · ${referenceLabel}` : "Analyse des revenus, dépenses et marges"}
