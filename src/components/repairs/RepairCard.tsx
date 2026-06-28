@@ -2,6 +2,7 @@ import { Phone, Wrench as WrenchIcon, Calendar, MoreHorizontal, Shield, Tag } fr
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -31,20 +32,38 @@ interface RepairCardProps {
   onPrint: (repair: Repair) => void;
   onCancel: (repair: Repair) => void;
   onStatusChange: (repair: Repair, newStatus: RepairStatus) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (repair: Repair, selected: boolean) => void;
 }
 
-export function RepairCard({ repair, onViewDetails, onEdit, onPrint, onCancel, onStatusChange }: RepairCardProps) {
+export function RepairCard({ repair, onViewDetails, onEdit, onPrint, onCancel, onStatusChange, selectable = false, selected = false, onSelectChange }: RepairCardProps) {
   const status = statusConfig[repair.status];
   const StatusIcon = status.icon;
   const remaining = repair.total - repair.paid;
   const { format } = useCurrency();
 
   return (
-    <Card className={cn(
-      "hover:shadow-soft transition-shadow",
-      repair.is_warranty && "border-orange-500/40 bg-orange-500/5"
-    )}>
+    <Card
+      className={cn(
+        "hover:shadow-soft transition-shadow",
+        repair.is_warranty && "border-orange-500/40 bg-orange-500/5",
+        selectable && "cursor-pointer",
+        selected && "ring-2 ring-primary border-primary/40"
+      )}
+      onClick={selectable ? () => onSelectChange?.(repair, !selected) : undefined}
+    >
       <CardContent className="p-4">
+        {selectable && (
+          <div className="mb-2 flex items-center" onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={selected}
+              onCheckedChange={(c) => onSelectChange?.(repair, !!c)}
+              aria-label="Sélectionner la réparation"
+            />
+          </div>
+        )}
+
         <div className="flex items-start justify-between mb-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
