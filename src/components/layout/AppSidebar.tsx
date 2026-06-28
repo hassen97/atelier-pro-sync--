@@ -172,9 +172,7 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
               className="w-9 h-9 rounded-lg object-cover"
             />
           ) : (
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-primary">
-              <Smartphone className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src={repairProLogo} alt="RepairPro" className="w-9 h-9 rounded-lg" width={36} height={36} />
           )
         )}
         {!isMobile && (
