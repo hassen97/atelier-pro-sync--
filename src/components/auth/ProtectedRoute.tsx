@@ -84,7 +84,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const location = useLocation();
   const { allowedPages, isLoading: pagesLoading } = useAllowedPages();
-  const { data: isPlatformAdmin, isLoading: adminLoading, isError: adminError } = useIsPlatformAdmin();
+  const { data: isPlatformAdmin, isLoading: adminLoading } = useIsPlatformAdmin();
   const { isImpersonating, isVerifying } = useImpersonation();
   const hasShownToast = useRef(false);
   const { data: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus(user?.id);
