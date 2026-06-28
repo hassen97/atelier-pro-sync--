@@ -70,12 +70,16 @@ export function useIsPlatformAdmin() {
     queryKey: ["is-platform-admin", user?.id],
     queryFn: async () => {
       if (!user) return false;
+      // A user can have multiple rows in user_roles (e.g. platform_admin +
+      // super_admin). Filtering by role returns at most one row, so this is
+      // safe with .maybeSingle() and never fails on multi-role accounts.
       const { data } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .single();
-      return data?.role === "platform_admin";
+        .eq("role", "platform_admin")
+        .maybeSingle();
+      return !!data;
     },
     enabled: !!user,
   });

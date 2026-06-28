@@ -1,46 +1,67 @@
-# Rollback to before the deep scan
+# Fix super-admin login (multi-role detection bug)
 
-## What's happening now
-After the deep scan, the super admin login no longer redirects at all — it's **stuck on the loading screen**. This is a direct side effect of the last hardening change in `ProtectedRoute.tsx`:
+## Root cause (confirmed in the database)
+`useIsPlatformAdmin()` and the login role check both assume each user has exactly **one** row in `user_roles`:
 
-```text
-if (loading || ... || (adminError && !!user) || ...) { show loader }
+```ts
+.from("user_roles").select("role").eq("user_id", user.id).single()
 ```
 
-The admin-role query is failing/erroring for your account, and because the guard now keeps the loader visible on `adminError`, you never leave "Chargement...". Before the deep scan this code didn't exist, so login worked.
-
-## Recommended rollback: use History (safest, one click)
-The cleanest way to get back to the exact state **before the deep scan** is the built-in History — no risk, no "undo code", and it restores every touched file at once (`useAdmin.ts`, `ProtectedRoute.tsx`, `Auth.tsx`, `useProfit.ts`, `usePresence.ts`, `vite.config.ts`, etc.).
-
-Steps:
-1. Open History (button below).
-2. Find the version **just before** the "deep scan / db indexes" turn.
-3. Click Restore on that version.
-
-Everything after stays archived in chat and can be reapplied later if you ever want it.
+But the super-admin `hassen` (`855c224e-…`) has **two** rows in the test/preview backend:
 
 ```text
-Before deep scan  ──►  [RESTORE HERE]  ──►  deep scan  ──►  admin hardening (broken)
+user_roles for hassen:
+  platform_admin
+  super_admin
 ```
 
-## What rollback does and does not touch
-- **Code**: fully reverted to the pre-deep-scan state. This removes the `adminError`-based loader trap, so the super admin login behaves as it did before.
-- **Database indexes**: the indexes added during the deep scan are **not removed** by a code revert. That's fine — indexes only make reads faster, they never change data or behavior, and they are not what broke login. Leaving them in place is safe and recommended.
-- **Data**: untouched. No customer, repair, sales, or session data is affected.
+`.single()` throws "multiple rows returned" → `data` is null → `isPlatformAdmin` becomes `false` → `ProtectedRoute` redirects to `/dashboard` (shop owner). The earlier `.maybeSingle()` + `throw` version had the same multi-row failure, which is why it got stuck on the loader. In production hassen has only `platform_admin`, which is why it behaved differently there.
 
-## Alternative: I revert only the 3 admin files for you
-If you'd rather keep the other deep-scan improvements (chunking, PWA precache, profit-day fix) and only undo the part that broke admin login, I can instead restore just these to their pre-deep-scan versions:
-- `src/hooks/useAdmin.ts`
-- `src/components/auth/ProtectedRoute.tsx`
-- `src/pages/Auth.tsx`
+A separate admin login page would still call the same broken query, so the real fix is to make role detection **multi-role aware**.
 
-Tell me which you prefer:
-- **A)** Full rollback to before the deep scan (via History — recommended), or
-- **B)** I surgically revert only the admin-login changes and keep the rest.
+## Fix
 
-## Note on the live site
-Code rollbacks only reach your live customers after a successful **Publish**. Once you've rolled back (or I revert the admin files), we should retry publishing so the working version goes live.
+### 1. `src/hooks/useAdmin.ts` — `useIsPlatformAdmin`
+Stop assuming one role row. Query specifically for the admin role so the number of other roles is irrelevant:
 
-<presentation-actions>
-<presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
+```ts
+const { data } = await supabase
+  .from("user_roles")
+  .select("role")
+  .eq("user_id", user.id)
+  .eq("role", "platform_admin")
+  .maybeSingle();
+return !!data;
+```
+
+`maybeSingle()` is safe here because filtering by `role` returns at most one row. This works whether the user has 1 role or several.
+
+### 2. `src/pages/Auth.tsx` — login role/tab matching
+Replace the `.single()` lookup (line ~144) with a fetch of **all** the user's roles and derive an effective role from the set, so multi-role accounts don't break:
+
+```ts
+const { data: roles } = await supabase
+  .from("user_roles").select("role").eq("user_id", userId);
+const roleSet = new Set((roles ?? []).map(r => r.role));
+const isPlatformAdmin = roleSet.has("platform_admin");
+const isOwner = roleSet.has("super_admin") || roleSet.has("admin");
+const isEmployee = roleSet.has("employee") || roleSet.has("manager");
+```
+
+- If `isPlatformAdmin` → allow login regardless of selected tab; `ProtectedRoute` then routes to `/admin`.
+- Keep the existing employee/owner tab-mismatch guards, but base them on `isOwner` / `isEmployee` (a platform admin bypasses these checks).
+
+### 3. No change needed in `ProtectedRoute.tsx`
+Once `useIsPlatformAdmin` returns `true` again, the existing redirect (`isPlatformAdmin && pathname !== "/admin" → /admin`) sends you to the admin dashboard correctly.
+
+## About the suggested separate admin login page
+Not required to fix this, and it adds a second auth surface to maintain. The multi-role fix restores correct routing from the single existing login. If you still want a dedicated `/admin-login` for convenience/branding afterward, we can add it as a follow-up — but it's optional, not the fix.
+
+## Optional data cleanup (separate step, with your OK)
+The duplicate `super_admin` row on `hassen` is harmless once the code is multi-role aware, but if you want a clean state I can remove the extra `super_admin` row from platform-admin accounts via an `insert`/`delete` data operation. I'll only do this if you confirm.
+
+## Verification
+1. Type-check passes.
+2. Log in as `hassen` in the preview → lands on `/admin`, not the shop dashboard.
+3. Log in as a normal shop owner → still lands on `/dashboard`.
+4. Publish so the fix reaches the live site.
