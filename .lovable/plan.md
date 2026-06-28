@@ -1,41 +1,42 @@
-# Repairs page — bulk selection & actions
+# Fix Category Mapping in Excel/CSV Stock Import
 
-Add the ability to select multiple repairs (or all visible), then **delete selected**, **mark as finished**, or **mark as rejected** in one action. A new **Rejeté** status is introduced (no payment is taken when bulk-finishing).
+## Problem
+The importer in `src/components/inventory/ExcelImportDialog.tsx` parses the category text from the file (the `category` field is already extracted by the parser), but the `handleImport` insert builds product rows **without** `category_id`. So imported products land uncategorized in the POS view. Categories live in their own `categories` table (type `product`) and products reference them via a `category_id` UUID foreign key.
 
-No database migration is required: the `status` column has no constraint, so `rejected` is added purely in code. The existing status-history trigger will log the change automatically.
+## Fix Overview
+Add a category-resolution step before inserting product batches, then attach the resolved `category_id` to each product row. All work stays inside `ExcelImportDialog.tsx`; no database schema change is needed (the `category_id` column and `categories` table already exist).
 
-## 1. New "Rejeté" status
-- `src/components/repairs/RepairStatusSelect.tsx`: extend `RepairStatus` to include `"rejected"` and add a `statusConfig.rejected` entry (red/destructive styling, X-circle icon, label "Rejeté").
-- `src/hooks/useRepairs.ts`: extend the `RepairStatus` union with `"rejected"`.
+## Implementation Steps
 
-## 2. Selection mode on the Repairs page (`src/pages/Repairs.tsx`)
-- Add state: `selectionMode` (boolean) and `selectedIds` (Set of repair ids).
-- Add a **"Sélectionner"** toggle button near the search/filter row. When active:
-  - Each card shows a checkbox (top-left).
-  - A sticky **bulk action bar** appears showing the count selected, with:
-    - **Tout sélectionner / Tout désélectionner** — selects every repair in the currently filtered tab/view.
-    - **Marquer terminé** (status → `completed`, **no payment dialog**, no payment recorded).
-    - **Marquer rejeté** (status → `rejected`).
-    - **Supprimer** (permanent delete, guarded by a confirm dialog).
-  - The "Marquer terminé / rejeté" buttons stay available on any tab but are most relevant on **En attente**; the action bar text adapts to the active tab.
-- Selecting clears automatically after an action completes or when leaving selection mode.
-- A confirmation dialog (reusing AlertDialog) is shown before bulk delete and before bulk reject.
+### 1. Category resolution helper (before batch insert)
+Inside `handleImport`, before the insert loop:
+- Collect every distinct non-empty category name from the valid rows (trimmed).
+- Always include the fallback name `"Non classé"`.
+- Fetch all existing product categories for this shop: `select id, name from categories where user_id = effectiveUserId and type = 'product'`.
+- Build a case-insensitive lookup map (`name.toLowerCase() -> id`).
+- For each file category name not already present, insert it into `categories` (`{ name, type: 'product', user_id: effectiveUserId }`), returning its new `id`, and add it to the map.
+- Result: a `Map<string (lowercased name), string (uuid)>` covering every category referenced by the import plus the default.
 
-## 3. Card checkbox (`src/components/repairs/RepairCard.tsx`)
-- Add optional props: `selectable`, `selected`, `onSelectChange`.
-- When `selectable`, render a Checkbox overlay and make the card body toggle selection (the `...` menu still works independently).
-- Add a **"→ Rejeté"** item to the per-card dropdown menu so a single repair can also be rejected.
+### 2. Product mapping
+When building each batch row in the insert loop:
+- Resolve `category_id` from the map using the row's `category` (lowercased/trimmed).
+- If the row has a blank/missing category, use the `"Non classé"` category id.
+- Add `category_id` to the inserted object (never insert the raw text string).
+- `subcategory_id` is left untouched (out of scope; no subcategory column in template).
 
-## 4. Bulk hooks (`src/hooks/useRepairs.ts`)
-- `useBulkUpdateRepairStatus()` — updates `status` for an array of ids in one Supabase call (`.in("id", ids)`), with optimistic cache update and a single success toast (e.g. "8 réparations marquées terminées").
-- `useBulkDeleteRepair()` — deletes an array of ids in one call (`.in("id", ids)`), optimistic removal, single toast.
-- Both invalidate the same query keys the existing single-item mutations use (`repairs`, `recent-repairs`, `dashboard-stats`, `profit`).
+### 3. Fallback / default category
+- A blank category cell resolves to the auto-created/looked-up `"Non classé"` category. The product is still imported, never dropped.
 
-## 5. Tabs / counts
-- Add a **Rejeté** tab (shown only when there is at least one rejected repair), and include `rejected` in `getStatusCounts`.
-- Rejected repairs remain in the `all` list.
+### 4. Template column
+- The downloadable template already emits a `catégorie` header (column 8). Keep it, and ensure the example row clearly shows a value (e.g. "Écrans") so users know where to type it. The parser already maps `catégorie`, `categorie`, and `category` to the internal `category` key, so no alias change is required.
 
-## Technical notes
-- "Marquer terminé" in bulk intentionally bypasses the per-repair payment dialog (per request: no payment). It only sets `status = completed`; it does not touch `amount_paid`, so any remaining balance behaves as it does today.
-- Bulk operations act only on the **currently loaded / filtered** repairs (the page already paginates 100 per page), which matches what the user sees on screen.
-- Loyalty awarding only happens on `delivered` + fully paid, so bulk "terminé" and "rejeté" won't trigger loyalty side effects.
+### 5. Cache invalidation
+After a successful import, also invalidate the `["categories"]` query so newly created categories appear immediately in the POS / inventory filters (alongside the existing `products`, `dashboard-stats`, `low-stock-alerts` invalidations).
+
+## Technical Notes
+- The resolution runs once up front (one select + at most a few inserts), not per-row, so performance stays fine with the existing 20-row batch insert.
+- Category matching is case-insensitive per the requirement; stored name keeps the original casing from the file (or the first occurrence).
+- If category fetch/insert fails, surface a toast error and abort before importing products, so we never silently drop categorization.
+
+## Files Changed
+- `src/components/inventory/ExcelImportDialog.tsx` — add category resolution, attach `category_id` to product rows, invalidate categories query, tidy template example.
