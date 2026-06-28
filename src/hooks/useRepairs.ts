@@ -10,7 +10,7 @@ export type Repair = Tables<"repairs">;
 export type RepairInsert = TablesInsert<"repairs">;
 export type RepairUpdate = TablesUpdate<"repairs">;
 
-export type RepairStatus = "pending" | "in_progress" | "completed" | "delivered";
+export type RepairStatus = "pending" | "in_progress" | "completed" | "delivered" | "rejected";
 
 export const REPAIRS_PAGE_SIZE = 100;
 
