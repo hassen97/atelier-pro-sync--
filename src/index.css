@@ -357,50 +357,47 @@
   box-shadow: 0 0 0 2px hsla(217, 91%, 60%, 0.15) !important;
 }
 
-/* Landing Page - Premium Dark SaaS */
+/* Landing Page - Emerald Prestige Launch Theme */
 .landing-page {
-  --lp-bg: 240 10% 4%;
-  --lp-card: 240 6% 10%;
-  --lp-card-hover: 240 6% 13%;
-  --lp-border: 240 4% 16%;
-  --lp-border-hover: 240 4% 22%;
-  --lp-text: 0 0% 98%;
-  --lp-text-muted: 240 5% 55%;
-  --lp-accent: 217 91% 60%;
-  --lp-accent-glow: 217 91% 50%;
-  background-color: hsl(var(--lp-bg));
-  color: hsl(var(--lp-text));
+  --lp-cream: 45 46% 92%;
+  --lp-emerald-deep: 162 85% 17%;
+  --lp-emerald: 162 80% 26%;
+  --lp-gold: 44 53% 54%;
+  --lp-ink: 162 85% 12%;
+  background-color: hsl(var(--lp-cream));
+  color: hsl(var(--lp-ink));
+  font-family: 'Hind', system-ui, sans-serif;
+}
+
+.landing-page .font-display {
+  font-family: 'Archivo Black', system-ui, sans-serif;
 }
 
 .lp-glass {
-  backdrop-filter: blur(20px) saturate(1.5);
-  background: hsla(240, 6%, 10%, 0.6);
-  border: 1px solid hsla(0, 0%, 100%, 0.06);
+  backdrop-filter: blur(20px) saturate(1.4);
+  background: hsla(45, 46%, 96%, 0.92);
+  border: 1px solid hsla(162, 80%, 26%, 0.12);
 }
 
 .lp-glass-card {
-  backdrop-filter: blur(16px);
-  background: hsla(240, 6%, 10%, 0.5);
-  border: 1px solid hsla(0, 0%, 100%, 0.06);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #ffffff;
+  border: 1px solid hsla(162, 80%, 26%, 0.1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px hsla(162, 85%, 12%, 0.04);
 }
 
 .lp-glass-card:hover {
-  background: hsla(240, 6%, 13%, 0.6);
-  border-color: hsla(217, 91%, 60%, 0.15);
-  box-shadow: 0 8px 32px hsla(217, 91%, 60%, 0.08);
-  transform: translateY(-2px);
+  border-color: hsla(44, 53%, 54%, 0.5);
+  box-shadow: 0 14px 36px hsla(162, 85%, 17%, 0.12);
+  transform: translateY(-3px);
 }
 
 .lp-gradient-text {
-  background: linear-gradient(135deg, hsl(0 0% 100%), hsl(217 91% 70%));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: hsl(var(--lp-emerald-deep));
 }
 
 .lp-gradient-text-accent {
-  background: linear-gradient(135deg, hsl(217 91% 60%), hsl(187 72% 55%));
+  background: linear-gradient(135deg, hsl(162 80% 26%), hsl(44 53% 48%));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -416,15 +413,15 @@
   position: absolute;
   inset: -2px;
   border-radius: inherit;
-  background: linear-gradient(135deg, hsl(217 91% 60%), hsl(187 72% 50%));
+  background: linear-gradient(135deg, hsl(44 53% 54%), hsl(162 80% 26%));
   opacity: 0;
-  filter: blur(16px);
-  transition: opacity 0.4s;
+  filter: blur(14px);
+  transition: opacity 0.35s;
   z-index: -1;
 }
 
 .lp-glow-btn:hover::before {
-  opacity: 0.6;
+  opacity: 0.55;
 }
 
 .lp-mesh-gradient {
@@ -433,15 +430,15 @@
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(ellipse 600px 400px at 10% 20%, hsla(217, 91%, 50%, 0.08) 0%, transparent 70%),
-    radial-gradient(ellipse 500px 500px at 85% 80%, hsla(187, 72%, 50%, 0.06) 0%, transparent 70%),
-    radial-gradient(ellipse 400px 300px at 50% 50%, hsla(260, 60%, 50%, 0.04) 0%, transparent 70%);
+    radial-gradient(ellipse 600px 420px at 8% 12%, hsla(162, 80%, 30%, 0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 520px 520px at 92% 88%, hsla(44, 53%, 54%, 0.09) 0%, transparent 70%),
+    radial-gradient(ellipse 420px 320px at 60% 45%, hsla(162, 85%, 17%, 0.04) 0%, transparent 70%);
 }
 
 .lp-navbar-scrolled {
-  backdrop-filter: blur(20px) saturate(1.8);
-  background: hsla(240, 10%, 4%, 0.75) !important;
-  border-bottom: 1px solid hsla(0, 0%, 100%, 0.06);
+  backdrop-filter: blur(18px) saturate(1.6);
+  background: hsla(45, 46%, 94%, 0.85) !important;
+  border-bottom: 1px solid hsla(162, 80%, 26%, 0.1);
 }
 
 .lp-bento-card {
@@ -455,8 +452,8 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, hsla(217, 91%, 60%, 0.3), transparent);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, hsla(44, 53%, 54%, 0.7), transparent);
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -472,10 +469,10 @@
 .lp-pricing-popular::before {
   content: '';
   position: absolute;
-  inset: -1px;
+  inset: -1.5px;
   border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, hsl(217 91% 60%), hsl(187 72% 50%), hsl(260 60% 60%), hsl(217 91% 60%));
+  padding: 1.5px;
+  background: linear-gradient(135deg, hsl(44 53% 54%), hsl(162 80% 26%), hsl(44 53% 60%), hsl(44 53% 54%));
   background-size: 300% 300%;
   animation: lp-border-rotate 4s linear infinite;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -490,14 +487,14 @@
 }
 
 .lp-dashboard-mockup {
-  background: hsla(240, 6%, 8%, 0.9);
-  border: 1px solid hsla(0, 0%, 100%, 0.08);
-  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid hsla(162, 80%, 26%, 0.1);
+  border-radius: 16px;
   box-shadow:
-    0 25px 50px -12px hsla(0, 0%, 0%, 0.5),
-    0 0 0 1px hsla(0, 0%, 100%, 0.05),
-    inset 0 1px 0 hsla(0, 0%, 100%, 0.05);
+    0 30px 60px -15px hsla(162, 85%, 12%, 0.25),
+    0 0 0 1px hsla(162, 80%, 26%, 0.04);
 }
+
 
 @media print {
   @page { margin: 0; }
