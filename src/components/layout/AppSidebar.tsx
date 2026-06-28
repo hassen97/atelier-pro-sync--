@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FeedbackDialog } from "@/components/feedback/FeedbackDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import repairProLogo from "@/assets/repairpro-logo.png";
 import {
   Tooltip,
   TooltipContent,
