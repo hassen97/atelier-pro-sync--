@@ -6,10 +6,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Clock, Loader2, CheckCircle2, Truck } from "lucide-react";
+import { Clock, Loader2, CheckCircle2, Truck, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type RepairStatus = "pending" | "in_progress" | "completed" | "delivered";
+export type RepairStatus = "pending" | "in_progress" | "completed" | "delivered" | "rejected";
 
 interface RepairStatusSelectProps {
   value: RepairStatus;
@@ -37,6 +37,11 @@ export const statusConfig = {
     label: "Livré",
     icon: Truck,
     className: "bg-accent/10 text-accent border-accent/20",
+  },
+  rejected: {
+    label: "Rejeté",
+    icon: XCircle,
+    className: "bg-destructive/10 text-destructive border-destructive/20",
   },
 };
 
