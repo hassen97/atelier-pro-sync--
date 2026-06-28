@@ -70,14 +70,19 @@ export function useIsPlatformAdmin() {
     queryKey: ["is-platform-admin", user?.id],
     queryFn: async () => {
       if (!user) return false;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
+      // Throw on a real failure so React Query retries instead of silently
+      // returning `false` (which would demote an admin to the shop-owner view).
+      if (error) throw error;
       return data?.role === "platform_admin";
     },
     enabled: !!user,
+    retry: 2,
+    staleTime: 60_000,
   });
 }
 
