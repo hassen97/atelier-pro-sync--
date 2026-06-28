@@ -145,7 +145,7 @@ export default function Auth() {
           .from("user_roles")
           .select("role")
           .eq("user_id", userId)
-          .single();
+          .maybeSingle();
 
         const userRole = roleData?.role;
 

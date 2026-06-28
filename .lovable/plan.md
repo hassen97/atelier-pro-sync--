@@ -1,47 +1,45 @@
-# Performance Fix: Login & Tracking-Page Slowdowns
+# Fix: Super admin wrongly redirected to shop-owner dashboard
 
-## What happened this morning
-The backend itself was healthy (low connections, normal memory, no restarts), so this was **not** an outage or a capacity problem. The slowdown came from **database queries doing full-table scans** because the busiest tables have no indexes on the columns every query filters by. During the morning rush (many owners logging in at once + their customers opening tracking links), those scans pile up and requests crawl — exactly the "login is stuck" / "tracking page keeps loading" symptom.
+## Problem
+After logging in, the super ultra admin (`hassen`, role `platform_admin`) lands on the normal shop-owner dashboard instead of `/admin`.
 
-This was confirmed against the live database with real query plans:
-
-```text
-products  WHERE user_id = ...            -> Seq Scan, 81 ms   (no user_id index)
-repair_status_history WHERE repair_id=.. -> Seq Scan          (no repair_id index)
-```
-
-The `repair_status_history` scan is the key one for the **public tracking page**: it runs inside the `get_repair_by_token` function, so every customer who opens a tracking link forces a full scan of that table.
+The database and RLS are correct (one `platform_admin` role, readable by the user). The routing in `ProtectedRoute.tsx` correctly redirects a `platform_admin` to `/admin`. The fault is in how the admin role is detected.
 
 ## Root cause
-The hot tables only have primary-key indexes. They are missing indexes on the foreign-key / owner columns used in every read:
+`useIsPlatformAdmin()` in `src/hooks/useAdmin.ts`:
 
-| Table | Missing index | Used by |
-|-------|---------------|---------|
-| `repair_status_history` | `repair_id` | Public tracking page (RPC) |
-| `products` | `user_id` | POS, Inventory, Dashboard |
-| `repairs` | `user_id`, `customer_id` | Repairs list, Dashboard |
-| `sales` | `user_id` | POS, Profit, Dashboard |
-| `customers` | `user_id` | Customers, CRM lookups |
-| `expenses` | `user_id` | Expenses, Profit |
-| `shop_subscriptions` | `user_id` | Login funnel guard (ProtectedRoute) |
-| `repair_payments` | `repair_id`, `user_id` | Repairs, Profit |
+```ts
+const { data } = await supabase
+  .from("user_roles").select("role").eq("user_id", user.id).single();
+return data?.role === "platform_admin";
+```
 
-## Plan
+- It uses `.single()` and **discards the `error`**. Any transient failure (flaky mobile network, a stale cached JS chunk from the failed publishes) makes `data` `undefined`, so the hook returns `false`.
+- When it returns `false`, `ProtectedRoute` skips the `/admin` redirect and renders the shop-owner dashboard — with no error surfaced.
+- Every other role hook (`useIsOwner`, `useMyTeamInfo`) was already hardened with `.maybeSingle()` + error handling; this one was not.
 
-### 1. Add the missing indexes (database migration)
-Create btree indexes on each owner/foreign-key column listed above (composite where the query also sorts, e.g. `products(user_id, name)`, `repairs(user_id, created_at desc)`). This turns the sequential scans into index lookups and is the single highest-impact fix. Indexes are additive and safe — no data or behavior changes.
+The mobile screenshot and "works sometimes / intermittent" nature both point to this fragile query silently failing.
 
-### 2. Reduce redundant query churn during login
-- `useOnboardingStatus` in `ProtectedRoute.tsx` currently uses `staleTime: 0`, so its three gating queries (`user_roles`, `shop_settings`, `shop_subscriptions`) re-run on **every** navigation. Give it a short `staleTime` (e.g. 30s) so the login funnel check isn't re-fetched on each page change.
-- `usePresence` writes `last_online_at` very frequently (it was the #2 query by total time). Increase the throttle/interval so presence updates don't compete with real reads during the morning rush.
+## Fix
 
-### 3. Verify
-Re-run the live query plans after the indexes are created to confirm `Index Scan` replaces `Seq Scan` on `products`, `repair_status_history`, and `shop_subscriptions`, and confirm the tracking RPC is fast.
+### 1. Harden `useIsPlatformAdmin` (`src/hooks/useAdmin.ts`)
+- Switch `.single()` → `.maybeSingle()`.
+- **Throw on a real query error** instead of returning `false`. This is the key change: on error, React Query keeps the result in a loading/error state and retries, so `ProtectedRoute` shows the loader and retries rather than wrongly concluding "not an admin" and dropping the user into the shop dashboard.
+- Add `retry: 2` and a short `staleTime` (e.g. 60s) so the admin status is resilient on mobile networks and isn't re-fetched on every navigation.
 
-## Important note about reaching production
-The live database is currently **behind** on migrations (e.g. the recent `register_sessions` work exists in the test backend but not in Live). That means these index fixes — like all backend changes — **only reach your customers after a successful Publish**. The earlier "Publishing failed" issue must be resolved (the bundle-splitting work we did should help) so this fix actually lands on the live site. I'll flag if publish still fails after these changes.
+### 2. Make the route guard fail safe (`src/components/auth/ProtectedRoute.tsx`)
+- Pull `isError`/`isLoading` from `useIsPlatformAdmin()` and keep the loading screen visible while the admin check is still loading or errored, so a failed admin check never falls through to rendering the shop owner UI. (The funnel guard already skips `platform_admin`, so this only tightens the admin path.)
 
-## Technical details
-- Indexes created with plain `CREATE INDEX IF NOT EXISTS` inside a migration (not `CONCURRENTLY`, which can't run in a migration transaction). Table sizes are small, so creation is instant.
-- No RLS, schema, or app-logic changes beyond the two client-side caching/throttle tweaks in step 2.
-- No changes to the Returns/RMA module or any frozen systems.
+### 3. Align the login-time role check (`src/pages/Auth.tsx`)
+- The post-login role lookup (around line 144) also uses `.single()`. Switch it to `.maybeSingle()` for consistency so a hiccup there doesn't misclassify the account. This is secondary (navigation still goes through `ProtectedRoute`), but keeps the behavior consistent.
+
+## After the fix
+- Publish is required for this to reach the live site. Because earlier publishes failed, I'll confirm the build succeeds and recommend a fresh publish. If you're using the installed PWA, a hard refresh (or reopening the app) clears the old cached bundle so the corrected admin redirect loads.
+
+## Verification
+- Type-check / build passes.
+- Trace the logic: a `platform_admin` whose role query succeeds → redirected to `/admin`; whose role query errors → stays on the loader and retries, never the shop dashboard.
+
+## Technical notes
+- No database or RLS changes are needed — the data is already correct.
+- Files touched: `src/hooks/useAdmin.ts`, `src/components/auth/ProtectedRoute.tsx`, `src/pages/Auth.tsx`.
