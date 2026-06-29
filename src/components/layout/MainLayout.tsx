@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Menu, Search, User, Moon, Sun, LogOut, Settings, MessageCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,10 +28,25 @@ export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  // Defer the language chooser so it never intercepts the first paint after login.
+  const [deferredReady, setDeferredReady] = useState(false);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { data: unreadCount = 0 } = useUnreadMessageCount();
+
+  useEffect(() => {
+    const w = window as typeof window & {
+      requestIdleCallback?: (cb: () => void) => number;
+    };
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(() => setDeferredReady(true));
+      return () => (w as any).cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(() => setDeferredReady(true), 1200);
+    return () => clearTimeout(t);
+  }, []);
+
 
   const handleSignOut = async () => {
     await signOut();
@@ -172,8 +187,8 @@ export function MainLayout() {
       {/* What's New Modal */}
       <WhatsNewModal />
 
-      {/* First-login language chooser (shown only when profiles.language is null) */}
-      <LanguageModal />
+      {/* First-login language chooser (deferred; shown only when profiles.language is null) */}
+      {deferredReady && <LanguageModal />}
     </div>
   );
 }

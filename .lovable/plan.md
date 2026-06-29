@@ -1,92 +1,37 @@
-## Objectif
+## Goal
 
-Mettre en place une vraie infrastructure i18n avec **react-i18next** pour Français, **Arabe (RTL)** et Anglais. On installe la librairie, on crée les fichiers de traduction de base, on persiste le choix dans la table `profiles`, on ajoute un sélecteur de langue, un popup de premier choix, et la gestion automatique du RTL. On **remplace** l'ancien système maison (`I18nContext` FR/EN lié à `shop_settings`).
+Keep the current FR/AR/EN language system but remove what makes login feel slow: the blocking language popup and the per-load database read on the login path.
 
-Note: cette étape couvre **l'infrastructure uniquement** — les libellés de base (navigation, boutons communs). La traduction complète de chaque page sera faite plus tard.
+## What's actually slowing login
 
----
+1. **`useLanguage` runs a Supabase read** (`profiles.language`) on every authenticated mount, with its own `loading` state — it competes with the rest of the login render.
+2. **`<LanguageModal />` blocks the UI** right after login (whenever `profiles.language` is null), so login *feels* unfinished until the user dismisses it.
 
-## 1. Base de données
+Both sit directly on the post-login critical path. The fix keeps the feature but takes it off that path.
 
-Ajouter une colonne `language` à la table `profiles` pour persister le choix par utilisateur :
-- `language` : texte, peut être vide (`null` = l'utilisateur n'a pas encore choisi → déclenche le popup).
-- Valeurs attendues : `fr`, `ar`, `en`.
+## Plan
 
-C'est volontairement `null` par défaut pour que le `LanguageModal` ne s'affiche qu'au premier passage.
+### 1. Cache + defer the language read (`src/hooks/useLanguage.ts`)
+- Move the `profiles.language` fetch into a **React Query** query keyed by user id, with a long `staleTime` (e.g. 30 min) and `gcTime`, so it runs once and is reused across navigations instead of refetching on every mount.
+- Mark it non-blocking: the app renders immediately with the detected/last-used language; the stored preference is applied when it resolves.
+- Persist the chosen language in `localStorage` (already partly done via the i18n detector) so subsequent loads apply instantly with zero DB dependency.
 
-## 2. Installation
+### 2. Stop the popup from blocking login (`MainLayout.tsx` + `LanguageModal.tsx`)
+- Only consider showing the modal **after auth is fully ready and the preference query has resolved** — never during the login transition.
+- Defer mounting the modal (e.g. render it only once the dashboard is interactive / on idle) so it can't intercept the first paint after login.
+- Result: returning users go straight in; the chooser only appears, unobtrusively, for brand-new users who have never set a language.
 
-- `i18next`
-- `react-i18next`
-- `i18next-browser-languagedetector` (détection de la langue du navigateur comme valeur initiale par défaut)
+### 3. Keep the switcher lightweight
+- `LanguageSwitcher` stays in the header. Writing a new choice still updates `profiles.language` + `localStorage`, but reads come from the cached query.
 
-## 3. Structure des fichiers de traduction
+### 4. Verify
+- Log in as an existing user → lands on dashboard immediately, no popup, no extra blocking request.
+- Switch language via the header dropdown → applies and persists.
+- New user (null language) → app loads first, chooser appears after, non-blocking.
 
-```text
-src/i18n/
-  index.ts                 # init i18next + détection + export
-  locales/
-    fr/common.json
-    ar/common.json
-    en/common.json
-```
+## Note on "all languages"
+The current curated system only ships real FR/AR/EN translation strings, so the switcher keeps those three. Offering *every* language would require the Google Translate route (machine translation) instead of curated strings — say the word and I'll switch approaches, but this plan keeps your existing FR/AR/EN setup and just makes login fast.
 
-Chaque `common.json` contiendra les libellés de base déjà présents dans l'ancien système (navigation sidebar, boutons communs : Enregistrer, Annuler, Supprimer, Rechercher…), structurés par namespaces logiques (`nav.*`, `common.*`, `language.*`). Les traductions **arabes seront réelles** (rédigées correctement), pas des placeholders.
-
-## 4. Initialisation
-
-- `src/i18n/index.ts` initialise i18next avec les 3 langues, `fallbackLng: 'fr'`, et le détecteur de langue navigateur.
-- Import de `./i18n` dans `src/main.tsx` pour que l'instance soit disponible **partout** (y compris pages publiques, auth, et le modal) — pas seulement dans les routes protégées.
-
-## 5. Persistance + synchronisation (`useLanguage` hook)
-
-Créer `src/hooks/useLanguage.ts` :
-- Lit `profiles.language` de l'utilisateur connecté.
-- `changeLanguage(lang)` : appelle `i18n.changeLanguage(lang)`, met à jour `document.documentElement` (`lang` + `dir`), et **écrit la valeur dans `profiles.language`** via Supabase.
-- Au chargement, si `profiles.language` est défini, on applique cette langue ; sinon on laisse la langue détectée et on signale que le modal doit s'afficher.
-
-## 6. Gestion RTL (Tailwind)
-
-- Tailwind v3 supporte nativement les variantes `rtl:` / `ltr:` basées sur l'attribut `dir` du `<html>` — **aucun plugin nécessaire**.
-- Un utilitaire applique sur `<html>` : `dir="rtl"` + `lang="ar"` quand la langue est arabe, sinon `dir="ltr"`.
-- Appliqué à chaque changement de langue ET au démarrage de l'app, dans le hook `useLanguage`/init i18n.
-
-## 7. Composant `LanguageSwitcher`
-
-`src/components/i18n/LanguageSwitcher.tsx` :
-- Dropdown (shadcn `DropdownMenu`) avec les 3 langues (drapeau/label : Français, العربية, English).
-- Au clic → `changeLanguage()` (met à jour i18n, le `dir`, et la base de données).
-- Intégré dans le header de `MainLayout.tsx` (à côté du bouton thème/notifications).
-
-## 8. Composant `LanguageModal`
-
-`src/components/i18n/LanguageModal.tsx` :
-- S'affiche **uniquement si `profiles.language` est `null`** (premier passage).
-- Dialog shadcn non-fermable au clic extérieur, propose les 3 langues.
-- Au choix → enregistre dans `profiles.language`, applique la langue + le `dir`, puis se ferme.
-- Monté dans `MainLayout.tsx` (zone authentifiée).
-
-## 9. Remplacement de l'ancien système
-
-- Migrer les 3 fichiers utilisant `useI18n` vers `useTranslation` de react-i18next :
-  - `src/pages/Settings.tsx`
-  - `src/components/layout/AppSidebar.tsx`
-  - (`src/contexts/I18nContext.tsx` supprimé)
-- Retirer `<I18nProvider>` de `src/App.tsx`.
-- Supprimer `src/contexts/I18nContext.tsx`.
-- Le sélecteur de langue dans **Settings** pointera désormais vers `useLanguage` (profiles) au lieu de `shop_settings.language`.
-
----
-
-## Détails techniques
-
-- **Source de vérité unique** : `profiles.language` (par utilisateur). `shop_settings.language` n'est plus utilisé pour l'UI.
-- **Clés de traduction** : on réutilise les clés existantes de l'ancien `I18nContext` (`nav.*`, `common.*`, etc.) pour limiter les changements dans les composants déjà branchés.
-- **Ordre de priorité de la langue au démarrage** : `profiles.language` → langue détectée navigateur → `fr`.
-- **RTL** : variantes Tailwind `rtl:`/`ltr:` natives ; le `dir` est posé sur `<html>`. Les composants existants restent compatibles ; des ajustements RTL fins par page pourront être ajoutés lors de la traduction complète ultérieure.
-- **Aucune modification** de `src/integrations/supabase/client.ts` ni des fichiers auto-générés.
-
-## Hors périmètre (à faire plus tard)
-
-- Traduction de tout le contenu de chaque page (seuls les libellés de base sont couverts ici).
-- Ajustements RTL détaillés page par page.
+## Technical notes
+- No schema changes; `profiles.language` stays as-is.
+- Auth readiness is taken from `useAuth().loading` so the modal logic waits for the session to hydrate before deciding to show.
