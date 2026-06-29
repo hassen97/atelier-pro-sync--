@@ -52,6 +52,7 @@ const viewLabels: Record<AdminView, string> = {
   reports:         "Rapports & Export",
   services_catalog:  "Catalogue services",
   services_requests: "Demandes services",
+  system_health:     "Santé Système",
 };
 
 const AdminDashboard = () => {
