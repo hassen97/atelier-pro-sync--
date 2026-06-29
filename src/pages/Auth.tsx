@@ -118,18 +118,21 @@ export default function Auth() {
     setError(null);
     setLoading(true);
 
-    const { error } = await signIn(loginUsername, loginPassword);
+    try {
+      const { error } = await signIn(loginUsername, loginPassword);
 
-    if (error) {
-      const msg = error.message || "";
-      if (msg === "Invalid login credentials") {
-        setError("Nom d'utilisateur ou mot de passe incorrect");
-      } else if (msg.includes("banned") || msg.includes("User is banned")) {
-        setError("Votre compte est en attente de validation par l'administrateur.");
-      } else {
-        setError(msg);
+      if (error) {
+        const msg = error.message || "";
+        if (msg === "Invalid login credentials") {
+          setError("Nom d'utilisateur ou mot de passe incorrect");
+        } else if (msg.includes("banned") || msg.includes("User is banned")) {
+          setError("Votre compte est en attente de validation par l'administrateur.");
+        } else {
+          setError(msg);
+        }
+        return;
       }
-    } else {
+
       // Remember me
       if (rememberMe) {
         localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({ username: loginUsername }));
@@ -159,14 +162,12 @@ export default function Auth() {
           if (loginRole === "employee" && isOwner) {
             await supabase.auth.signOut();
             setError("Ce compte est un compte propriétaire. Veuillez utiliser l'onglet « Propriétaire ».");
-            setLoading(false);
             return;
           }
 
           if (loginRole === "owner" && isEmployee) {
             await supabase.auth.signOut();
             setError("Ce compte est un compte employé. Veuillez utiliser l'onglet « Employé ».");
-            setLoading(false);
             return;
           }
         }
@@ -181,7 +182,6 @@ export default function Auth() {
           // Admin kill-switch: account explicitly locked by an admin
           await supabase.auth.signOut();
           setError("Votre compte est verrouillé par l'administrateur. Veuillez le contacter.");
-          setLoading(false);
           return;
         }
       }
@@ -191,9 +191,14 @@ export default function Auth() {
       const redirect = searchParams.get("redirect");
       const from = redirect || (location.state as { from?: Location })?.from?.pathname || "/dashboard";
       navigate(from, { replace: true });
+    } catch (err) {
+      setError(
+        (err as Error)?.message ||
+          "Connexion au serveur impossible. Vérifiez votre connexion et réessayez.",
+      );
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
