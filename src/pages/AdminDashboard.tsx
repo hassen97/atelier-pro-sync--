@@ -22,6 +22,7 @@ import { AdminCommunityView } from "@/components/admin/AdminCommunityView";
 import { AdminReportsView } from "@/components/admin/AdminReportsView"; // NEW
 import { AdminServicesView } from "@/components/admin/AdminServicesView";
 import { AdminServiceRequestsView } from "@/components/admin/AdminServiceRequestsView";
+import { AdminSystemHealthView } from "@/components/admin/AdminSystemHealthView";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAdminSignupNotifier } from "@/hooks/useAdminSignupNotifier";
@@ -31,7 +32,7 @@ type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
   | "settings" | "employees" | "plans" | "gateways" | "feature_flags"
   | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
-  | "services_catalog" | "services_requests";
+  | "services_catalog" | "services_requests" | "system_health";
 
 const viewLabels: Record<AdminView, string> = {
   overview:        "Dashboard",
@@ -51,6 +52,7 @@ const viewLabels: Record<AdminView, string> = {
   reports:         "Rapports & Export",
   services_catalog:  "Catalogue services",
   services_requests: "Demandes services",
+  system_health:     "Santé Système",
 };
 
 const AdminDashboard = () => {
@@ -235,6 +237,7 @@ const AdminDashboard = () => {
             {activeView === "reports"          && <AdminReportsView />}
             {activeView === "services_catalog"  && <AdminServicesView />}
             {activeView === "services_requests" && <AdminServiceRequestsView />}
+            {activeView === "system_health"     && <AdminSystemHealthView />}
           </div>
         </main>
       </div>
