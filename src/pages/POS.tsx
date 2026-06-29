@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ShoppingCart } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, useDebounce } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useAllProducts } from "@/hooks/useProducts";
 import { useRepairs } from "@/hooks/useRepairs";
@@ -100,9 +100,13 @@ export default function POS() {
       ]
     : [];
 
+  // Debounce manual typing so rapid scanner input doesn't thrash the grid filter
+  const debouncedSearch = useDebounce(searchQuery, 250);
+
   const filteredProducts = products.filter((p: any) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = debouncedSearch.toLowerCase();
+    const matchesSearch = p.name.toLowerCase().includes(q) ||
+      (p.sku && p.sku.toLowerCase().includes(q));
     const matchesCategory = !selectedCategory || p.category?.name === selectedCategory;
     const matchesSubcategory = !selectedSubcategory || p.subcategory?.name === selectedSubcategory;
     return matchesSearch && matchesCategory && matchesSubcategory;
@@ -129,16 +133,30 @@ export default function POS() {
   }, []);
 
   const handleScan = (value: string) => {
-    if (!value.trim()) return;
-    const product = products.find((p: any) => p.sku && p.sku.toLowerCase() === value.trim().toLowerCase());
+    // Rigorously strip trailing spaces, CR/LF and zero-width chars the scanner appends
+    const code = value.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+    if (!code) {
+      scanRef.current?.focus();
+      return;
+    }
+    const needle = code.toLowerCase();
+    // Exact match against barcodes (code-barre) OR sku — case-insensitive
+    const product = products.find((p: any) => {
+      const skuMatch = p.sku && p.sku.trim().toLowerCase() === needle;
+      const barcodeMatch =
+        Array.isArray(p.barcodes) &&
+        p.barcodes.some((b: string) => b && b.trim().toLowerCase() === needle);
+      return skuMatch || barcodeMatch;
+    });
     if (product) {
       addToCart(product);
       playBeep();
       flashGreen();
     } else {
-      toast.error(`Produit non trouvé: ${value}`);
+      toast.error(`Article pas disponible: ${code}`);
     }
     setScanInput("");
+    // Keep focus so the cashier can scan items back-to-back without clicking
     scanRef.current?.focus();
   };
 

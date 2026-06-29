@@ -1,37 +1,32 @@
-## Goal
+# Fix POS Barcode Scanner ("Article pas disponible")
 
-Keep the current FR/AR/EN language system but remove what makes login feel slow: the blocking language popup and the per-load database read on the login path.
+## Root cause
+The POS scan handler (`handleScan` in `src/pages/POS.tsx`) only compares the scanned value against each product's `sku` field. It never checks the `barcodes` array. Since most "douchette" scanners read the barcode (code-barre) — which is stored in the `barcodes` column, not `sku` — every scan that isn't literally equal to the SKU falls through to "Produit non trouvé" / "Article pas disponible". The `useAllProducts` hook already loads `barcodes` for each product, so the data is available; the matching logic just ignores it.
 
-## What's actually slowing login
+## What will change (only `src/pages/POS.tsx`)
 
-1. **`useLanguage` runs a Supabase read** (`profiles.language`) on every authenticated mount, with its own `loading` state — it competes with the rest of the login render.
-2. **`<LanguageModal />` blocks the UI** right after login (whenever `profiles.language` is null), so login *feels* unfinished until the user dismisses it.
+### 1. Barcode + SKU exact match on scan (the real fix)
+Rewrite `handleScan` so it:
+- Trims the value (removes trailing spaces, `\n`, `\r`, hidden characters the scanner appends).
+- Looks for an exact match against **either** the `barcodes` array **or** the `sku` (case-insensitive), e.g. match if `p.barcodes?.some(b => b.trim().toLowerCase() === code)` OR `p.sku?.toLowerCase() === code`.
+- On match: add to cart, play beep, flash green, clear input, re-focus.
+- On no match: keep the existing error toast.
 
-Both sit directly on the post-login critical path. The fix keeps the feature but takes it off that path.
+### 2. Hardened Enter-key handling
+The scan input already calls `handleScan` on `Enter` (line 566). Keep it, and make trimming rigorous inside `handleScan` (covers spaces, CR/LF, zero-width chars). On Enter with an exact match, the item is added instantly with no click required — already the behavior once matching is fixed.
 
-## Plan
+### 3. Auto-focus after each scan
+`handleScan` already calls `scanRef.current?.focus()` after clearing. Keep and verify it always runs (including the not-found path) so the cashier can scan items back-to-back without clicking. No structural change needed beyond ensuring focus fires in both branches.
 
-### 1. Cache + defer the language read (`src/hooks/useLanguage.ts`)
-- Move the `profiles.language` fetch into a **React Query** query keyed by user id, with a long `staleTime` (e.g. 30 min) and `gcTime`, so it runs once and is reused across navigations instead of refetching on every mount.
-- Mark it non-blocking: the app renders immediately with the detected/last-used language; the stored preference is applied when it resolves.
-- Persist the chosen language in `localStorage` (already partly done via the i18n detector) so subsequent loads apply instantly with zero DB dependency.
+### 4. Debounce manual typing in the product search
+The main product search input (`searchQuery`, line 426) filters the in-memory grid on every keystroke. Wrap it with the existing `useDebounce` helper (already in `src/lib/utils.ts`) at 250ms, and use the debounced value inside `filteredProducts` so rapid scanner "typing" into the search box doesn't thrash the grid. The dedicated scan input stays Enter-triggered (no debounce needed there).
 
-### 2. Stop the popup from blocking login (`MainLayout.tsx` + `LanguageModal.tsx`)
-- Only consider showing the modal **after auth is fully ready and the preference query has resolved** — never during the login transition.
-- Defer mounting the modal (e.g. render it only once the dashboard is interactive / on idle) so it can't intercept the first paint after login.
-- Result: returning users go straight in; the chooser only appears, unobtrusively, for brand-new users who have never set a language.
+## Notes
+- No database or backend changes — `barcodes` and `sku` are already fetched.
+- The separate `SmartScanBar` component (used in Inventory) already matches barcodes correctly; this change brings the POS scan input to the same behavior.
+- Scope is limited to the POS page front-end logic; cart, payment, and receipt flows are untouched.
 
-### 3. Keep the switcher lightweight
-- `LanguageSwitcher` stays in the header. Writing a new choice still updates `profiles.language` + `localStorage`, but reads come from the cached query.
-
-### 4. Verify
-- Log in as an existing user → lands on dashboard immediately, no popup, no extra blocking request.
-- Switch language via the header dropdown → applies and persists.
-- New user (null language) → app loads first, chooser appears after, non-blocking.
-
-## Note on "all languages"
-The current curated system only ships real FR/AR/EN translation strings, so the switcher keeps those three. Offering *every* language would require the Google Translate route (machine translation) instead of curated strings — say the word and I'll switch approaches, but this plan keeps your existing FR/AR/EN setup and just makes login fast.
-
-## Technical notes
-- No schema changes; `profiles.language` stays as-is.
-- Auth readiness is taken from `useAuth().loading` so the modal logic waits for the session to hydrate before deciding to show.
+## Technical details
+- Edit `handleScan` (~lines 131–143) to search `barcodes` + `sku`.
+- Add `const debouncedSearch = useDebounce(searchQuery, 250);` and reference it in `filteredProducts` (lines 103–109).
+- Import `useDebounce` from `@/lib/utils`.
