@@ -68,6 +68,7 @@ const navSections: { label: string; items: NavItem[] }[] = [
   {
     label: "Système",
     items: [
+      { id: "system_health",   label: "Santé Système",  icon: HeartPulse, badge: "Nouveau" },
       { id: "signup_attempts", label: "Tentatives",     icon: Shield },
       { id: "feature_flags",   label: "Feature Flags",  icon: Flag },
       { id: "settings",        label: "Paramètres",     icon: Settings },
