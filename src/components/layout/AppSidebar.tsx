@@ -76,7 +76,7 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
   const { settings } = useShopSettingsContext();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { allowedPages } = useAllowedPages();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const { data: unreadCount = 0 } = useUnreadMessageCount();
 
   // Filter navigation based on allowed pages
