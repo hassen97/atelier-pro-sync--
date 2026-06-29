@@ -113,11 +113,9 @@ const App = () => (
                   <ProtectedRoute>
                     <ShopSettingsProvider>
                       <BrandThemeProvider>
-                        <I18nProvider>
-                          <NotificationsProvider>
-                            <MainLayout />
-                          </NotificationsProvider>
-                        </I18nProvider>
+                        <NotificationsProvider>
+                          <MainLayout />
+                        </NotificationsProvider>
                       </BrandThemeProvider>
                     </ShopSettingsProvider>
                   </ProtectedRoute>
