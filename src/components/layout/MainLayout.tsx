@@ -7,6 +7,8 @@ import { AppSidebar } from "./AppSidebar";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ReadOnlyBanner } from "./ReadOnlyBanner";
 import { WhatsNewModal } from "@/components/announcements/WhatsNewModal";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { LanguageModal } from "@/components/i18n/LanguageModal";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +99,7 @@ export function MainLayout() {
           </div>
 
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <Button
               variant="ghost"
               size="icon"
@@ -168,6 +171,9 @@ export function MainLayout() {
 
       {/* What's New Modal */}
       <WhatsNewModal />
+
+      {/* First-login language chooser (shown only when profiles.language is null) */}
+      <LanguageModal />
     </div>
   );
 }

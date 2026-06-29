@@ -58,7 +58,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { countries, currencies, getCurrencyForCountry } from "@/data/countries";
 import { BRAND_COLOR_PRESETS, useBrandTheme } from "@/contexts/BrandThemeContext";
-import { useI18n } from "@/contexts/I18nContext";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { AppLanguage } from "@/i18n";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const TABS = [
@@ -139,7 +141,8 @@ export default function Settings() {
 
   const { updatePassword, user } = useAuth();
   const { applyColor } = useBrandTheme();
-  const { language, setLanguage, t } = useI18n();
+  const { t } = useTranslation();
+  const { language, changeLanguage } = useLanguage();
   const isMobile = useIsMobile();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -646,10 +649,11 @@ export default function Settings() {
               {/* Language */}
               <div>
                 <p className="text-sm font-medium mb-2">{t("settings.language")}</p>
-                <Select value={language} onValueChange={(val) => setLanguage(val as "fr" | "en")}>
+                <Select value={language} onValueChange={(val) => changeLanguage(val as AppLanguage)}>
                   <SelectTrigger className="max-w-[200px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                    <SelectItem value="ar">🇸🇦 العربية</SelectItem>
                     <SelectItem value="en">🇬🇧 English</SelectItem>
                   </SelectContent>
                 </Select>

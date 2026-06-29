@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { useAllowedPages } from "@/hooks/useTeam";
-import { useI18n } from "@/contexts/I18nContext";
+import { useTranslation } from "react-i18next";
 import { useUnreadMessageCount } from "@/hooks/useCommunity";
 
 const navigation = [
@@ -76,7 +76,7 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
   const { settings } = useShopSettingsContext();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { allowedPages } = useAllowedPages();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const { data: unreadCount = 0 } = useUnreadMessageCount();
 
   // Filter navigation based on allowed pages

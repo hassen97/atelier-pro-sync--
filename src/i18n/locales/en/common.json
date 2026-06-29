@@ -1,0 +1,56 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "pos": "Point of Sale",
+    "repairs": "Repairs",
+    "inventory": "Inventory",
+    "customers": "Customers",
+    "suppliers": "Suppliers",
+    "expenses": "Expenses",
+    "debts": "Customer Debts",
+    "invoices": "Invoices",
+    "statistics": "Statistics",
+    "profit": "Profit",
+    "warranty": "Warranty",
+    "settings": "Settings",
+    "feedback": "Report / Suggest",
+    "community": "Community",
+    "messages": "Messages",
+    "team": "Team",
+    "services": "Services & Tools"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search",
+    "loading": "Loading...",
+    "all": "All",
+    "none": "None",
+    "actions": "Actions",
+    "print": "Print",
+    "export": "Export",
+    "back": "Back",
+    "confirm": "Confirm",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "settings": {
+    "language": "Language",
+    "brandColor": "Brand Color",
+    "uploadLogo": "Upload Logo",
+    "removeLogo": "Remove Logo"
+  },
+  "language": {
+    "title": "Choose your language",
+    "description": "Select the display language for the app. You can change it anytime.",
+    "label": "Language",
+    "fr": "Français",
+    "ar": "العربية",
+    "en": "English",
+    "confirm": "Continue"
+  }
+}
