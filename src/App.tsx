@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ShopSettingsProvider } from "@/contexts/ShopSettingsContext";
-import { I18nProvider } from "@/contexts/I18nContext";
+
 import { BrandThemeProvider } from "@/contexts/BrandThemeContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
