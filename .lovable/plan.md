@@ -1,61 +1,60 @@
-# One-time "cold backup" of Test → Live
+# God Mode — System Health Dashboard
 
-Your goal: make a one-time snapshot so the Live database isn't 3 months stale. Login keeps working on Test exactly as today. Nobody logs into Live day-to-day.
+A new **"Santé Système"** view inside the existing Ultra Admin panel that monitors database size, bloat, connections, and currently-running slow queries, plus a global maintenance-mode flag. Access is restricted to `platform_admin` users at both the database (function-level) and UI layers.
 
-## Two hard constraints (please read first)
+Decisions confirmed: integrated admin **view** (not a standalone route), maintenance mode is **flag-only** (stored, no user blocking yet), and the UI shows **real data only** (no mock fallback).
 
-1. **I cannot write data into the Live database.** My tools only write to Test; Live changes only when you publish, and publishing copies *structure and functions, never data*. So I physically cannot push rows from Test into the Live instance myself.
-2. **Login accounts can't be copied by me.** Your usernames/passwords live in a protected `auth` area I can't read or write. All your business data (profiles, customers, repairs, sales…) is tagged with the user IDs from *Test's* accounts. If that data is dropped into Live — which has its own different 337 accounts — every row points to an account that doesn't exist there, so it would be broken/orphaned. A correct in-place clone therefore must also clone the accounts, which only Lovable support can do at the platform level.
+---
 
-Because of these, a true "click-and-clone Test into the Live instance" isn't something I can safely execute alone. Here's what I recommend instead.
+## Phase 1 — Backend (Supabase RPCs & security)
 
-## Recommended: full downloadable backup now (the real safety net)
+One migration creating four `SECURITY DEFINER` functions, each gated so only platform admins can run them. They run as the `postgres` owner, which can read the `pg_stat_*` catalogs, while a `has_role(auth.uid(), 'platform_admin')` guard blocks everyone else (raises an exception for non-admins).
 
-This is the genuinely safe, zero-risk cold backup and it doesn't touch Live, Test, or anyone's login. Your real data is tiny (~15 MB excluding logs), so this is quick.
+1. **`get_db_table_sizes()`** — joins `pg_stat_user_tables` with `pg_total_relation_size()`; returns per table: `table_name`, `total_size_mb` (numeric), `live_tuples`, `dead_tuples`, and `dead_ratio` (dead / (live+dead) as a percentage). Ordered by size descending.
+2. **`get_active_connections()`** — from `pg_stat_activity`: returns `total`, `active`, and `idle` connection counts (scoped to the current database).
+3. **`get_slow_queries()`** — from `pg_stat_activity`: returns rows where `state = 'active'` and `now() - query_start > interval '1 second'`, excluding the function's own query. Returns `pid`, `duration_seconds`, truncated `query` text, and `state`.
+4. **Maintenance mode** — insert a `maintenance_mode` row into the existing key-value `platform_settings` table (`key='maintenance_mode'`, `value='false'`), matching the existing `safe_mode_enabled` convention. No schema column change needed.
 
-```text
-What I'll produce (saved to your documents):
-  - One CSV per table for all 54 public tables (complete row-for-row export of Test)
-  - A combined JSON archive of everything (single-file restore point)
-  - A short manifest: table list + row counts + export timestamp
-```
+`GRANT EXECUTE` on the three metric functions to `authenticated` (the in-function role check is the real gate). `platform_settings` already has working policies.
 
-Result: a complete, dated snapshot of today's Test data you can store anywhere. If Test is ever lost, this is the source of truth to restore from — and it's more reliable than a half-populated Live instance with mismatched accounts.
+## Phase 2 — Frontend UI (React + Recharts)
 
-```text
-Scope of the export (current Test row counts):
-  profiles 388 · customers 1,392 · products 4,598 · repairs 1,625 · sales 545
-  + all remaining tables (settings, subscriptions, suppliers, invoices, etc.)
-Excluded: internal log/queue tables that are pure noise (activity_log can be
-included if you want it — it's ~3 MB of history).
-```
+**New view component** `src/components/admin/AdminSystemHealthView.tsx`, rendered inside `AdminDashboard.tsx` and reachable from `AdminSidebar.tsx` under the **"Système"** section (new id `system_health`, label "Santé Système", `Activity`/`HeartPulse` icon). God Mode dark aesthetic consistent with the existing admin shell (`admin-glass-card`, neon accents).
 
-## To actually populate the Live instance (optional, needs support)
+- **Metric cards grid** (reusing `AdminStatCard`): Active Connections, Total DB Size (sum of table sizes), and a derived **System Status** badge — Healthy / Warning / Critical computed from connection count, total size, and presence of slow queries.
+- **Storage Radar** — `recharts` `BarChart` of the **top 5** largest tables (size in MB) from `get_db_table_sizes`.
+- **Bloat Warning table** — all tables with size, live/dead tuples, and dead ratio; rows with `dead_ratio > 20%` highlighted in red.
+- **Danger Zone card** — a `Switch` for "Activer le Mode Maintenance Global" that reads/writes the `maintenance_mode` row in `platform_settings` (flag only; confirmation toast on change).
 
-If you want Live to be a *working* standby that people could log into, that requires cloning the accounts too. I'll prepare the exact request for you to send to Lovable support:
+## Phase 3 — Data fetching & polling
 
-```text
-"Please do a platform-level clone of my project's Test (development) backend
- into Live (production), INCLUDING auth users, so the Live instance mirrors
- Test. Keep Test as the active login database — do not change where my custom
- domain / app points. This is a one-time refresh; Live is a cold standby."
-```
+**New hook** `src/hooks/useSystemHealth.ts` using `@tanstack/react-query`:
+- `useDbTableSizes()` — `staleTime` ~60s (sizes change slowly).
+- `useActiveConnections()` and `useSlowQueries()` — `refetchInterval: 30000` so they auto-poll every 30s. React Query unmounts the interval automatically when the view changes, so no manual cleanup/memory leaks.
+- `useMaintenanceMode()` query + `useSetMaintenanceMode()` mutation invalidating its key.
 
-I can't trigger that clone from here, but support can do it cleanly (accounts + data together) so nothing ends up orphaned.
+All hooks call `supabase.rpc(...)`. Errors surface as an inline "métrique indisponible" state per card/section.
 
-## What I will NOT do
-- Not touch Test data or anyone's login.
-- Not attempt to shove data into Live with mismatched accounts (would create broken/orphaned records).
-- Not change where your app or custom domain points.
+## Phase 4 — Testing & validation
 
-## Steps once approved
-1. Page through every public table in Test via the database read tools and write one CSV per table to your documents folder.
-2. Build the combined JSON archive + manifest with row counts and timestamp.
-3. Verify exported row counts match the live counts above, and report the totals.
-4. Hand you the ready-to-send support request if you also want the in-place Live clone.
+- Run the migration and confirm the four functions compile without SQL errors.
+- Verify each RPC returns data (and that a non-admin call is rejected) via a read query / direct invocation.
+- Confirm the view handles loading and error/empty states gracefully (skeletons + fallback text), and that the bar chart maps the RPC JSON correctly.
+- Typecheck the new components/hook.
+
+---
 
 ## Technical notes
-- Export uses read-only queries against Test (`development`); fully non-destructive.
-- Large tables (products 4,598, repairs 1,625) are paged in chunks to stay within query limits.
-- The combined JSON is restorable later via the existing restore tooling / a generated INSERT bundle if needed.
-- An in-place Live load is intentionally excluded because (a) tooling can't write to Live and (b) auth-account cloning is platform-only; doing data-only would violate foreign keys to the auth accounts.
+
+- Role guard uses the existing `platform_admin` app_role and `has_role()` security-definer function — consistent with the rest of the codebase. The user's word "admin" maps to `platform_admin` here.
+- No standalone `/admin/system-health` route: `ProtectedRoute` force-redirects platform admins to `/admin`, so the metric view is registered in the `AdminView` union, the sidebar, and the `AdminDashboard` content switch — the same pattern as every other admin screen.
+- `platform_settings` stays key-value; `maintenance_mode` is just another row.
+- Functions are `SECURITY DEFINER` with `SET search_path = public, pg_catalog` and an explicit admin check that raises on unauthorized callers.
+
+## Files
+
+- **Migration** (new): four functions + `maintenance_mode` seed row.
+- `src/hooks/useSystemHealth.ts` (new): query/mutation hooks with 30s polling.
+- `src/components/admin/AdminSystemHealthView.tsx` (new): the dashboard UI.
+- `src/components/admin/AdminSidebar.tsx`: add nav item + `system_health` to the `AdminView` union.
+- `src/pages/AdminDashboard.tsx`: add `system_health` to the union, `viewLabels`, and the content switch.

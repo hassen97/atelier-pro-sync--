@@ -2332,11 +2332,38 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_active_connections: {
+        Args: never
+        Returns: {
+          active: number
+          idle: number
+          total: number
+        }[]
+      }
+      get_db_table_sizes: {
+        Args: never
+        Returns: {
+          dead_ratio: number
+          dead_tuples: number
+          live_tuples: number
+          table_name: string
+          total_size_mb: number
+        }[]
+      }
       get_or_create_open_session: {
         Args: { _shop_id: string }
         Returns: string
       }
       get_repair_by_token: { Args: { p_token: string }; Returns: Json }
+      get_slow_queries: {
+        Args: never
+        Returns: {
+          duration_seconds: number
+          pid: number
+          query: string
+          state: string
+        }[]
+      }
       get_team_owner_id: { Args: { _member_id: string }; Returns: string }
       has_role: {
         Args: {
