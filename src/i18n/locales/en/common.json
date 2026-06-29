@@ -38,6 +38,12 @@
     "yes": "Yes",
     "no": "No"
   },
+  "settings": {
+    "language": "Language",
+    "brandColor": "Brand Color",
+    "uploadLogo": "Upload Logo",
+    "removeLogo": "Remove Logo"
+  },
   "language": {
     "title": "Choose your language",
     "description": "Select the display language for the app. You can change it anytime.",

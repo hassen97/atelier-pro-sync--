@@ -38,6 +38,12 @@
     "yes": "نعم",
     "no": "لا"
   },
+  "settings": {
+    "language": "اللغة",
+    "brandColor": "لون العلامة التجارية",
+    "uploadLogo": "تحميل شعار",
+    "removeLogo": "حذف الشعار"
+  },
   "language": {
     "title": "اختر لغتك",
     "description": "اختر لغة عرض التطبيق. يمكنك تغييرها في أي وقت.",
