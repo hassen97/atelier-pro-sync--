@@ -195,10 +195,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Primary: Supabase JS client
     console.log("[Auth] signIn: attempting with Supabase client...");
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: internalEmail,
-        password,
-      });
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email: internalEmail,
+          password,
+        }),
+        12000,
+      );
       console.log("[Auth] signIn: client result", { error: error?.message });
       if (!error) return { error: null };
       if (!isNetworkError(error)) return { error };
