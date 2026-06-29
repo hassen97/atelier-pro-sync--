@@ -7,6 +7,8 @@ import { AppSidebar } from "./AppSidebar";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ReadOnlyBanner } from "./ReadOnlyBanner";
 import { WhatsNewModal } from "@/components/announcements/WhatsNewModal";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { LanguageModal } from "@/components/i18n/LanguageModal";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
