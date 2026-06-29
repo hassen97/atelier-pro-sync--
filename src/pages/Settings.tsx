@@ -58,7 +58,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { countries, currencies, getCurrencyForCountry } from "@/data/countries";
 import { BRAND_COLOR_PRESETS, useBrandTheme } from "@/contexts/BrandThemeContext";
-import { useI18n } from "@/contexts/I18nContext";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { AppLanguage } from "@/i18n";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const TABS = [
