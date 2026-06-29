@@ -99,6 +99,7 @@ export function MainLayout() {
           </div>
 
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <Button
               variant="ghost"
               size="icon"
@@ -170,6 +171,9 @@ export function MainLayout() {
 
       {/* What's New Modal */}
       <WhatsNewModal />
+
+      {/* First-login language chooser (shown only when profiles.language is null) */}
+      <LanguageModal />
     </div>
   );
 }
