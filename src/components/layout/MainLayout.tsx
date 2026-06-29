@@ -187,8 +187,8 @@ export function MainLayout() {
       {/* What's New Modal */}
       <WhatsNewModal />
 
-      {/* First-login language chooser (shown only when profiles.language is null) */}
-      <LanguageModal />
+      {/* First-login language chooser (deferred; shown only when profiles.language is null) */}
+      {deferredReady && <LanguageModal />}
     </div>
   );
 }
