@@ -141,7 +141,8 @@ export default function Settings() {
 
   const { updatePassword, user } = useAuth();
   const { applyColor } = useBrandTheme();
-  const { language, setLanguage, t } = useI18n();
+  const { t } = useTranslation();
+  const { language, changeLanguage } = useLanguage();
   const isMobile = useIsMobile();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
