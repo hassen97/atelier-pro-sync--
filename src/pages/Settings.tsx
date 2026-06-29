@@ -649,10 +649,11 @@ export default function Settings() {
               {/* Language */}
               <div>
                 <p className="text-sm font-medium mb-2">{t("settings.language")}</p>
-                <Select value={language} onValueChange={(val) => setLanguage(val as "fr" | "en")}>
+                <Select value={language} onValueChange={(val) => changeLanguage(val as AppLanguage)}>
                   <SelectTrigger className="max-w-[200px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                    <SelectItem value="ar">🇸🇦 العربية</SelectItem>
                     <SelectItem value="en">🇬🇧 English</SelectItem>
                   </SelectContent>
                 </Select>
