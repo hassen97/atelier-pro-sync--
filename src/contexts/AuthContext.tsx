@@ -30,6 +30,29 @@ function isNetworkError(err: unknown): boolean {
     message.includes("aborted");
 }
 
+// Race a promise against a timeout. If it doesn't settle in time, reject with
+// an AbortError so callers treat it as a network error and fall through to the
+// resilient REST fallback (which has its own timeout + retries).
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const err = new Error("Request timed out (aborted)");
+      err.name = "AbortError";
+      reject(err);
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 // Fallback: Direct fetch to Supabase Auth REST API with timeout + retries
 async function authFetch(endpoint: string, body: Record<string, unknown>, maxRetries = 3): Promise<{ data: any; error: Error | null }> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
