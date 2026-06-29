@@ -1,60 +1,61 @@
-# Emergency cleanup: reclaim 6.5 GB safely
+# One-time "cold backup" of Test → Live
 
-## What's actually taking the space (confirmed)
+Your goal: make a one-time snapshot so the Live database isn't 3 months stale. Login keeps working on Test exactly as today. Nobody logs into Live day-to-day.
+
+## Two hard constraints (please read first)
+
+1. **I cannot write data into the Live database.** My tools only write to Test; Live changes only when you publish, and publishing copies *structure and functions, never data*. So I physically cannot push rows from Test into the Live instance myself.
+2. **Login accounts can't be copied by me.** Your usernames/passwords live in a protected `auth` area I can't read or write. All your business data (profiles, customers, repairs, sales…) is tagged with the user IDs from *Test's* accounts. If that data is dropped into Live — which has its own different 337 accounts — every row points to an account that doesn't exist there, so it would be broken/orphaned. A correct in-place clone therefore must also clone the accounts, which only Lovable support can do at the platform level.
+
+Because of these, a true "click-and-clone Test into the Live instance" isn't something I can safely execute alone. Here's what I recommend instead.
+
+## Recommended: full downloadable backup now (the real safety net)
+
+This is the genuinely safe, zero-risk cold backup and it doesn't touch Live, Test, or anyone's login. Your real data is tiny (~15 MB excluding logs), so this is quick.
 
 ```text
-job_run_details   6.5 GB   <-- pg_cron run history log (99% of the DB) -- DISPOSABLE
-all real data    ~15 MB    <-- products, repairs, sales, customers, profiles... HEALTHY
-TOTAL            ~6.6 GB
+What I'll produce (saved to your documents):
+  - One CSV per table for all 54 public tables (complete row-for-row export of Test)
+  - A combined JSON archive of everything (single-file restore point)
+  - A short manifest: table list + row counts + export timestamp
 ```
 
-Your business data is tiny and fine. The entire problem is one internal log table, `cron.job_run_details`, which records every scheduled-job execution and never gets cleaned. Because the `process-email-queue` job fires **every 5 seconds**, this table accumulated well over a million rows (each storing the full job command text) over the last 3+ months.
+Result: a complete, dated snapshot of today's Test data you can store anywhere. If Test is ever lost, this is the source of truth to restore from — and it's more reliable than a half-populated Live instance with mismatched accounts.
 
-**Nothing here is your data.** This table only logs "a cron job ran at time X with result Y." Clearing it does not touch a single product, sale, repair, customer, account, or the cron jobs themselves — only their historical run logs.
-
-## The fix (two parts)
-
-### Part 1 — Reclaim the space now (emergency)
-Empty the bloated log table instantly. We will use `TRUNCATE cron.job_run_details`, not `DELETE`:
-- `DELETE` on 1M+ rows would be slow, would not return the disk space (leaves bloat), and a plain `COUNT(*)` already times out on this table.
-- `TRUNCATE` is instant and immediately returns the ~6.5 GB of disk to the database.
-- The cron **job definitions** (`cron.job`) are untouched — the email queue, onboarding reminders, and verification reminders all keep running normally. Only their past run logs are cleared.
-
-### Part 2 — Stop it from coming back (retention)
-Add a small scheduled maintenance job that automatically prunes old run history so this can never silently grow to 6.5 GB again:
-
-```sql
--- runs every hour, keeps only the last 2 days of cron run history
-SELECT cron.schedule(
-  'purge-cron-history',
-  '0 * * * *',
-  $$ DELETE FROM cron.job_run_details WHERE end_time < now() - interval '2 days' $$
-);
+```text
+Scope of the export (current Test row counts):
+  profiles 388 · customers 1,392 · products 4,598 · repairs 1,625 · sales 545
+  + all remaining tables (settings, subscriptions, suppliers, invoices, etc.)
+Excluded: internal log/queue tables that are pure noise (activity_log can be
+included if you want it — it's ~3 MB of history).
 ```
 
-2 days of history is plenty for debugging while keeping the table at a few MB max.
+## To actually populate the Live instance (optional, needs support)
 
-### Part 3 (optional) — Reduce future log volume at the source
-The email-queue poll every 5 seconds is the reason this table grows so fast. Options:
-- **Leave it at 5s** (fastest email delivery) and rely on Part 2 retention — recommended, since retention fully solves the disk issue.
-- **Slow it to every 15–30s** to cut log volume ~3–6x with a small email-delivery delay.
+If you want Live to be a *working* standby that people could log into, that requires cloning the accounts too. I'll prepare the exact request for you to send to Lovable support:
 
-I recommend leaving the 5s frequency and just adding retention. I'll only change the frequency if you ask.
+```text
+"Please do a platform-level clone of my project's Test (development) backend
+ into Live (production), INCLUDING auth users, so the Live instance mirrors
+ Test. Keep Test as the active login database — do not change where my custom
+ domain / app points. This is a one-time refresh; Live is a cold standby."
+```
 
-## Safety summary
-- Zero business data touched — only internal cron run logs.
-- No schema changes to any of your app tables.
-- No downtime; the truncate is near-instant.
-- Cron jobs keep running throughout.
-- After cleanup I'll re-check the database size to confirm the ~6.5 GB is reclaimed and report the new total.
+I can't trigger that clone from here, but support can do it cleanly (accounts + data together) so nothing ends up orphaned.
 
-## Steps I'll take once approved
-1. `TRUNCATE cron.job_run_details` to instantly free ~6.5 GB.
-2. Schedule the hourly `purge-cron-history` retention job (2-day window).
-3. Re-run the size check and confirm the new database size + that all 3 cron jobs are still active.
-4. Report back the before/after numbers.
+## What I will NOT do
+- Not touch Test data or anyone's login.
+- Not attempt to shove data into Live with mismatched accounts (would create broken/orphaned records).
+- Not change where your app or custom domain points.
+
+## Steps once approved
+1. Page through every public table in Test via the database read tools and write one CSV per table to your documents folder.
+2. Build the combined JSON archive + manifest with row counts and timestamp.
+3. Verify exported row counts match the live counts above, and report the totals.
+4. Hand you the ready-to-send support request if you also want the in-place Live clone.
 
 ## Technical notes
-- `cron.job_run_details` is part of the `pg_cron` extension; only run history lives there, not job definitions.
-- Truncating it is a standard, supported maintenance operation and is the only way to immediately reclaim the disk (vs. DELETE which leaves bloat requiring a VACUUM FULL / table rewrite).
-- Retention via a self-scheduled `DELETE` keeps the table small without ever needing a manual truncate again.
+- Export uses read-only queries against Test (`development`); fully non-destructive.
+- Large tables (products 4,598, repairs 1,625) are paged in chunks to stay within query limits.
+- The combined JSON is restorable later via the existing restore tooling / a generated INSERT bundle if needed.
+- An in-place Live load is intentionally excluded because (a) tooling can't write to Live and (b) auth-account cloning is platform-only; doing data-only would violate foreign keys to the auth accounts.
