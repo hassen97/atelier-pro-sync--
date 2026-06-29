@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { useAllowedPages } from "@/hooks/useTeam";
-import { useI18n } from "@/contexts/I18nContext";
+import { useTranslation } from "react-i18next";
 import { useUnreadMessageCount } from "@/hooks/useCommunity";
 
 const navigation = [
