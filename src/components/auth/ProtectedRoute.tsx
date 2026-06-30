@@ -2,12 +2,15 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAllowedPages } from "@/hooks/useTeam";
 import { useIsPlatformAdmin } from "@/hooks/useAdmin";
+import { useMaintenanceModeFlag } from "@/hooks/useSystemHealth";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+
+const MaintenancePage = lazy(() => import("@/pages/Maintenance"));
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -90,6 +93,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isImpersonating, isVerifying } = useImpersonation();
   const hasShownToast = useRef(false);
   const { data: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus(user?.id);
+  // Maintenance mode: only checked for non-admins (admins always operate).
+  const { data: maintenanceOn } = useMaintenanceModeFlag(
+    !!user && isPlatformAdmin === false,
+  );
 
   // Normalize path: treat "/" and "/dashboard" as equivalent
   const currentPath = location.pathname === "/" ? "/dashboard" : location.pathname;
@@ -130,6 +137,21 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // Platform admin redirect logic
   if (isPlatformAdmin && location.pathname !== "/admin" && !isImpersonating) {
     return <Navigate to="/admin" replace />;
+  }
+
+  // Maintenance mode: block non-admins with a full maintenance page.
+  if (!isPlatformAdmin && maintenanceOn) {
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        }
+      >
+        <MaintenancePage />
+      </Suspense>
+    );
   }
 
   if (!isPlatformAdmin && (pagesLoading || onboardingLoading)) {

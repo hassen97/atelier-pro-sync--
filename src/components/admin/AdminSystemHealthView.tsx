@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { AdminStatCard } from "./AdminStatCard";
 import {
   useDbTableSizes,
@@ -5,8 +6,32 @@ import {
   useSlowQueries,
   useMaintenanceMode,
   useSetMaintenanceMode,
+  useHealthAlertSettings,
+  useSaveHealthAlertSettings,
+  useTestHealthAlert,
+  useRunMaintenance,
+  type HealthAlertSettings,
 } from "@/hooks/useSystemHealth";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Activity,
   Database,
@@ -15,6 +40,11 @@ import {
   Loader2,
   Timer,
   ShieldAlert,
+  BellRing,
+  Send,
+  Wrench,
+  Save,
+  Webhook,
 } from "lucide-react";
 import {
   BarChart,
@@ -42,6 +72,22 @@ export function AdminSystemHealthView() {
   const slow = useSlowQueries();
   const maintenance = useMaintenanceMode();
   const setMaintenance = useSetMaintenanceMode();
+
+  const alertSettings = useHealthAlertSettings();
+  const saveAlerts = useSaveHealthAlertSettings();
+  const testAlert = useTestHealthAlert();
+  const runMaintenance = useRunMaintenance();
+
+  // Local editable copy of the alert settings form
+  const [form, setForm] = useState<HealthAlertSettings | null>(null);
+  useEffect(() => {
+    if (alertSettings.data) setForm(alertSettings.data);
+  }, [alertSettings.data]);
+
+  // Per-table maintenance confirmation
+  const [pending, setPending] = useState<
+    { table: string; mode: "vacuum_analyze" | "analyze" } | null
+  >(null);
 
   const tables = sizes.data ?? [];
   const totalSizeMb = tables.reduce((sum, t) => sum + Number(t.total_size_mb || 0), 0);
@@ -249,7 +295,8 @@ export function AdminSystemHealthView() {
                   <th className="py-2 px-4 font-medium text-right">Taille</th>
                   <th className="py-2 px-4 font-medium text-right">Lignes</th>
                   <th className="py-2 px-4 font-medium text-right">Mortes</th>
-                  <th className="py-2 pl-4 font-medium text-right">Bloat</th>
+                  <th className="py-2 px-4 font-medium text-right">Bloat</th>
+                  <th className="py-2 pl-4 font-medium text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -277,17 +324,208 @@ export function AdminSystemHealthView() {
                       </td>
                       <td
                         className={cn(
-                          "py-2 pl-4 text-right font-mono-numbers font-semibold",
+                          "py-2 px-4 text-right font-mono-numbers font-semibold",
                           bloated ? "text-red-400" : "text-slate-400"
                         )}
                       >
                         {Number(t.dead_ratio)}%
+                      </td>
+                      <td className="py-2 pl-4 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={cn(
+                                "h-7 gap-1.5 text-xs",
+                                bloated
+                                  ? "text-red-300 hover:text-red-200 hover:bg-red-500/10"
+                                  : "text-slate-400 hover:text-slate-200"
+                              )}
+                              disabled={
+                                runMaintenance.isPending &&
+                                pending?.table === t.table_name
+                              }
+                            >
+                              {runMaintenance.isPending &&
+                              runMaintenance.variables?.table === t.table_name ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Wrench className="h-3.5 w-3.5" />
+                              )}
+                              Maintenance
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setPending({
+                                  table: t.table_name,
+                                  mode: "vacuum_analyze",
+                                })
+                              }
+                            >
+                              VACUUM ANALYZE
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setPending({
+                                  table: t.table_name,
+                                  mode: "analyze",
+                                })
+                              }
+                            >
+                              ANALYZE seulement
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* Automatic alerts */}
+      <div className="admin-glass-card rounded-xl p-5">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <BellRing className="h-4 w-4 text-slate-400" />
+            <h3 className="text-sm font-semibold text-white">
+              Alertes automatiques
+            </h3>
+          </div>
+          <Switch
+            checked={form?.enabled ?? false}
+            disabled={alertSettings.isLoading || !form}
+            onCheckedChange={(v) =>
+              setForm((f) => (f ? { ...f, enabled: v } : f))
+            }
+          />
+        </div>
+
+        {!form ? (
+          <div className="py-6 flex justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Envoie un e-mail et/ou un webhook lorsqu'une requête lente ou un
+              bloat de table dépasse les seuils. Vérification auto toutes les 5
+              min.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400">
+                  E-mail destinataire
+                </Label>
+                <Input
+                  type="email"
+                  placeholder="admin@exemple.com"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm({ ...form, email: e.target.value })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400 flex items-center gap-1">
+                  <Webhook className="h-3 w-3" /> URL Webhook
+                </Label>
+                <Input
+                  type="url"
+                  placeholder="https://hooks.slack.com/..."
+                  value={form.webhookUrl}
+                  onChange={(e) =>
+                    setForm({ ...form, webhookUrl: e.target.value })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400">
+                  Requête lente (s)
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={form.slowThresholdS}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      slowThresholdS: Number(e.target.value),
+                    })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400">Bloat (%)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={form.bloatRatio}
+                  onChange={(e) =>
+                    setForm({ ...form, bloatRatio: Number(e.target.value) })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400">
+                  Taille min. (MB)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.minSizeMb}
+                  onChange={(e) =>
+                    setForm({ ...form, minSizeMb: Number(e.target.value) })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                size="sm"
+                onClick={() => form && saveAlerts.mutate(form)}
+                disabled={saveAlerts.isPending}
+                className="gap-1.5"
+              >
+                {saveAlerts.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Enregistrer
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => testAlert.mutate()}
+                disabled={testAlert.isPending}
+                className="gap-1.5"
+              >
+                {testAlert.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                Tester l'alerte
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -302,7 +540,8 @@ export function AdminSystemHealthView() {
           <div>
             <p className="text-sm font-medium text-white">Mode Maintenance Global</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              Active un indicateur de maintenance à l'échelle de la plateforme.
+              Une fois activé, seuls les Super Admins peuvent utiliser
+              l'application. Les autres voient une page de maintenance.
             </p>
           </div>
           {maintenance.isLoading ? (
@@ -316,6 +555,38 @@ export function AdminSystemHealthView() {
           )}
         </div>
       </div>
+
+      {/* Maintenance confirmation */}
+      <AlertDialog
+        open={!!pending}
+        onOpenChange={(o) => !o && setPending(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pending?.mode === "vacuum_analyze"
+                ? "Lancer VACUUM ANALYZE ?"
+                : "Lancer ANALYZE ?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pending?.mode === "vacuum_analyze"
+                ? `Récupère l'espace des lignes mortes et rafraîchit les statistiques de « ${pending?.table} ». L'opération peut générer de la charge sur la table.`
+                : `Rafraîchit uniquement les statistiques du planificateur pour « ${pending?.table} ». Opération légère.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pending) runMaintenance.mutate(pending);
+                setPending(null);
+              }}
+            >
+              Confirmer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
