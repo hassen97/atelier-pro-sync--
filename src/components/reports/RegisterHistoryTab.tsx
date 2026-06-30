@@ -82,7 +82,9 @@ export function RegisterHistoryTab() {
       net: format(row.snapshot_net),
       itemsSold: row.report_data?.totals.itemsSold,
       byCategory: catRows(row),
+      byProduct: prodRows(row),
       byPaymentMethod: payRows(row),
+      repairsRows: repairBreakdown(row),
       closedBy: row.closed_by_name,
       isReprint: true,
     });
@@ -105,7 +107,9 @@ export function RegisterHistoryTab() {
           closedBy: row.closed_by_name,
           isDuplicate: true,
           byCategory: row.report_data.byCategory,
+          byProduct: row.report_data.byProduct,
           byPaymentMethod: row.report_data.byPaymentMethod,
+          repairsRows: row.report_data.repairs?.rows,
           returns: row.report_data.returns.rows,
           expenses: row.report_data.expenses.rows,
           totals: row.report_data.totals,
@@ -117,6 +121,37 @@ export function RegisterHistoryTab() {
       toast.error("Erreur lors de la génération du PDF");
     } finally {
       setPdfBusy(null);
+    }
+  };
+
+  const handleExcel = async (row: RegisterHistoryRow) => {
+    if (!row.report_data) {
+      toast.error("Aucun rapport détaillé pour cette clôture.");
+      return;
+    }
+    setXlsBusy(row.id);
+    try {
+      await generateClosingReportExcel(
+        {
+          shopName,
+          dateTime: formatClosedAt(row.closed_at),
+          closedBy: row.closed_by_name,
+          isDuplicate: true,
+          byCategory: row.report_data.byCategory,
+          byProduct: row.report_data.byProduct || [],
+          byPaymentMethod: row.report_data.byPaymentMethod,
+          repairs: row.report_data.repairs?.rows || [],
+          returns: row.report_data.returns.rows,
+          expenses: row.report_data.expenses.rows,
+          totals: row.report_data.totals,
+        },
+        format
+      );
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de la génération du fichier Excel");
+    } finally {
+      setXlsBusy(null);
     }
   };
 
