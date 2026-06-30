@@ -1,31 +1,46 @@
 ## Problem
 
-Two issues with the "Digital Blueprint" 3D login animation:
+Existing shop owners (e.g. `coolstoresbz`, who has `onboarding_completed = true` and real data) are **sometimes** redirected to `/onboarding/setup` after login, as if they were brand-new accounts with no data.
 
-1. **It only appears on the second login (after a login + logout).** The 3D scene lives in a lazily-imported chunk (`BlueprintCanvas`). On the very first login the browser hasn't downloaded that chunk yet, so during the short loader window only the CSS fallback shows. The chunk finishes downloading in the background *after* navigation and gets cached — which is why it appears the next time you log in.
-2. **It's too fast.** The loader holds for only ~1.1s total, and the 3D canvas is additionally gated behind a 500ms delay, leaving roughly half a second of 3D before the app navigates away.
+## Root cause
+
+The funnel guard lives in `useOnboardingStatus` inside `src/components/auth/ProtectedRoute.tsx`. It reads `shop_settings.onboarding_completed` like this:
+
+```ts
+const { data: settings } = await supabase
+  .from("shop_settings")
+  .select("onboarding_completed")
+  .eq("user_id", userId)
+  .maybeSingle();
+
+const onboardingCompleted = (settings as any)?.onboarding_completed === true;
+```
+
+Two problems combine:
+
+1. **The query error is ignored.** If the read transiently fails (network blip, or the auth token not fully attached on the first request right after login), `settings` is `undefined`, so `onboardingCompleted` silently becomes `false`.
+2. **The bad result is cached.** The query returns successfully (no throw) with `onboardingCompleted = false`, and `staleTime: 30s` keeps that wrong value around. The guard then fires:
+
+```ts
+if (onboardingStatus.isVerified && !onboardingStatus.onboardingCompleted) {
+  if (path !== "/onboarding/setup") return <Navigate to="/onboarding/setup" replace />;
+}
+```
+
+So a transient read failure pushes a fully-onboarded owner into the onboarding funnel until the cache expires — exactly the intermittent behavior reported.
+
+The same swallow-the-error pattern exists for the `user_roles` and `shop_subscriptions` reads in that hook, which can similarly mis-classify a user during a transient failure.
 
 ## Fix
 
-### 1. Preload the 3D bundle before it's needed (`BlueprintLoader.tsx`)
+Edit only `useOnboardingStatus` in `src/components/auth/ProtectedRoute.tsx` so a failed read never gets interpreted as "not onboarded":
 
-- Export a `preloadBlueprint()` helper that fires the `import("./BlueprintCanvas")` dynamic import (and warms the logo texture) on demand.
-- This makes the chunk available the moment the loader shows, so the 3D scene renders on the **first** login.
+1. **Throw on real errors** from the `user_roles`, `shop_settings`, and `shop_subscriptions` reads instead of ignoring them. React Query then retries with backoff rather than caching a false negative. Bump the query `retry` (e.g. `retry: 2`) for this gate.
+2. **Only redirect to onboarding on a positive signal.** Compute `onboardingCompleted` only from a successfully-read row. If the `shop_settings` row read returns no error but `data` is `null` (row genuinely missing — should not happen for existing owners since the signup trigger always creates it), treat it as `skip`/no-redirect rather than forcing the funnel.
+3. **Keep brand-new-owner behavior intact:** a real new owner still has a `shop_settings` row with `onboarding_completed = false`, which is a definitive read → they are still correctly sent to `/onboarding/setup`.
 
-### 2. Warm the bundle on the Auth page (`Auth.tsx`)
-
-- Call `preloadBlueprint()` when the login form is in view / when the user focuses the username field, so by the time they press "Connexion" the chunk is already cached.
-
-### 3. Show 3D as soon as it's ready (`BlueprintLoader.tsx`)
-
-- Remove (or shrink to near-zero) the fixed 500ms `allow3D` delay now that the bundle is preloaded, so the 3D canvas paints immediately while the CSS fallback stays underneath as a seamless backdrop.
-
-### 4. Slow the animation down (`Auth.tsx`)
-
-- Increase the minimum loader display time from `1100ms` to a longer, more intentional duration (≈3000–5000ms) so the holographic logo + wireframe animation has time to play before navigating to the dashboard.
-
-## Technical notes
-
-- Files touched: `src/components/auth/BlueprintLoader.tsx`, `src/pages/Auth.tsx`. No backend changes.
-- The CSS fallback (`BlueprintLoaderFallback`) remains the instant first paint and the WebGL-unavailable fallback, so behavior degrades gracefully.
-- Preloading is best-effort (`import().catch(() => {})`) and never blocks the login form or the login request.
+### Technical notes
+- This is a frontend-only change; no schema or data changes.
+- `isPlatformAdmin`, employee, and impersonation skip paths stay unchanged.
+- Auth.tsx already invalidates `["onboarding-status"]` on login; with the retry-on-error fix, the post-login refetch will no longer cache a transient `false`.
+- Note for awareness (not changed by this fix): 74 owners legitimately have `onboarding_completed = false` while having data; those are real incomplete-onboarding accounts and will still be routed to the funnel by design. If you want those grandfathered in, that's a separate data decision we can handle on request.
