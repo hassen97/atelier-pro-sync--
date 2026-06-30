@@ -174,12 +174,22 @@ export default function LandingPage() {
             <div className="flex flex-col gap-3">
               <a href="#features" onClick={() => setMenuOpen(false)} className="text-sm py-2" style={{ color: "hsl(240 5% 65%)" }}>Fonctionnalités</a>
               <a href="#pricing" onClick={() => setMenuOpen(false)} className="text-sm py-2" style={{ color: "hsl(240 5% 65%)" }}>Tarifs</a>
+              <Button
+                variant="outline"
+                onClick={() => { setMenuOpen(false); startDemo(); }}
+                disabled={demoLoading}
+                className="w-full justify-center rounded-full"
+                style={{ borderColor: "hsla(217, 91%, 60%, 0.4)", color: "hsl(217 91% 70%)" }}
+              >
+                {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><PlayCircle className="mr-1.5 h-4 w-4" /> Essayer la démo</>}
+              </Button>
               <Link to="/auth" onClick={() => setMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start" style={{ color: "hsl(240 5% 65%)" }}>Connexion</Button>
               </Link>
-              <a href="#waitlist" onClick={() => setMenuOpen(false)}>
-                <Button className="w-full rounded-full" style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 45%))", color: "white" }}>Rejoindre la liste</Button>
-              </a>
+              <Link to="/auth?tab=register" onClick={() => setMenuOpen(false)}>
+                <Button className="w-full rounded-full" style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 45%))", color: "white" }}>Créer un compte</Button>
+              </Link>
+
             </div>
           </motion.div>
         )}
