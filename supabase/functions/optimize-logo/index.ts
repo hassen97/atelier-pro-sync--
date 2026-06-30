@@ -59,6 +59,16 @@ function removeWhiteBackground(img: Image): Image {
   return img;
 }
 
+/** Base64-encode bytes in chunks to avoid call-stack overflow on large buffers. */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
