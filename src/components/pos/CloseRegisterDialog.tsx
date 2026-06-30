@@ -95,7 +95,9 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
           dateTime: nowStr(),
           closedBy: null,
           byCategory: report.byCategory,
+          byProduct: report.byProduct,
           byPaymentMethod: report.byPaymentMethod,
+          repairsRows: report.repairs.rows,
           returns: report.returns.rows,
           expenses: report.expenses.rows,
           totals: report.totals,
@@ -105,6 +107,33 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
     } catch (e) {
       console.error(e);
       toast.error("Erreur lors de la génération du PDF");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleExcel = async () => {
+    if (!report) return;
+    setBusy("excel");
+    try {
+      await generateClosingReportExcel(
+        {
+          shopName,
+          dateTime: nowStr(),
+          closedBy: null,
+          byCategory: report.byCategory,
+          byProduct: report.byProduct,
+          byPaymentMethod: report.byPaymentMethod,
+          repairs: report.repairs.rows,
+          returns: report.returns.rows,
+          expenses: report.expenses.rows,
+          totals: report.totals,
+        },
+        format
+      );
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de la génération du fichier Excel");
     } finally {
       setBusy(null);
     }
@@ -124,7 +153,9 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
         net: format(net),
         itemsSold: report.totals.itemsSold,
         byCategory: catRows(report),
+        byProduct: prodRows(report),
         byPaymentMethod: payRows(report),
+        repairsRows: repairBreakdown(report),
       });
     } finally {
       setBusy(null);
@@ -146,7 +177,9 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
         net: format(net),
         itemsSold: report?.totals.itemsSold,
         byCategory: report ? catRows(report) : [],
+        byProduct: report ? prodRows(report) : [],
         byPaymentMethod: report ? payRows(report) : [],
+        repairsRows: report ? repairBreakdown(report) : [],
       });
 
       toast.success("Caisse clôturée — nouveau cycle démarré");
@@ -157,6 +190,7 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
       setBusy(null);
     }
   };
+
 
   const summaryRows = [
     { label: "Total Ventes", value: format(sales), icon: ShoppingCart, negative: false },
