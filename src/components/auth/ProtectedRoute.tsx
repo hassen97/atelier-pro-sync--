@@ -93,6 +93,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isImpersonating, isVerifying } = useImpersonation();
   const hasShownToast = useRef(false);
   const { data: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus(user?.id);
+  // Maintenance mode: only checked for non-admins (admins always operate).
+  const { data: maintenanceOn } = useMaintenanceModeFlag(
+    !!user && isPlatformAdmin === false,
+  );
 
   // Normalize path: treat "/" and "/dashboard" as equivalent
   const currentPath = location.pathname === "/" ? "/dashboard" : location.pathname;
