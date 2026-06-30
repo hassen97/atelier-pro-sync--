@@ -4,6 +4,21 @@ import { BlueprintLoaderFallback } from "./BlueprintLoaderFallback";
 // Heavy 3D libs load ONLY when this is rendered — never blocks the login form.
 const BlueprintCanvas = lazy(() => import("./BlueprintCanvas"));
 
+/**
+ * Eagerly warm the 3D bundle so the holographic animation is ready on the
+ * FIRST login (otherwise the chunk only finishes downloading after navigation,
+ * making the 3D appear only on the second login). Best-effort, never blocks.
+ */
+let preloadStarted = false;
+export function preloadBlueprint() {
+  if (preloadStarted) return;
+  preloadStarted = true;
+  import("./BlueprintCanvas").catch(() => {
+    // allow a later retry if the first attempt failed (e.g. offline)
+    preloadStarted = false;
+  });
+}
+
 interface BlueprintLoaderProps {
   visible: boolean;
   logoUrl?: string | null;
