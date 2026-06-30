@@ -62,6 +62,8 @@ import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { AppLanguage } from "@/i18n";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { LogoOptimizerDialog } from "@/components/settings/LogoOptimizerDialog";
+import { Sparkles } from "lucide-react";
 
 const TABS = [
   { value: "boutique", label: "Boutique", icon: Store },
@@ -146,6 +148,7 @@ export default function Settings() {
   const isMobile = useIsMobile();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoOptimizerOpen, setLogoOptimizerOpen] = useState(false);
   const [logoSize, setLogoSize] = useState<"small" | "medium" | "large" | "xlarge">("medium");
   const [brandColor, setBrandColor] = useState("blue");
   const [customHex, setCustomHex] = useState("");
