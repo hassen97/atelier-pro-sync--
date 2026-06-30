@@ -20,6 +20,8 @@ import {
   Undo2,
   Package,
   CreditCard,
+  Boxes,
+  Sheet,
 } from "lucide-react";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
@@ -33,6 +35,7 @@ import {
   generateClosingReportPdf,
   type ClosingBreakdownRow,
 } from "@/lib/receiptPdf";
+import { generateClosingReportExcel } from "@/lib/closingReportExcel";
 import { format as formatDate } from "date-fns";
 import { toast } from "sonner";
 
