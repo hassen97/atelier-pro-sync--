@@ -401,6 +401,19 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
               )}
               80mm
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExcel}
+              disabled={!!busy || isLoading || !report}
+            >
+              {busy === "excel" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sheet className="h-4 w-4" />
+              )}
+              Excel
+            </Button>
           </div>
           <Button onClick={handleConfirm} disabled={!!busy || isLoading}>
             {busy === "close" ? (
