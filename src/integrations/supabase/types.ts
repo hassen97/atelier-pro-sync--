@@ -2208,6 +2208,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_category_preferences: {
+        Row: {
+          bg_color: string | null
+          category_id: string
+          category_kind: string
+          display_order: number | null
+          id: string
+          text_size: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bg_color?: string | null
+          category_id: string
+          category_kind?: string
+          display_order?: number | null
+          id?: string
+          text_size?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bg_color?: string | null
+          category_id?: string
+          category_kind?: string
+          display_order?: number | null
+          id?: string
+          text_size?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

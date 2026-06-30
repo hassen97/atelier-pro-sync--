@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Receipt, Loader2, ScanBarcode, Wrench, CheckCircle2, AlertTriangle, Zap, Percent, DollarSign } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,25 @@ import { LoyaltyRedeemCard } from "@/components/pos/LoyaltyRedeemCard";
 import { CloseRegisterDialog } from "@/components/pos/CloseRegisterDialog";
 import { useCanCloseRegister } from "@/hooks/useRegisterSession";
 import { toast } from "sonner";
+import { Settings2 } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { useCategories, useSubcategories } from "@/hooks/useCategories";
+import {
+  useCategoryPreferences,
+  useReorderCategoryPreferences,
+  type CategoryKind,
+} from "@/hooks/useCategoryPreferences";
+import { SortableCategoryButton, type MergedCategory } from "@/components/pos/SortableCategoryButton";
+import { CategoryCustomizeDialog } from "@/components/pos/CategoryCustomizeDialog";
 
 interface CartItem {
   id: string;
@@ -86,19 +105,106 @@ export default function POS() {
   // Completed repairs only
   const completedRepairs = (rawRepairs || []).filter((r: any) => r.status === "completed");
 
-  const categories = [...new Set(products.map((p: any) => p.category?.name).filter(Boolean))];
+  // --- Per-user category customization & ordering ---
+  const [editMode, setEditMode] = useState(false);
+  const [customizeTarget, setCustomizeTarget] = useState<MergedCategory | null>(null);
+  const [mainOrderOverride, setMainOrderOverride] = useState<string[] | null>(null);
+  const [subOrderOverride, setSubOrderOverride] = useState<string[] | null>(null);
 
-  // Subcategories available for the currently selected main category
-  const subcategories = selectedCategory
-    ? [
-        ...new Set(
-          products
-            .filter((p: any) => p.category?.name === selectedCategory)
-            .map((p: any) => p.subcategory?.name)
-            .filter(Boolean)
-        ),
-      ]
-    : [];
+  const { data: mainCatRows = [] } = useCategories("product");
+  const { data: subCatRows = [] } = useSubcategories();
+  const { data: catPrefs = [] } = useCategoryPreferences();
+  const reorderPrefs = useReorderCategoryPreferences();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  );
+
+  const prefMap = useMemo(
+    () => new Map(catPrefs.map((p) => [p.category_id, p])),
+    [catPrefs],
+  );
+
+  // Apply a saved/optimistic id ordering on top of a merged list.
+  const applyOrder = (list: MergedCategory[], override: string[] | null) => {
+    if (!override) return list;
+    const byId = new Map(list.map((c) => [c.id, c]));
+    const ordered = override.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
+    const remaining = list.filter((c) => !override.includes(c.id));
+    return [...ordered, ...remaining];
+  };
+
+  const sortMerged = (a: { order: number | null; created_at: string }, b: { order: number | null; created_at: string }) => {
+    if (a.order != null && b.order != null) return a.order - b.order;
+    if (a.order != null) return -1;
+    if (b.order != null) return 1;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  };
+
+  const mainCategories: MergedCategory[] = useMemo(() => {
+    const merged = (mainCatRows as any[]).map((c) => {
+      const pref = prefMap.get(c.id);
+      return {
+        id: c.id,
+        name: c.name,
+        kind: "main" as CategoryKind,
+        bg_color: pref?.bg_color ?? null,
+        text_size: pref?.text_size ?? null,
+        order: pref?.display_order ?? null,
+        created_at: c.created_at,
+      };
+    });
+    merged.sort(sortMerged);
+    return applyOrder(merged.map(({ order, created_at, ...rest }) => rest), mainOrderOverride);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainCatRows, prefMap, mainOrderOverride]);
+
+  // Names of main categories that have an actual product (for "Tout" fallback list)
+  const selectedMain = mainCategories.find((c) => c.name === selectedCategory) ?? null;
+
+  const subCategories: MergedCategory[] = useMemo(() => {
+    if (!selectedMain) return [];
+    const merged = (subCatRows as any[])
+      .filter((s) => s.category_id === selectedMain.id)
+      .map((s) => {
+        const pref = prefMap.get(s.id);
+        return {
+          id: s.id,
+          name: s.name,
+          kind: "sub" as CategoryKind,
+          bg_color: pref?.bg_color ?? null,
+          text_size: pref?.text_size ?? null,
+          order: pref?.display_order ?? null,
+          created_at: s.created_at,
+        };
+      });
+    merged.sort(sortMerged);
+    return applyOrder(merged.map(({ order, created_at, ...rest }) => rest), subOrderOverride);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subCatRows, prefMap, selectedMain, subOrderOverride]);
+
+  const handleMainDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = mainCategories.findIndex((c) => c.id === active.id);
+    const newIndex = mainCategories.findIndex((c) => c.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const newList = arrayMove(mainCategories, oldIndex, newIndex);
+    setMainOrderOverride(newList.map((c) => c.id));
+    reorderPrefs.mutate({ kind: "main", orderedIds: newList.map((c) => c.id) });
+  };
+
+  const handleSubDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = subCategories.findIndex((c) => c.id === active.id);
+    const newIndex = subCategories.findIndex((c) => c.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const newList = arrayMove(subCategories, oldIndex, newIndex);
+    setSubOrderOverride(newList.map((c) => c.id));
+    reorderPrefs.mutate({ kind: "sub", orderedIds: newList.map((c) => c.id) });
+  };
 
   // Debounce manual typing so rapid scanner input doesn't thrash the grid filter
   const debouncedSearch = useDebounce(searchQuery, 250);
@@ -422,6 +528,12 @@ export default function POS() {
 
       <CloseRegisterDialog open={closeRegisterOpen} onOpenChange={setCloseRegisterOpen} />
 
+      <CategoryCustomizeDialog
+        open={!!customizeTarget}
+        onOpenChange={(o) => { if (!o) setCustomizeTarget(null); }}
+        category={customizeTarget}
+      />
+
       <div className="grid gap-6 lg:grid-cols-4 lg:h-[calc(100%-5rem)]">
         {/* Products & Repairs Section - Full Width */}
         <Tabs defaultValue="products" className="lg:col-span-3 flex flex-col min-h-0">
@@ -443,19 +555,53 @@ export default function POS() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Rechercher un produit..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  <Button variant={selectedCategory === null ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(null); setSelectedSubcategory(null); }}>Tout</Button>
-                  {categories.map((cat) => (
-                    <Button key={cat} variant={selectedCategory === cat ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(cat); setSelectedSubcategory(null); }}>{cat}</Button>
-                  ))}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleMainDragEnd}>
+                    <div className="flex gap-2 flex-wrap items-center">
+                      <Button variant={selectedCategory === null ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(null); setSelectedSubcategory(null); }}>Tout</Button>
+                      <SortableContext items={mainCategories.map((c) => c.id)} strategy={horizontalListSortingStrategy}>
+                        {mainCategories.map((cat) => (
+                          <SortableCategoryButton
+                            key={cat.id}
+                            category={cat}
+                            selected={selectedCategory === cat.name}
+                            editMode={editMode}
+                            onSelect={() => { setSelectedCategory(cat.name); setSelectedSubcategory(null); }}
+                            onCustomize={() => setCustomizeTarget(cat)}
+                          />
+                        ))}
+                      </SortableContext>
+                    </div>
+                  </DndContext>
+                  <Button
+                    variant={editMode ? "default" : "ghost"}
+                    size="sm"
+                    className="ml-auto shrink-0"
+                    onClick={() => setEditMode((v) => !v)}
+                  >
+                    <Settings2 className="h-4 w-4 mr-1.5" />
+                    {editMode ? "Terminé" : "Personnaliser"}
+                  </Button>
                 </div>
-                {selectedCategory && subcategories.length > 0 && (
-                  <div className="flex gap-2 flex-wrap pl-2 border-l-2 border-muted">
-                    <Button variant={selectedSubcategory === null ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(null)}>Toutes</Button>
-                    {subcategories.map((sub) => (
-                      <Button key={sub} variant={selectedSubcategory === sub ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(sub)}>{sub}</Button>
-                    ))}
-                  </div>
+                {selectedCategory && subCategories.length > 0 && (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSubDragEnd}>
+                    <div className="flex gap-2 flex-wrap pl-2 border-l-2 border-muted items-center">
+                      <Button variant={selectedSubcategory === null ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(null)}>Toutes</Button>
+                      <SortableContext items={subCategories.map((c) => c.id)} strategy={horizontalListSortingStrategy}>
+                        {subCategories.map((sub) => (
+                          <SortableCategoryButton
+                            key={sub.id}
+                            category={sub}
+                            selected={selectedSubcategory === sub.name}
+                            editMode={editMode}
+                            small
+                            onSelect={() => setSelectedSubcategory(sub.name)}
+                            onCustomize={() => setCustomizeTarget(sub)}
+                          />
+                        ))}
+                      </SortableContext>
+                    </div>
+                  </DndContext>
                 )}
               </div>
               <div className="flex-1 overflow-auto min-h-0">
