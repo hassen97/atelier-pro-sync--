@@ -389,6 +389,147 @@ export function AdminSystemHealthView() {
         )}
       </div>
 
+      {/* Automatic alerts */}
+      <div className="admin-glass-card rounded-xl p-5">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <BellRing className="h-4 w-4 text-slate-400" />
+            <h3 className="text-sm font-semibold text-white">
+              Alertes automatiques
+            </h3>
+          </div>
+          <Switch
+            checked={form?.enabled ?? false}
+            disabled={alertSettings.isLoading || !form}
+            onCheckedChange={(v) =>
+              setForm((f) => (f ? { ...f, enabled: v } : f))
+            }
+          />
+        </div>
+
+        {!form ? (
+          <div className="py-6 flex justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Envoie un e-mail et/ou un webhook lorsqu'une requête lente ou un
+              bloat de table dépasse les seuils. Vérification auto toutes les 5
+              min.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400">
+                  E-mail destinataire
+                </Label>
+                <Input
+                  type="email"
+                  placeholder="admin@exemple.com"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm({ ...form, email: e.target.value })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400 flex items-center gap-1">
+                  <Webhook className="h-3 w-3" /> URL Webhook
+                </Label>
+                <Input
+                  type="url"
+                  placeholder="https://hooks.slack.com/..."
+                  value={form.webhookUrl}
+                  onChange={(e) =>
+                    setForm({ ...form, webhookUrl: e.target.value })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400">
+                  Requête lente (s)
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={form.slowThresholdS}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      slowThresholdS: Number(e.target.value),
+                    })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400">Bloat (%)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={form.bloatRatio}
+                  onChange={(e) =>
+                    setForm({ ...form, bloatRatio: Number(e.target.value) })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-400">
+                  Taille min. (MB)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.minSizeMb}
+                  onChange={(e) =>
+                    setForm({ ...form, minSizeMb: Number(e.target.value) })
+                  }
+                  className="h-9 bg-slate-900/50 border-white/10 text-sm text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                size="sm"
+                onClick={() => form && saveAlerts.mutate(form)}
+                disabled={saveAlerts.isPending}
+                className="gap-1.5"
+              >
+                {saveAlerts.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Enregistrer
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => testAlert.mutate()}
+                disabled={testAlert.isPending}
+                className="gap-1.5"
+              >
+                {testAlert.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                Tester l'alerte
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Danger zone */}
       <div className="rounded-xl border border-red-500/25 bg-red-500/[0.04] p-5">
         <div className="flex items-center gap-2 mb-4">
