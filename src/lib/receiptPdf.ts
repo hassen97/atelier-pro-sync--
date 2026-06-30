@@ -535,12 +535,30 @@ export function printRegisterZReport(
     )
     .join("");
 
+  const prodRows = (data.byProduct || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}${
+          r.meta ? ` (${escHtml(r.meta)})` : ""
+        }</span><span class="val">${escHtml(r.value)}</span></div>`
+    )
+    .join("");
+
   const payRows = (data.byPaymentMethod || [])
     .map(
       (r) =>
         `<div class="z-row"><span>${escHtml(r.label)}</span><span class="val">${escHtml(
           r.value
         )}</span></div>`
+    )
+    .join("");
+
+  const repairRows = (data.repairsRows || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}${
+          r.meta ? ` - ${escHtml(r.meta)}` : ""
+        }</span><span class="val">${escHtml(r.value)}</span></div>`
     )
     .join("");
 
