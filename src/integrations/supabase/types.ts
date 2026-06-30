@@ -1187,9 +1187,11 @@ export type Database = {
       register_sessions: {
         Row: {
           closed_at: string | null
+          closed_by_name: string | null
           created_at: string
           id: string
           opened_at: string
+          report_data: Json | null
           shop_id: string
           snapshot_depenses: number
           snapshot_net: number
@@ -1199,9 +1201,11 @@ export type Database = {
         }
         Insert: {
           closed_at?: string | null
+          closed_by_name?: string | null
           created_at?: string
           id?: string
           opened_at?: string
+          report_data?: Json | null
           shop_id: string
           snapshot_depenses?: number
           snapshot_net?: number
@@ -1211,9 +1215,11 @@ export type Database = {
         }
         Update: {
           closed_at?: string | null
+          closed_by_name?: string | null
           created_at?: string
           id?: string
           opened_at?: string
+          report_data?: Json | null
           shop_id?: string
           snapshot_depenses?: number
           snapshot_net?: number
@@ -2356,7 +2362,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      close_register_session: { Args: { _shop_id: string }; Returns: string }
+      close_register_session:
+        | { Args: { _shop_id: string }; Returns: string }
+        | {
+            Args: { _closed_by_name?: string; _report?: Json; _shop_id: string }
+            Returns: string
+          }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
