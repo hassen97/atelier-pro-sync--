@@ -20,6 +20,8 @@ import {
   Undo2,
   Package,
   CreditCard,
+  Boxes,
+  Sheet,
 } from "lucide-react";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
@@ -33,6 +35,7 @@ import {
   generateClosingReportPdf,
   type ClosingBreakdownRow,
 } from "@/lib/receiptPdf";
+import { generateClosingReportExcel } from "@/lib/closingReportExcel";
 import { format as formatDate } from "date-fns";
 import { toast } from "sonner";
 
@@ -46,7 +49,7 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
   const { settings } = useShopSettingsContext();
   const { data: report, isLoading } = useClosingReport(open);
   const closeSession = useCloseSession();
-  const [busy, setBusy] = useState<"pdf" | "thermal" | "close" | null>(null);
+  const [busy, setBusy] = useState<"pdf" | "thermal" | "excel" | "close" | null>(null);
 
   const t = report?.totals;
   const sales = t?.sales ?? 0;
@@ -64,6 +67,18 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
       value: format(c.revenue),
       meta: `${c.items}`,
     }));
+  const prodRows = (r: ClosingReport): ClosingBreakdownRow[] =>
+    (r.byProduct || []).map((p) => ({
+      label: p.product_name,
+      value: format(p.revenue),
+      meta: `${p.quantity}`,
+    }));
+  const repairBreakdown = (r: ClosingReport): ClosingBreakdownRow[] =>
+    (r.repairs.rows || []).map((rp) => ({
+      label: rp.label,
+      value: format(rp.amount),
+      meta: rp.customer || undefined,
+    }));
   const payRows = (r: ClosingReport): ClosingBreakdownRow[] =>
     r.byPaymentMethod.map((p) => ({ label: p.method, value: format(p.revenue) }));
 
@@ -80,7 +95,9 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
           dateTime: nowStr(),
           closedBy: null,
           byCategory: report.byCategory,
+          byProduct: report.byProduct,
           byPaymentMethod: report.byPaymentMethod,
+          repairsRows: report.repairs.rows,
           returns: report.returns.rows,
           expenses: report.expenses.rows,
           totals: report.totals,
@@ -90,6 +107,33 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
     } catch (e) {
       console.error(e);
       toast.error("Erreur lors de la génération du PDF");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleExcel = async () => {
+    if (!report) return;
+    setBusy("excel");
+    try {
+      await generateClosingReportExcel(
+        {
+          shopName,
+          dateTime: nowStr(),
+          closedBy: null,
+          byCategory: report.byCategory,
+          byProduct: report.byProduct,
+          byPaymentMethod: report.byPaymentMethod,
+          repairs: report.repairs.rows,
+          returns: report.returns.rows,
+          expenses: report.expenses.rows,
+          totals: report.totals,
+        },
+        format
+      );
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de la génération du fichier Excel");
     } finally {
       setBusy(null);
     }
@@ -109,7 +153,9 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
         net: format(net),
         itemsSold: report.totals.itemsSold,
         byCategory: catRows(report),
+        byProduct: prodRows(report),
         byPaymentMethod: payRows(report),
+        repairsRows: repairBreakdown(report),
       });
     } finally {
       setBusy(null);
@@ -131,7 +177,9 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
         net: format(net),
         itemsSold: report?.totals.itemsSold,
         byCategory: report ? catRows(report) : [],
+        byProduct: report ? prodRows(report) : [],
         byPaymentMethod: report ? payRows(report) : [],
+        repairsRows: report ? repairBreakdown(report) : [],
       });
 
       toast.success("Caisse clôturée — nouveau cycle démarré");
@@ -142,6 +190,7 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
       setBusy(null);
     }
   };
+
 
   const summaryRows = [
     { label: "Total Ventes", value: format(sales), icon: ShoppingCart, negative: false },
@@ -219,6 +268,54 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
                           <span className="text-xs opacity-70">({c.items} art.)</span>
                         </span>
                         <span className="font-mono font-medium">{format(c.revenue)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Product breakdown */}
+              {report && report.byProduct && report.byProduct.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                    <Boxes className="h-3.5 w-3.5" /> Ventes par produit
+                  </p>
+                  <div className="rounded-lg border divide-y">
+                    {report.byProduct.map((p, i) => (
+                      <div
+                        key={`${p.product_name}-${i}`}
+                        className="flex items-center justify-between px-3 py-2 text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {p.product_name}{" "}
+                          <span className="text-xs opacity-70">x{p.quantity}</span>
+                        </span>
+                        <span className="font-mono font-medium">{format(p.revenue)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Repairs breakdown */}
+              {report && report.repairs.rows.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                    <Wrench className="h-3.5 w-3.5" /> Réparations payées
+                  </p>
+                  <div className="rounded-lg border divide-y">
+                    {report.repairs.rows.map((r, i) => (
+                      <div
+                        key={`${r.label}-${i}`}
+                        className="flex items-center justify-between px-3 py-2 text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {r.label}
+                          {r.customer ? (
+                            <span className="text-xs opacity-70"> — {r.customer}</span>
+                          ) : null}
+                        </span>
+                        <span className="font-mono font-medium">{format(r.amount)}</span>
                       </div>
                     ))}
                   </div>
@@ -303,6 +400,19 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
                 <Printer className="h-4 w-4" />
               )}
               80mm
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExcel}
+              disabled={!!busy || isLoading || !report}
+            >
+              {busy === "excel" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sheet className="h-4 w-4" />
+              )}
+              Excel
             </Button>
           </div>
           <Button onClick={handleConfirm} disabled={!!busy || isLoading}>

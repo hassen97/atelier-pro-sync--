@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Printer, History, Wallet, FileDown, Eye, Loader2 } from "lucide-react";
+import { Printer, History, Wallet, FileDown, Eye, Loader2, Sheet } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -27,6 +27,7 @@ import {
   generateClosingReportPdf,
   type ClosingBreakdownRow,
 } from "@/lib/receiptPdf";
+import { generateClosingReportExcel } from "@/lib/closingReportExcel";
 import { format as formatDate } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -37,6 +38,7 @@ export function RegisterHistoryTab() {
   const { data: sessions, isLoading } = useRegisterHistory();
   const [detail, setDetail] = useState<RegisterHistoryRow | null>(null);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const [xlsBusy, setXlsBusy] = useState<string | null>(null);
 
   const shopName = (settings as any).shop_name || "Boutique";
 
@@ -49,10 +51,22 @@ export function RegisterHistoryTab() {
       value: format(c.revenue),
       meta: `${c.items}`,
     }));
+  const prodRows = (row: RegisterHistoryRow): ClosingBreakdownRow[] =>
+    (row.report_data?.byProduct || []).map((p) => ({
+      label: p.product_name,
+      value: format(p.revenue),
+      meta: `${p.quantity}`,
+    }));
   const payRows = (row: RegisterHistoryRow): ClosingBreakdownRow[] =>
     (row.report_data?.byPaymentMethod || []).map((p) => ({
       label: p.method,
       value: format(p.revenue),
+    }));
+  const repairBreakdown = (row: RegisterHistoryRow): ClosingBreakdownRow[] =>
+    (row.report_data?.repairs.rows || []).map((rp) => ({
+      label: rp.label,
+      value: format(rp.amount),
+      meta: rp.customer || undefined,
     }));
 
   const handleReprint = (row: RegisterHistoryRow) => {
@@ -68,7 +82,9 @@ export function RegisterHistoryTab() {
       net: format(row.snapshot_net),
       itemsSold: row.report_data?.totals.itemsSold,
       byCategory: catRows(row),
+      byProduct: prodRows(row),
       byPaymentMethod: payRows(row),
+      repairsRows: repairBreakdown(row),
       closedBy: row.closed_by_name,
       isReprint: true,
     });
@@ -91,7 +107,9 @@ export function RegisterHistoryTab() {
           closedBy: row.closed_by_name,
           isDuplicate: true,
           byCategory: row.report_data.byCategory,
+          byProduct: row.report_data.byProduct,
           byPaymentMethod: row.report_data.byPaymentMethod,
+          repairsRows: row.report_data.repairs?.rows,
           returns: row.report_data.returns.rows,
           expenses: row.report_data.expenses.rows,
           totals: row.report_data.totals,
@@ -103,6 +121,37 @@ export function RegisterHistoryTab() {
       toast.error("Erreur lors de la génération du PDF");
     } finally {
       setPdfBusy(null);
+    }
+  };
+
+  const handleExcel = async (row: RegisterHistoryRow) => {
+    if (!row.report_data) {
+      toast.error("Aucun rapport détaillé pour cette clôture.");
+      return;
+    }
+    setXlsBusy(row.id);
+    try {
+      await generateClosingReportExcel(
+        {
+          shopName,
+          dateTime: formatClosedAt(row.closed_at),
+          closedBy: row.closed_by_name,
+          isDuplicate: true,
+          byCategory: row.report_data.byCategory,
+          byProduct: row.report_data.byProduct || [],
+          byPaymentMethod: row.report_data.byPaymentMethod,
+          repairs: row.report_data.repairs?.rows || [],
+          returns: row.report_data.returns.rows,
+          expenses: row.report_data.expenses.rows,
+          totals: row.report_data.totals,
+        },
+        format
+      );
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de la génération du fichier Excel");
+    } finally {
+      setXlsBusy(null);
     }
   };
 
@@ -190,6 +239,19 @@ export function RegisterHistoryTab() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleExcel(row)}
+                          disabled={xlsBusy === row.id || !row.report_data}
+                          title="Exporter en Excel"
+                        >
+                          {xlsBusy === row.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Sheet className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleReprint(row)}
                           title="Réimprimer (80mm)"
                         >
@@ -239,6 +301,30 @@ export function RegisterHistoryTab() {
                         key={c.category}
                         left={`${c.category} (${c.items} art.)`}
                         right={format(c.revenue)}
+                      />
+                    ))}
+                  </Section>
+                )}
+
+                {rd.byProduct && rd.byProduct.length > 0 && (
+                  <Section title="Ventes par produit">
+                    {rd.byProduct.map((p, i) => (
+                      <Row
+                        key={`${p.product_name}-${i}`}
+                        left={`${p.product_name} x${p.quantity}`}
+                        right={format(p.revenue)}
+                      />
+                    ))}
+                  </Section>
+                )}
+
+                {rd.repairs?.rows && rd.repairs.rows.length > 0 && (
+                  <Section title="Réparations payées">
+                    {rd.repairs.rows.map((r, i) => (
+                      <Row
+                        key={`${r.label}-${i}`}
+                        left={r.customer ? `${r.label} — ${r.customer}` : r.label}
+                        right={format(r.amount)}
                       />
                     ))}
                   </Section>

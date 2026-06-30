@@ -511,7 +511,9 @@ export interface RegisterZReportData {
   returns?: string | null; // pre-formatted refund total
   itemsSold?: number;
   byCategory?: ClosingBreakdownRow[];
+  byProduct?: ClosingBreakdownRow[];
   byPaymentMethod?: ClosingBreakdownRow[];
+  repairsRows?: ClosingBreakdownRow[];
 }
 
 export function printRegisterZReport(
@@ -533,12 +535,30 @@ export function printRegisterZReport(
     )
     .join("");
 
+  const prodRows = (data.byProduct || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}${
+          r.meta ? ` (${escHtml(r.meta)})` : ""
+        }</span><span class="val">${escHtml(r.value)}</span></div>`
+    )
+    .join("");
+
   const payRows = (data.byPaymentMethod || [])
     .map(
       (r) =>
         `<div class="z-row"><span>${escHtml(r.label)}</span><span class="val">${escHtml(
           r.value
         )}</span></div>`
+    )
+    .join("");
+
+  const repairRows = (data.repairsRows || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}${
+          r.meta ? ` - ${escHtml(r.meta)}` : ""
+        }</span><span class="val">${escHtml(r.value)}</span></div>`
     )
     .join("");
 
@@ -575,8 +595,18 @@ ${
     : ""
 }
 ${
+  prodRows
+    ? `<p class="z-section">Ventes par produit</p>${prodRows}<div class="sep"></div>`
+    : ""
+}
+${
   payRows
     ? `<p class="z-section">Modes de paiement</p>${payRows}<div class="sep"></div>`
+    : ""
+}
+${
+  repairRows
+    ? `<p class="z-section">Réparations payées</p>${repairRows}<div class="sep"></div>`
     : ""
 }
 <div class="z-row"><span>VENTES:</span><span class="val">${escHtml(data.sales)}</span></div>
@@ -621,7 +651,9 @@ export interface ClosingPdfData {
   closedBy?: string | null;
   isDuplicate?: boolean;
   byCategory: { category: string; revenue: number; items: number }[];
+  byProduct?: { product_name: string; quantity: number; revenue: number }[];
   byPaymentMethod: { method: string; revenue: number }[];
+  repairsRows?: { label: string; customer: string | null; amount: number }[];
   returns: { product_name: string; quantity: number; refund_amount: number }[];
   expenses: { category: string; amount: number }[];
   totals: {
@@ -815,6 +847,25 @@ export async function generateClosingReportPdf(
     data.byCategory.map((c) => [c.category, String(c.items), format(c.revenue)]),
     ["left", "right", "right"]
   );
+
+  if (data.byProduct && data.byProduct.length) {
+    drawTable(
+      "Ventes par produit",
+      ["Produit", "Qté", "Total"],
+      data.byProduct.map((p) => [p.product_name, String(p.quantity), format(p.revenue)]),
+      ["left", "right", "right"]
+    );
+  }
+
+  if (data.repairsRows && data.repairsRows.length) {
+    drawTable(
+      "Réparations payées",
+      ["Réparation", "Client", "Montant"],
+      data.repairsRows.map((r) => [r.label, r.customer || "—", format(r.amount)]),
+      ["left", "left", "right"]
+    );
+  }
+
 
   drawTable(
     "Modes de paiement",

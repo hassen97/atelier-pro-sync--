@@ -24,6 +24,16 @@ interface ExpenseAgg {
   category: string;
   amount: number;
 }
+interface ProductAgg {
+  product_name: string;
+  quantity: number;
+  revenue: number;
+}
+interface RepairRow {
+  label: string;
+  customer: string | null;
+  amount: number;
+}
 
 function methodLabel(m: string | null | undefined): string {
   switch ((m || "").toLowerCase()) {
@@ -115,8 +125,9 @@ Deno.serve(async (req) => {
         sessionId: null,
         openedAt: null,
         byCategory: [],
+        byProduct: [] as ProductAgg[],
         byPaymentMethod: [],
-        repairs: { total: 0, count: 0 },
+        repairs: { total: 0, count: 0, rows: [] as RepairRow[] },
         returns: { total: 0, count: 0, rows: [] as ReturnRow[] },
         expenses: { total: 0, rows: [] as ExpenseAgg[] },
         totals: {
@@ -154,13 +165,14 @@ Deno.serve(async (req) => {
       saleItems = (items as any[]) || [];
     }
 
-    // Resolve product -> category names
+    // Resolve product -> category names and product display names
     const productIds = [...new Set(saleItems.map((i) => i.product_id).filter(Boolean))] as string[];
     const productCat = new Map<string, string | null>();
+    const productName = new Map<string, string>();
     if (productIds.length) {
       const { data: products } = await admin
         .from("products")
-        .select("id, category_id")
+        .select("id, name, category_id")
         .in("id", productIds);
       const catIds = [...new Set((products || []).map((p) => p.category_id).filter(Boolean))] as string[];
       const catName = new Map<string, string>();
@@ -171,11 +183,13 @@ Deno.serve(async (req) => {
       (products || []).forEach((p) => {
         const cid = p.category_id as string | null;
         productCat.set(p.id as string, cid ? catName.get(cid) || "Sans catégorie" : "Sans catégorie");
+        productName.set(p.id as string, (p.name as string) || "Article");
       });
     }
 
-    // ---- Aggregate by category + total items ----
+    // ---- Aggregate by category + by product + total items ----
     const catMap = new Map<string, CategoryAgg>();
+    const prodMap = new Map<string, ProductAgg>();
     let itemsSold = 0;
     for (const it of saleItems) {
       const cat = (it.product_id && productCat.get(it.product_id)) || "Sans catégorie";
@@ -186,8 +200,16 @@ Deno.serve(async (req) => {
       agg.revenue += line;
       agg.items += qty;
       catMap.set(cat, agg);
+
+      const pname = (it.product_id && productName.get(it.product_id)) || "Article divers";
+      const pkey = (it.product_id as string) || pname;
+      const pagg = prodMap.get(pkey) || { product_name: pname, quantity: 0, revenue: 0 };
+      pagg.quantity += qty;
+      pagg.revenue += line;
+      prodMap.set(pkey, pagg);
     }
     const byCategory = [...catMap.values()].sort((a, b) => b.revenue - a.revenue);
+    const byProduct = [...prodMap.values()].sort((a, b) => b.revenue - a.revenue);
 
     // ---- Aggregate by payment method (sales only) ----
     const payMap = new Map<string, PaymentAgg>();
@@ -203,12 +225,43 @@ Deno.serve(async (req) => {
     }
     const byPaymentMethod = [...payMap.values()].sort((a, b) => b.revenue - a.revenue);
 
-    // ---- Repair payments ----
+    // ---- Repair payments (detailed) ----
     const { data: repairPays } = await admin
       .from("repair_payments")
-      .select("amount")
+      .select("amount, repair_id, customer_id")
       .eq("session_id", sessionId);
     const repairsTotal = (repairPays || []).reduce((s, r) => s + Number(r.amount || 0), 0);
+
+    // Resolve repair labels (device / ticket) and customer names
+    const repairIds = [...new Set((repairPays || []).map((r) => r.repair_id).filter(Boolean))] as string[];
+    const custIds = [...new Set((repairPays || []).map((r) => r.customer_id).filter(Boolean))] as string[];
+    const repairInfo = new Map<string, string>();
+    const custName = new Map<string, string>();
+    if (repairIds.length) {
+      const { data: reps } = await admin
+        .from("repairs")
+        .select("id, device_model, ticket_number")
+        .in("id", repairIds);
+      (reps || []).forEach((rp) => {
+        const ticket = rp.ticket_number
+          ? `REP-${String(rp.ticket_number).padStart(5, "0")}`
+          : "";
+        const device = (rp.device_model as string) || "Réparation";
+        repairInfo.set(rp.id as string, ticket ? `${device} (${ticket})` : device);
+      });
+    }
+    if (custIds.length) {
+      const { data: custs } = await admin
+        .from("customers")
+        .select("id, name")
+        .in("id", custIds);
+      (custs || []).forEach((c) => custName.set(c.id as string, (c.name as string) || ""));
+    }
+    const repairRows: RepairRow[] = (repairPays || []).map((r) => ({
+      label: (r.repair_id && repairInfo.get(r.repair_id as string)) || "Réparation",
+      customer: (r.customer_id && custName.get(r.customer_id as string)) || null,
+      amount: Number(r.amount || 0),
+    }));
 
     // ---- Returns (no session_id; window by opened_at) ----
     const { data: returns } = await admin
@@ -247,8 +300,9 @@ Deno.serve(async (req) => {
       sessionId,
       openedAt,
       byCategory,
+      byProduct,
       byPaymentMethod,
-      repairs: { total: repairsTotal, count: (repairPays || []).length },
+      repairs: { total: repairsTotal, count: (repairPays || []).length, rows: repairRows },
       returns: { total: returnsTotal, count: returnRows.length, rows: returnRows },
       expenses: { total: expensesTotal, rows: expenseRows },
       totals: {

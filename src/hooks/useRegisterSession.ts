@@ -31,12 +31,23 @@ export interface ClosingReportExpense {
   category: string;
   amount: number;
 }
+export interface ClosingReportProduct {
+  product_name: string;
+  quantity: number;
+  revenue: number;
+}
+export interface ClosingReportRepair {
+  label: string;
+  customer: string | null;
+  amount: number;
+}
 export interface ClosingReport {
   sessionId: string | null;
   openedAt: string | null;
   byCategory: ClosingReportCategory[];
+  byProduct: ClosingReportProduct[];
   byPaymentMethod: ClosingReportPayment[];
-  repairs: { total: number; count: number };
+  repairs: { total: number; count: number; rows: ClosingReportRepair[] };
   returns: { total: number; count: number; rows: ClosingReportReturn[] };
   expenses: { total: number; rows: ClosingReportExpense[] };
   totals: {
