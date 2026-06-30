@@ -52,6 +52,13 @@ export default function Auth() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captchaRef = useRef<HCaptcha>(null);
 
+  // Warm the 3D "Digital Blueprint" bundle as soon as the login page mounts so
+  // the holographic animation is ready on the FIRST owner login (not just the
+  // second). Best-effort, never blocks the form.
+  useEffect(() => {
+    preloadBlueprint();
+  }, []);
+
   // Restore remembered username
   useEffect(() => {
     try {
