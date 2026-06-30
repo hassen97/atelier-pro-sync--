@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
       const decoded = await Image.decode(raw);
       const transparent = removeWhiteBackground(decoded);
       const png = await transparent.encode(); // PNG with alpha
-      outBase64 = btoa(String.fromCharCode(...new Uint8Array(png)));
+      outBase64 = bytesToBase64(new Uint8Array(png));
     } catch (e) {
       console.error("background removal failed, returning raw AI image", e);
     }
