@@ -44,6 +44,9 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // 3D "Digital Blueprint" login transition
+  const [showLoader, setShowLoader] = useState(false);
+  const [loaderLogo, setLoaderLogo] = useState<string | null>(null);
   const [adminWhatsapp, setAdminWhatsapp] = useState("");
   const [signupCooldown, setSignupCooldown] = useState(0);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
