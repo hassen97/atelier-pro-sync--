@@ -60,8 +60,40 @@ export function MainLayout() {
   };
 
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle("dark");
+    const next = !darkMode;
+    setDarkMode(next);
+    document.documentElement.classList.toggle("dark", next);
+    try {
+      localStorage.setItem("theme", next ? "dark" : "light");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    const toastId = toast.loading("Recherche de mises à jour…");
+    try {
+      const hasUpdate = await checkForUpdate();
+      if (hasUpdate) {
+        toast("Mise à jour disponible", {
+          id: toastId,
+          description: "Une nouvelle version est prête.",
+          duration: Infinity,
+          action: {
+            label: "Actualiser",
+            onClick: () => applyUpdateNow(),
+          },
+        });
+      } else {
+        toast.success("Vous êtes à jour ✓", { id: toastId });
+      }
+    } catch {
+      toast.error("Vérification impossible", { id: toastId });
+    } finally {
+      setCheckingUpdate(false);
+    }
   };
 
   return (
