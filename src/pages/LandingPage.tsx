@@ -53,7 +53,9 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState("");
-  const [checkingVersion, setCheckingVersion] = useState(true);
+  const [updatePhase, setUpdatePhase] = useState<
+    "checking" | "current" | "update" | "done"
+  >("checking");
   const { user } = useAuth();
   const navigate = useNavigate();
   const { scrollYProgress } = useScroll();
@@ -61,16 +63,27 @@ export default function LandingPage() {
   const { data: plans } = usePublicPlans();
   const joinWaitlist = useJoinWaitlist();
 
-  // On open: check for a newer deployment BEFORE rendering the app. Time-boxed
-  // so a slow network never strands the visitor on the splash; reloads once
-  // into the latest version if an update is detected.
+  // On open: run a status-returning update check, then drive the 3D overlay.
+  //  - "current": play a brief confirmation beat, then reveal the landing page.
+  //  - "update":  show a blocking refresh prompt (mandatory) until the user
+  //               clears the cache and reloads into the latest version.
   useEffect(() => {
     let active = true;
-    checkForUpdateOnLoad(2500).finally(() => {
-      if (active) setCheckingVersion(false);
-    });
+    let timer: ReturnType<typeof setTimeout>;
+    getUpdateStatus(2500)
+      .then((status) => {
+        if (!active) return;
+        if (status === "update") {
+          setUpdatePhase("update");
+        } else {
+          setUpdatePhase("current");
+          timer = setTimeout(() => active && setUpdatePhase("done"), 1500);
+        }
+      })
+      .catch(() => active && setUpdatePhase("done"));
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, []);
 
