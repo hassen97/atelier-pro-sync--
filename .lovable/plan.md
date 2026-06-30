@@ -1,39 +1,31 @@
 ## Problem
 
-The 3D "Digital Blueprint" login animation never shows. I reproduced it with the real account: 350 ms after clicking "Se connecter", the app is already on the dashboard with a plain spinner — the dark holographic overlay never paints.
+Two issues with the "Digital Blueprint" 3D login animation:
 
-Root cause is in `src/pages/Auth.tsx`:
-
-```tsx
-if (user) {          // runs on every render
-  navigate(from);    // fires instantly once the session is set
-  return null;       // unmounts <BlueprintLoader>
-}
-```
-
-The moment `signIn()` succeeds, the auth listener sets `user`, Auth re-renders, this guard returns `null` and navigates away — before `handleLogin` can display the loader and hold its 1.1 s minimum. The overlay lives inside the very page that unmounts itself, so it is structurally unreachable. This render-time `navigate` also causes the "Cannot update a component while rendering" warning seen in the console.
-
-The 3D libraries themselves are healthy (`@react-three/fiber@8.18` + React 18, no crashes).
+1. **It only appears on the second login (after a login + logout).** The 3D scene lives in a lazily-imported chunk (`BlueprintCanvas`). On the very first login the browser hasn't downloaded that chunk yet, so during the short loader window only the CSS fallback shows. The chunk finishes downloading in the background *after* navigation and gets cached — which is why it appears the next time you log in.
+2. **It's too fast.** The loader holds for only ~1.1s total, and the 3D canvas is additionally gated behind a 500ms delay, leaving roughly half a second of 3D before the app navigates away.
 
 ## Fix
 
-Edit only `src/pages/Auth.tsx` — no backend, no other files, no logic outside auth UI.
+### 1. Preload the 3D bundle before it's needed (`BlueprintLoader.tsx`)
 
-1. **Stop redirecting during render.** Remove the render-time `if (user) { navigate; return null }` block and move the "already authenticated" redirect into a `useEffect`, which clears the React warning.
+- Export a `preloadBlueprint()` helper that fires the `import("./BlueprintCanvas")` dynamic import (and warms the logo texture) on demand.
+- This makes the chunk available the moment the loader shows, so the 3D scene renders on the **first** login.
 
-2. **Don't auto-redirect while the blueprint is playing.** Guard that effect so it skips navigation when `showLoader` is `true`. This keeps the Auth page (and its overlay) mounted for the full blueprint transition instead of being yanked away the instant the session appears.
+### 2. Warm the bundle on the Auth page (`Auth.tsx`)
 
-3. **Paint the loader instantly on owner login.** In `handleLogin`, set `setShowLoader(true)` (with the default logo) for the owner path *before* the role/profile/logo queries run, so the dark overlay appears immediately on click rather than after the network round-trips. Then refine the logo and run the existing ~1.1 s minimum-display hold, and `navigate("/dashboard")` at the end as today.
+- Call `preloadBlueprint()` when the login form is in view / when the user focuses the username field, so by the time they press "Connexion" the chunk is already cached.
 
-4. **Keep all existing safeguards.** Employee logins, locked accounts, wrong-tab errors, and auth failures still set `showLoader = false` and behave exactly as now.
+### 3. Show 3D as soon as it's ready (`BlueprintLoader.tsx`)
 
-## Validation
+- Remove (or shrink to near-zero) the fixed 500ms `allow3D` delay now that the bundle is preloaded, so the 3D canvas paints immediately while the CSS fallback stays underneath as a seamless backdrop.
 
-- Re-run the Playwright login as `coolstoresbz` and capture frames during the transition; confirm the dark zinc-950 overlay with the pulsing logo (and the 3D canvas after ~500 ms) is visible before the dashboard appears.
-- Confirm the "setState while rendering" console warning is gone.
-- Confirm an intentional wrong password still shows the error and no loader.
+### 4. Slow the animation down (`Auth.tsx`)
+
+- Increase the minimum loader display time from `1100ms` to a longer, more intentional duration (≈3000–5000ms) so the holographic logo + wireframe animation has time to play before navigating to the dashboard.
 
 ## Technical notes
 
-- The 500 ms WebGL/lazy-bundle beat and CSS fallback in `BlueprintLoader.tsx`/`BlueprintCanvas.tsx` already work and stay unchanged; they simply were never reached.
-- The minimum-display value (~1.1 s) stays the same so the animation reads as intentional without noticeably slowing login.
+- Files touched: `src/components/auth/BlueprintLoader.tsx`, `src/pages/Auth.tsx`. No backend changes.
+- The CSS fallback (`BlueprintLoaderFallback`) remains the instant first paint and the WebGL-unavailable fallback, so behavior degrades gracefully.
+- Preloading is best-effort (`import().catch(() => {})`) and never blocks the login form or the login request.

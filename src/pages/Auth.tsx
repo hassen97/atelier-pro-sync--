@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { SEO } from "@/components/seo/SEO";
-import { BlueprintLoader } from "@/components/auth/BlueprintLoader";
+import { BlueprintLoader, preloadBlueprint } from "@/components/auth/BlueprintLoader";
 import repairProLogo from "@/assets/repairpro-logo.png";
 
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY || "";
@@ -51,6 +51,13 @@ export default function Auth() {
   const [signupCooldown, setSignupCooldown] = useState(0);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captchaRef = useRef<HCaptcha>(null);
+
+  // Warm the 3D "Digital Blueprint" bundle as soon as the login page mounts so
+  // the holographic animation is ready on the FIRST owner login (not just the
+  // second). Best-effort, never blocks the form.
+  useEffect(() => {
+    preloadBlueprint();
+  }, []);
 
   // Restore remembered username
   useEffect(() => {
@@ -241,9 +248,10 @@ export default function Auth() {
           }
         }
 
-        // Minimum display so the animation reads as intentional, then navigate.
+        // Minimum display so the 3D animation has time to load and play out
+        // before we navigate to the dashboard.
         const elapsed = Date.now() - ownerLoaderStart;
-        const minDisplay = 1100;
+        const minDisplay = 3200;
         if (elapsed < minDisplay) {
           await new Promise((r) => setTimeout(r, minDisplay - elapsed));
         }
