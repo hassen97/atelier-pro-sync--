@@ -102,13 +102,18 @@ export default function Auth() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (user) {
+  // Redirect already-authenticated users — but NOT while the blueprint loader
+  // is playing, so the owner login animation can finish before we navigate.
+  // Done in an effect (not during render) to avoid the
+  // "Cannot update a component while rendering" warning.
+  useEffect(() => {
+    if (!user || showLoader) return;
     const searchParams = new URLSearchParams(location.search);
     const redirect = searchParams.get("redirect");
     const from = redirect || (location.state as { from?: Location })?.from?.pathname || "/dashboard";
     navigate(from, { replace: true });
-    return null;
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, showLoader]);
 
   const validateUsername = (username: string): string | null => {
     if (username.length < 3) return "Le nom d'utilisateur doit contenir au moins 3 caractères";
