@@ -324,11 +324,61 @@ export function AdminSystemHealthView() {
                       </td>
                       <td
                         className={cn(
-                          "py-2 pl-4 text-right font-mono-numbers font-semibold",
+                          "py-2 px-4 text-right font-mono-numbers font-semibold",
                           bloated ? "text-red-400" : "text-slate-400"
                         )}
                       >
                         {Number(t.dead_ratio)}%
+                      </td>
+                      <td className="py-2 pl-4 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={cn(
+                                "h-7 gap-1.5 text-xs",
+                                bloated
+                                  ? "text-red-300 hover:text-red-200 hover:bg-red-500/10"
+                                  : "text-slate-400 hover:text-slate-200"
+                              )}
+                              disabled={
+                                runMaintenance.isPending &&
+                                pending?.table === t.table_name
+                              }
+                            >
+                              {runMaintenance.isPending &&
+                              runMaintenance.variables?.table === t.table_name ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Wrench className="h-3.5 w-3.5" />
+                              )}
+                              Maintenance
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setPending({
+                                  table: t.table_name,
+                                  mode: "vacuum_analyze",
+                                })
+                              }
+                            >
+                              VACUUM ANALYZE
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setPending({
+                                  table: t.table_name,
+                                  mode: "analyze",
+                                })
+                              }
+                            >
+                              ANALYZE seulement
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   );
