@@ -1082,6 +1082,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_demo: boolean
           is_locked: boolean
           language: string | null
           last_online_at: string | null
@@ -1109,6 +1110,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_demo?: boolean
           is_locked?: boolean
           language?: string | null
           last_online_at?: string | null
@@ -1136,6 +1138,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_demo?: boolean
           is_locked?: boolean
           language?: string | null
           last_online_at?: string | null
