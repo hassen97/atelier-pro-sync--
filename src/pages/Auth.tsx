@@ -149,6 +149,14 @@ export default function Auth() {
         localStorage.removeItem(REMEMBER_ME_KEY);
       }
 
+      // Owner tab → paint the premium blueprint loader instantly (before any
+      // network round-trips) so it appears the moment the button is pressed.
+      const ownerLoaderStart = Date.now();
+      if (loginRole === "owner") {
+        setLoaderLogo(repairProLogo);
+        setShowLoader(true);
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
       let isOwnerLogin = false;
       let userIdForLogo: string | null = null;
@@ -172,12 +180,14 @@ export default function Auth() {
         if (!isPlatformAdmin) {
           if (loginRole === "employee" && isOwner) {
             await supabase.auth.signOut();
+            setShowLoader(false);
             setError("Ce compte est un compte propriétaire. Veuillez utiliser l'onglet « Propriétaire ».");
             return;
           }
 
           if (loginRole === "owner" && isEmployee) {
             await supabase.auth.signOut();
+            setShowLoader(false);
             setError("Ce compte est un compte employé. Veuillez utiliser l'onglet « Employé ».");
             return;
           }
@@ -192,6 +202,7 @@ export default function Auth() {
         if (profile?.is_locked) {
           // Admin kill-switch: account explicitly locked by an admin
           await supabase.auth.signOut();
+          setShowLoader(false);
           setError("Votre compte est verrouillé par l'administrateur. Veuillez le contacter.");
           return;
         }
@@ -208,10 +219,13 @@ export default function Auth() {
       const from = redirect || (location.state as { from?: Location })?.from?.pathname || "/dashboard";
 
       // Premium 3D loader for shop owners going to the dashboard.
+      // The overlay is already visible (set optimistically above); here we just
+      // refine the logo and hold a minimum display before navigating.
       if (isOwnerLogin && from === "/dashboard") {
-        const startedAt = Date.now();
-        setLoaderLogo(repairProLogo);
-        setShowLoader(true);
+        if (!showLoader) {
+          setLoaderLogo(repairProLogo);
+          setShowLoader(true);
+        }
 
         // Fetch the shop logo (best-effort) so it appears in the blueprint.
         if (userIdForLogo) {
@@ -228,15 +242,19 @@ export default function Auth() {
         }
 
         // Minimum display so the animation reads as intentional, then navigate.
-        const elapsed = Date.now() - startedAt;
+        const elapsed = Date.now() - ownerLoaderStart;
         const minDisplay = 1100;
         if (elapsed < minDisplay) {
           await new Promise((r) => setTimeout(r, minDisplay - elapsed));
         }
+        setShowLoader(false);
         navigate(from, { replace: true });
         return;
       }
 
+      // Non-owner / non-dashboard destinations: make sure the optimistic
+      // loader is cleared before navigating.
+      setShowLoader(false);
       navigate(from, { replace: true });
     } catch (err) {
       setShowLoader(false);
