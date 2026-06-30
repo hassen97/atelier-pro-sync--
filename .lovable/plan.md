@@ -1,74 +1,45 @@
-# Per-User POS Category Customization & Reordering
+# Plan: Dark mode persistence + update checks
 
-Let shop owners and employees personalize the color, text size, and order of POS category buttons — strictly per-user, never affecting others in the shop. Applies to both main categories and subcategories, kept in separate drag zones.
+Three changes: (1) make the dark/light theme stick after refresh, (2) add a manual "Check for update" button beside the theme toggle, (3) replace the 2-day-old toast-style hash check with an automatic update check that runs when the main landing page opens.
 
-## Important architecture notes (read first)
+## 1. Dark mode persists after refresh
 
-- There is **no `product_categories` table**. The real tables are `categories` (main, with a `type` column = `product`/`repair`) and `subcategories` (separate table, linked via `category_id`). The plan targets these.
-- The POS today builds category buttons from **product name strings**, not category IDs. To attach per-user preferences (keyed by ID) and to reorder, the POS will switch to fetching the real `categories` (type `product`) and `subcategories` rows that have IDs. Filtering of products stays by name match so existing data keeps working.
-- Because preferences must cover both main categories and subcategories (two source tables), the preference row stores `category_id` plus a `category_kind` discriminator (`main` | `sub`) instead of a single cross-table foreign key.
+Currently the header just toggles a CSS class with no storage, so every refresh resets to light.
 
-## Phase 1: Database
+- Add a tiny inline script in `index.html` `<head>` that reads `localStorage["theme"]` and applies the `dark` class **before first paint** (prevents a light flash on reload).
+- In `MainLayout.tsx`, initialize `darkMode` state from `localStorage`/the current `<html>` class instead of always `false`, and on toggle write the choice (`"dark"` / `"light"`) to `localStorage` so it survives refresh and is shared across pages.
 
-New table `user_category_preferences`:
+Result: a shop owner who picks dark mode stays in dark mode after refresh and across navigation.
 
-```text
-id            uuid  pk default gen_random_uuid()
-user_id       uuid  not null  (auth.users)
-category_id   uuid  not null  (id from categories OR subcategories)
-category_kind text  not null  ('main' | 'sub')
-bg_color      text  null      (e.g. 'blue-500' token name)
-text_size     text  null      ('normal' | 'large')
-display_order int   null
-updated_at    timestamptz default now()
-unique (user_id, category_id)
-```
+## 2. Manual "Check for update" button (beside theme toggle)
 
-- GRANTs for `authenticated` and `service_role`.
-- RLS: a user can SELECT / INSERT / UPDATE / DELETE only rows where `user_id = auth.uid()`.
-- `updated_at` auto-update trigger.
+- Add a refresh-style icon button in the `MainLayout` header, right next to the sun/moon toggle.
+- Clicking it shows a "Recherche de mises à jour…" toast, then:
+  - **Update found:** toast "Mise à jour disponible" with an **Actualiser** action that reloads into the new version.
+  - **Already current:** toast "Vous êtes à jour ✓".
+- The check asks the service worker for the newest deployment and compares the build version; a small helper for this is added to `src/lib/swUpdate.ts` and reused by the button.
 
-No changes to `categories` or `subcategories`.
+## 3. Automatic update check when the landing page opens (replaces the old toast check)
 
-## Phase 2: Data hook
+The current mechanism (added 2 days ago) waits in the background and pops a toast. You want the check to happen up front when someone opens the site.
 
-New hook `useCategoryPreferences` (`src/hooks/useCategoryPreferences.ts`):
-- Query: fetch the current user's rows from `user_category_preferences`.
-- `useUpsertCategoryPreference`: upsert color/text-size for one category (conflict target `user_id,category_id`).
-- `useReorderCategoryPreferences`: batch upsert `display_order` for an affected list after a drag.
-- Uses `useEffectiveUserId()` per project convention; writes always set `user_id` to the authenticated user.
+- On the **main landing page** load, before showing the normal content, run a quick version check against the latest deployed `index.html`/build stamp.
+- While checking, show a brief **"Chargement de la dernière version…"** splash (your "block with quick splash" choice). The check is time-boxed (~2.5s max) so a slow network never leaves users stuck on the splash.
+- If a newer version is detected, caches are cleared and the page reloads **once** into the latest version before the app runs. A one-time guard prevents any reload loop.
+- If it is already current (or the check times out), the landing page renders normally.
 
-## Phase 3: POS rendering refactor
+This keeps the existing background toast available inside the app as a safety net, but the primary update gate now happens at the landing page entry point.
 
-In `src/pages/POS.tsx`:
-- Fetch main categories from `useCategories('product')` and subcategories from `useSubcategories()` (filtered to the selected main category) — both give IDs.
-- Merge with preferences: each category button gets `bg_color`, `text_size`, and `display_order` from the user's preference if present; otherwise default styling and a fallback order by `created_at`.
-- Sort each list (main, sub) by `display_order`.
-- Keep product filtering by category/subcategory name so the existing product grid behavior is unchanged.
+## Technical notes
 
-## Phase 4: Edit Mode + Customize modal
+- Reuse and extend `src/lib/swUpdate.ts` (no new SW file) — it already guards against running inside the Lovable preview/iframe; the new manual check and landing splash respect those same guards so the editor preview is never affected.
+- Theme: `localStorage` key `theme`; inline head script + `MainLayout` stay in sync; no design-token or color changes.
+- Landing splash: lightweight overlay rendered by `LandingPage.tsx`, controlled by a small `checkForUpdateOnLoad()` helper with a hard timeout and a `sessionStorage` reload guard.
+- `__APP_VERSION__` (build timestamp from `vite.config.ts`) is the version signal compared during checks.
 
-- Add an **"Options / Personnaliser"** toggle button near the category row. When ON, buttons enter Edit Mode (show an edit icon + drag handle, subtle highlight).
-- New component `CategoryCustomizeDialog`: a grid of high-contrast POS color swatches (blue-500, red-500, emerald-500, amber-500, violet-500, etc. as semantic tokens — no hardcoded hex in components), a Normal/Large text-size toggle, and Save → fires the upsert. A "Réinitialiser" option clears the preference back to default.
-- Clicking a category in Edit Mode opens this dialog; clicking normally still filters products.
+## Files touched
 
-## Phase 5: Drag-and-drop reordering
-
-- Add `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`.
-- Two separate `SortableContext` containers: one for main categories, one for subcategories — dragging is constrained within each list (no cross-list drops).
-- Drag handle shown only in Edit Mode.
-- On drop: reorder locally for instant feedback, then persist new `display_order` for the moved item and recompute order for the others in that list via `useReorderCategoryPreferences`.
-- Smooth reorder transitions via dnd-kit's animation defaults.
-
-## Technical details
-
-- Colors stored as token names and mapped to Tailwind classes via a small lookup, so they respect the design system and dark mode.
-- All preference writes scoped to `auth.uid()`; RLS guarantees isolation between employees and the owner.
-- Subcategory list re-sorts per selected main category using the same preference set (filtered by `category_kind = 'sub'`).
-- New categories with no preference fall back to default color/size and creation-date ordering.
-
-## Files
-
-- New: migration for `user_category_preferences`; `src/hooks/useCategoryPreferences.ts`; `src/components/pos/CategoryCustomizeDialog.tsx`; `src/components/pos/SortableCategoryButton.tsx`.
-- Edit: `src/pages/POS.tsx`.
-- Dependencies: `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`.
+- `index.html` — pre-paint theme script.
+- `src/components/layout/MainLayout.tsx` — persistent dark mode + manual update button.
+- `src/lib/swUpdate.ts` — `checkForUpdate()` (manual) and `checkForUpdateOnLoad()` (landing) helpers.
+- `src/pages/LandingPage.tsx` — splash + on-open update check.
