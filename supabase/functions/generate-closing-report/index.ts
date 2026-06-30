@@ -225,12 +225,43 @@ Deno.serve(async (req) => {
     }
     const byPaymentMethod = [...payMap.values()].sort((a, b) => b.revenue - a.revenue);
 
-    // ---- Repair payments ----
+    // ---- Repair payments (detailed) ----
     const { data: repairPays } = await admin
       .from("repair_payments")
-      .select("amount")
+      .select("amount, repair_id, customer_id")
       .eq("session_id", sessionId);
     const repairsTotal = (repairPays || []).reduce((s, r) => s + Number(r.amount || 0), 0);
+
+    // Resolve repair labels (device / ticket) and customer names
+    const repairIds = [...new Set((repairPays || []).map((r) => r.repair_id).filter(Boolean))] as string[];
+    const custIds = [...new Set((repairPays || []).map((r) => r.customer_id).filter(Boolean))] as string[];
+    const repairInfo = new Map<string, string>();
+    const custName = new Map<string, string>();
+    if (repairIds.length) {
+      const { data: reps } = await admin
+        .from("repairs")
+        .select("id, device_model, ticket_number")
+        .in("id", repairIds);
+      (reps || []).forEach((rp) => {
+        const ticket = rp.ticket_number
+          ? `REP-${String(rp.ticket_number).padStart(5, "0")}`
+          : "";
+        const device = (rp.device_model as string) || "Réparation";
+        repairInfo.set(rp.id as string, ticket ? `${device} (${ticket})` : device);
+      });
+    }
+    if (custIds.length) {
+      const { data: custs } = await admin
+        .from("customers")
+        .select("id, name")
+        .in("id", custIds);
+      (custs || []).forEach((c) => custName.set(c.id as string, (c.name as string) || ""));
+    }
+    const repairRows: RepairRow[] = (repairPays || []).map((r) => ({
+      label: (r.repair_id && repairInfo.get(r.repair_id as string)) || "Réparation",
+      customer: (r.customer_id && custName.get(r.customer_id as string)) || null,
+      amount: Number(r.amount || 0),
+    }));
 
     // ---- Returns (no session_id; window by opened_at) ----
     const { data: returns } = await admin
