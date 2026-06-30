@@ -540,7 +540,8 @@ export function AdminSystemHealthView() {
           <div>
             <p className="text-sm font-medium text-white">Mode Maintenance Global</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              Active un indicateur de maintenance à l'échelle de la plateforme.
+              Une fois activé, seuls les Super Admins peuvent utiliser
+              l'application. Les autres voient une page de maintenance.
             </p>
           </div>
           {maintenance.isLoading ? (
