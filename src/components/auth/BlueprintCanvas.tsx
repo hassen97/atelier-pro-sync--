@@ -35,10 +35,10 @@ function WireframeAccent() {
   );
 }
 
-/** The shop logo rendered as a glowing holographic plane. */
-function LogoPlane({ src }: { src: string }) {
+/** The shop logo rendered as a glowing holographic disc (circle-masked). */
+function LogoDisc({ src }: { src: string }) {
   const ref = useRef<THREE.Mesh>(null);
-  const matRef = useRef<THREE.MeshBasicMaterial>(null);
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
   const texture = useTexture(src);
 
   // Keep aspect ratio of the source image
@@ -63,22 +63,28 @@ function LogoPlane({ src }: { src: string }) {
 
   return (
     <mesh ref={ref} scale={scale}>
-      <planeGeometry args={[1, 1]} />
-      <meshBasicMaterial
+      {/* circle mask → square JPGs render as clean discs immediately */}
+      <circleGeometry args={[1, 64]} />
+      <meshStandardMaterial
         ref={matRef}
         map={texture}
         transparent
         toneMapped={false}
-        blending={THREE.AdditiveBlending}
         depthWrite={false}
         side={THREE.DoubleSide}
+        emissive="#3B82F6"
+        emissiveMap={texture}
+        emissiveIntensity={0.25}
       />
     </mesh>
   );
 }
 
 export function BlueprintCanvas({ logoUrl }: BlueprintCanvasProps) {
-  const src = logoUrl || repairProLogo;
+  // Render exactly ONE logo. When a custom logo exists, the default "R"
+  // fallback is never mounted (prevents z-fighting from two stacked meshes).
+  const hasCustomLogo = Boolean(logoUrl);
+  const src = hasCustomLogo ? (logoUrl as string) : repairProLogo;
 
   return (
     <Canvas
@@ -88,8 +94,9 @@ export function BlueprintCanvas({ logoUrl }: BlueprintCanvasProps) {
       style={{ background: "transparent" }}
     >
       <ambientLight intensity={1} />
+      <directionalLight position={[2, 2, 4]} intensity={0.8} />
       <WireframeAccent />
-      <LogoPlane src={src} />
+      <LogoDisc key={src} src={src} />
     </Canvas>
   );
 }

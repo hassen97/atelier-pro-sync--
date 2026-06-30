@@ -1,46 +1,46 @@
-## Problem
+# 3D Loader Fixes + AI Logo Optimization
 
-Existing shop owners (e.g. `coolstoresbz`, who has `onboarding_completed = true` and real data) are **sometimes** redirected to `/onboarding/setup` after login, as if they were brand-new accounts with no data.
+## Part 1 — 3D Loader Fixes (`src/components/auth/BlueprintCanvas.tsx`)
 
-## Root cause
+**Z-fighting / double logo**
+- The `LogoPlane` currently always falls back to the bundled `repairpro-logo.png` (the "R" logo). Change the canvas so the default "R" logo is only ever mounted when there is **no** `logoUrl`. When a custom `logoUrl` exists, render only the custom logo texture — never both. This guarantees a single textured mesh in the scene.
 
-The funnel guard lives in `useOnboardingStatus` inside `src/components/auth/ProtectedRoute.tsx`. It reads `shop_settings.onboarding_completed` like this:
+**Circle mask + material**
+- Replace `<planeGeometry args={[1, 1]} />` with `<circleGeometry args={[1, 64]} />` so square JPGs are masked into a clean circle immediately.
+- Replace the current `meshBasicMaterial` (additive blending) with `<meshStandardMaterial map={texture} transparent />` so transparent PNGs and circle-masked JPGs render correctly with the scene lighting. Keep the existing aspect-ratio scaling and the gentle float/pulse animation.
 
-```ts
-const { data: settings } = await supabase
-  .from("shop_settings")
-  .select("onboarding_completed")
-  .eq("user_id", userId)
-  .maybeSingle();
+The CSS fallback (`BlueprintLoaderFallback.tsx`) and `BlueprintLoader.tsx` already pass a single `logoUrl`, so no change is needed there beyond the canvas itself.
 
-const onboardingCompleted = (settings as any)?.onboarding_completed === true;
-```
+## Part 2 — AI Logo Optimization Workflow (Lovable AI, no extra setup)
 
-Two problems combine:
+### Backend — new Edge Function `optimize-logo`
+- Accepts a temporary image (the just-selected file, sent as a base64 data URL or a signed URL from a temp upload).
+- Calls the Lovable AI image gateway (`https://ai.gateway.lovable.dev/v1/images/generations`) using a Gemini image-editing model with the source image plus a prompt to: sharpen/clean the logo and remove the background to produce a transparent PNG.
+- Returns the optimized PNG as base64.
+- Handles gateway errors explicitly: `429` (rate limit) and `402` (credits exhausted) surface clear messages to the UI.
+- Uses `LOVABLE_API_KEY` (already configured) and CORS headers.
 
-1. **The query error is ignored.** If the read transiently fails (network blip, or the auth token not fully attached on the first request right after login), `settings` is `undefined`, so `onboardingCompleted` silently becomes `false`.
-2. **The bad result is cached.** The query returns successfully (no throw) with `onboardingCompleted = false`, and `staleTime: 30s` keeps that wrong value around. The guard then fires:
+### Frontend — Settings page (`src/pages/Settings.tsx` + new component)
+- Add a prominent button **"Optimiser et Rendre Transparent (IA)"** next to the logo upload input.
+- Add the French hint below the upload button:
+  > *Cette fonction optimise, upscale et supprime le fond de votre logo pour un rendu 3D parfait. Le format transparent (PNG ou SVG) est recommandé.*
+- New component `LogoOptimizerDialog.tsx`:
+  - Lets the user pick / reuse the logo image, sends it to `optimize-logo`, shows a loading state.
+  - On completion, shows a **side-by-side comparison**: original JPG vs optimized transparent PNG, both over a CSS checkerboard background.
+  - Two actions:
+    - **"Utiliser ce logo"** — uploads the optimized PNG to the `shop-logos` bucket and saves it as `logo_url` (replacing the current logo), then closes.
+    - **"Télécharger"** — triggers a client-side download of the high-quality PNG.
 
-```ts
-if (onboardingStatus.isVerified && !onboardingStatus.onboardingCompleted) {
-  if (path !== "/onboarding/setup") return <Navigate to="/onboarding/setup" replace />;
-}
-```
+### Data / storage
+- Reuses the existing public `shop-logos` bucket and the existing `logo_url` field on `shop_settings`. No schema migration required.
 
-So a transient read failure pushes a fully-onboarded owner into the onboarding funnel until the cache expires — exactly the intermittent behavior reported.
+## Technical notes
+- Lovable AI image editing produces best-effort alpha transparency; results vary per logo. The comparison preview lets the user accept or reject before saving, so a poor result never overwrites the live logo.
+- Optimized PNG is saved under `${user.id}/logo-optimized-<timestamp>.png` with a cache-busting query param, consistent with the current upload flow.
+- All AI calls stay server-side in the edge function; the key is never exposed to the browser.
 
-The same swallow-the-error pattern exists for the `user_roles` and `shop_subscriptions` reads in that hook, which can similarly mis-classify a user during a transient failure.
-
-## Fix
-
-Edit only `useOnboardingStatus` in `src/components/auth/ProtectedRoute.tsx` so a failed read never gets interpreted as "not onboarded":
-
-1. **Throw on real errors** from the `user_roles`, `shop_settings`, and `shop_subscriptions` reads instead of ignoring them. React Query then retries with backoff rather than caching a false negative. Bump the query `retry` (e.g. `retry: 2`) for this gate.
-2. **Only redirect to onboarding on a positive signal.** Compute `onboardingCompleted` only from a successfully-read row. If the `shop_settings` row read returns no error but `data` is `null` (row genuinely missing — should not happen for existing owners since the signup trigger always creates it), treat it as `skip`/no-redirect rather than forcing the funnel.
-3. **Keep brand-new-owner behavior intact:** a real new owner still has a `shop_settings` row with `onboarding_completed = false`, which is a definitive read → they are still correctly sent to `/onboarding/setup`.
-
-### Technical notes
-- This is a frontend-only change; no schema or data changes.
-- `isPlatformAdmin`, employee, and impersonation skip paths stay unchanged.
-- Auth.tsx already invalidates `["onboarding-status"]` on login; with the retry-on-error fix, the post-login refetch will no longer cache a transient `false`.
-- Note for awareness (not changed by this fix): 74 owners legitimately have `onboarding_completed = false` while having data; those are real incomplete-onboarding accounts and will still be routed to the funnel by design. If you want those grandfathered in, that's a separate data decision we can handle on request.
+## Files touched
+- `src/components/auth/BlueprintCanvas.tsx` — circle geometry, standard material, single-logo logic
+- `supabase/functions/optimize-logo/index.ts` — new edge function
+- `src/components/settings/LogoOptimizerDialog.tsx` — new comparison/optimization UI
+- `src/pages/Settings.tsx` — new button + hint wiring

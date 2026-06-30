@@ -62,6 +62,8 @@ import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { AppLanguage } from "@/i18n";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { LogoOptimizerDialog } from "@/components/settings/LogoOptimizerDialog";
+import { Sparkles } from "lucide-react";
 
 const TABS = [
   { value: "boutique", label: "Boutique", icon: Store },
@@ -146,6 +148,7 @@ export default function Settings() {
   const isMobile = useIsMobile();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoOptimizerOpen, setLogoOptimizerOpen] = useState(false);
   const [logoSize, setLogoSize] = useState<"small" | "medium" | "large" | "xlarge">("medium");
   const [brandColor, setBrandColor] = useState("blue");
   const [customHex, setCustomHex] = useState("");
@@ -545,17 +548,42 @@ export default function Settings() {
                 )}
                 <div className="space-y-2">
                   <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/svg+xml" className="hidden" onChange={handleLogoUpload} />
-                  <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}>
-                    {uploadingLogo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                    {t("settings.uploadLogo")}
-                  </Button>
-                  {settings.logo_url && (
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={handleRemoveLogo}>
-                      <Trash2 className="h-4 w-4 mr-2" />{t("settings.removeLogo")}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}>
+                      {uploadingLogo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                      {t("settings.uploadLogo")}
                     </Button>
-                  )}
+                    <Button
+                      size="sm"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      onClick={() => setLogoOptimizerOpen(true)}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Optimiser et Rendre Transparent (IA)
+                    </Button>
+                    {settings.logo_url && (
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={handleRemoveLogo}>
+                        <Trash2 className="h-4 w-4 mr-2" />{t("settings.removeLogo")}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground max-w-md">
+                    Cette fonction optimise, upscale et supprime le fond de votre logo pour un rendu 3D parfait. Le format transparent (PNG ou SVG) est recommandé.
+                  </p>
                 </div>
               </div>
+
+              {user && (
+                <LogoOptimizerDialog
+                  open={logoOptimizerOpen}
+                  onOpenChange={setLogoOptimizerOpen}
+                  userId={user.id}
+                  currentLogoUrl={settings.logo_url}
+                  onSaved={async (url) => { await saveSettings({ logo_url: url }); }}
+                />
+              )}
+
+
 
               {/* Logo size on receipt — selector + live preview */}
               {settings.logo_url && (
