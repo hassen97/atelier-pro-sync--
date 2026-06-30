@@ -14,6 +14,7 @@ import {
   Sparkles, Mail, Loader2
 } from "lucide-react";
 import { SEO } from "@/components/seo/SEO";
+import { checkForUpdateOnLoad } from "@/lib/swUpdate";
 import repairProLogo from "@/assets/repairpro-logo.png";
 
 /* ── animation variants ── */
@@ -51,12 +52,26 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [checkingVersion, setCheckingVersion] = useState(true);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { scrollYProgress } = useScroll();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
   const { data: plans } = usePublicPlans();
   const joinWaitlist = useJoinWaitlist();
+
+  // On open: check for a newer deployment BEFORE rendering the app. Time-boxed
+  // so a slow network never strands the visitor on the splash; reloads once
+  // into the latest version if an update is detected.
+  useEffect(() => {
+    let active = true;
+    checkForUpdateOnLoad(2500).finally(() => {
+      if (active) setCheckingVersion(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -99,6 +114,19 @@ export default function LandingPage() {
   };
 
   const displayPlans = plans || [];
+
+  // Quick splash while we verify the visitor is on the latest deployment.
+  if (checkingVersion) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+        <img src={repairProLogo} alt="RepairPro" className="h-12 w-auto animate-pulse" />
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Chargement de la dernière version…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <main className="landing-page min-h-screen relative" style={{ scrollBehavior: "smooth" }}>

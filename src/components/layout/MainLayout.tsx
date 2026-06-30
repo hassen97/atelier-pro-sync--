@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Menu, Search, User, Moon, Sun, LogOut, Settings, MessageCircle } from "lucide-react";
+import { Menu, Search, User, Moon, Sun, LogOut, Settings, MessageCircle, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { checkForUpdate, applyUpdateNow } from "@/lib/swUpdate";
 import { useAuth } from "@/contexts/AuthContext";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { AppSidebar } from "./AppSidebar";
@@ -27,7 +29,12 @@ import { useUnreadMessageCount } from "@/hooks/useCommunity";
 export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark"),
+  );
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   // Defer the language chooser so it never intercepts the first paint after login.
   const [deferredReady, setDeferredReady] = useState(false);
   const isMobile = useIsMobile();
@@ -53,8 +60,40 @@ export function MainLayout() {
   };
 
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle("dark");
+    const next = !darkMode;
+    setDarkMode(next);
+    document.documentElement.classList.toggle("dark", next);
+    try {
+      localStorage.setItem("theme", next ? "dark" : "light");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    const toastId = toast.loading("Recherche de mises à jour…");
+    try {
+      const hasUpdate = await checkForUpdate();
+      if (hasUpdate) {
+        toast("Mise à jour disponible", {
+          id: toastId,
+          description: "Une nouvelle version est prête.",
+          duration: Infinity,
+          action: {
+            label: "Actualiser",
+            onClick: () => applyUpdateNow(),
+          },
+        });
+      } else {
+        toast.success("Vous êtes à jour ✓", { id: toastId });
+      }
+    } catch {
+      toast.error("Vérification impossible", { id: toastId });
+    } finally {
+      setCheckingUpdate(false);
+    }
   };
 
   return (
@@ -127,6 +166,21 @@ export function MainLayout() {
                 <Moon className="h-4 w-4" />
               )}
             </Button>
+
+            {/* Manual "check for update" */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCheckUpdate}
+              disabled={checkingUpdate}
+              aria-label="Vérifier les mises à jour"
+              title="Vérifier les mises à jour"
+              className="h-9 w-9"
+            >
+              <RefreshCw className={cn("h-4 w-4", checkingUpdate && "animate-spin")} />
+            </Button>
+
+
 
             {/* Messages button with unread badge */}
             <Button

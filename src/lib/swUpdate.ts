@@ -140,3 +140,128 @@ export function registerServiceWorker() {
       });
   });
 }
+
+// ---------------------------------------------------------------------------
+// Explicit update checks (manual button + landing-page on-open gate).
+//
+// Detection works by comparing the hashed entry-script URL of the running page
+// with the one in a freshly fetched copy of index.html. When a new deploy is
+// live, Vite emits a new hashed `/assets/index-*.js`, so the two differ.
+// ---------------------------------------------------------------------------
+
+function updateChecksAllowed(): boolean {
+  // Never interfere with the Lovable editor preview / iframe.
+  return !(isPreviewEnvironment() || isInIframe);
+}
+
+/** The entry module script URL currently executing in this page. */
+function getCurrentEntrySignature(): string | null {
+  const scripts = Array.from(
+    document.querySelectorAll<HTMLScriptElement>('script[type="module"][src]'),
+  );
+  const entry =
+    scripts.find((s) => /\/assets\/index-/.test(s.src)) ?? scripts[0];
+  return entry ? entry.getAttribute("src") : null;
+}
+
+/** Fetch a fresh copy of index.html and extract its entry module script URL. */
+async function getDeployedEntrySignature(timeoutMs: number): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`/index.html?_=${Date.now()}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const matches = Array.from(
+      html.matchAll(/<script[^>]+type="module"[^>]+src="([^"]+)"/g),
+    ).map((m) => m[1]);
+    const entry =
+      matches.find((src) => /\/assets\/index-/.test(src)) ?? matches[0] ?? null;
+    return entry;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Manual "check for update" used by the in-app button.
+ * Returns whether a newer deployment is available. Also nudges the SW to
+ * fetch the latest worker so the next reload swaps in fresh chunks.
+ */
+export async function checkForUpdate(): Promise<boolean> {
+  if (!updateChecksAllowed()) return false;
+
+  // Ask the service worker to look for a new worker as well.
+  if ("serviceWorker" in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      await reg?.update();
+      if (reg?.waiting && navigator.serviceWorker.controller) return true;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const current = getCurrentEntrySignature();
+  const deployed = await getDeployedEntrySignature(8000);
+  if (!current || !deployed) return false;
+  return current !== deployed;
+}
+
+/** Force-load the latest version (clears caches, then reloads once). */
+export async function applyUpdateNow(): Promise<void> {
+  try {
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch {
+    /* ignore */
+  }
+  reloadOnce();
+}
+
+/**
+ * Automatic update gate run when the landing page opens. Time-boxed so a slow
+ * network never strands the user on the splash. If a newer deployment is
+ * detected, caches are cleared and the page reloads ONCE (guarded by
+ * sessionStorage) into the latest version before the app runs.
+ *
+ * Returns when it is safe to render the landing page (either up to date, the
+ * check timed out, or a reload has been triggered).
+ */
+const LANDING_RELOAD_GUARD = "landing_update_reloaded";
+
+export async function checkForUpdateOnLoad(timeoutMs = 2500): Promise<void> {
+  if (!updateChecksAllowed()) return;
+
+  // Prevent any possibility of a reload loop within the same session.
+  if (sessionStorage.getItem(LANDING_RELOAD_GUARD)) {
+    sessionStorage.removeItem(LANDING_RELOAD_GUARD);
+    return;
+  }
+
+  const current = getCurrentEntrySignature();
+  const deployed = await getDeployedEntrySignature(timeoutMs);
+
+  if (!current || !deployed || current === deployed) return;
+
+  // New version live — reload once into it.
+  sessionStorage.setItem(LANDING_RELOAD_GUARD, "1");
+  try {
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch {
+    /* ignore */
+  }
+  reloadOnce();
+  // Give the reload a moment so the splash stays up instead of flashing content.
+  await new Promise((r) => setTimeout(r, 3000));
+}

@@ -17,6 +17,19 @@
     <!-- Browser theme color -->
     <meta name="theme-color" content="#000000" />
 
+    <!-- Apply the saved theme before first paint to avoid a light-mode flash. -->
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem("theme") === "dark") {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+
+
     <!-- Preconnect for faster Google Fonts loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
