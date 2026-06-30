@@ -27,27 +27,42 @@ function useOnboardingStatus(userId: string | undefined) {
     queryFn: async () => {
       if (!userId || isPlatformAdmin) return { skip: true } as const;
 
-      // Check if user is an employee (employees skip the funnel)
-      const { data: role } = await supabase
+      // Check if user is an employee (employees skip the funnel).
+      // Throw on a real error so React Query retries instead of mis-classifying
+      // the user (a swallowed error here could drop role info entirely).
+      const { data: role, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
         .in("role", ["employee", "manager", "platform_admin"]);
+
+      if (roleError) throw roleError;
 
       const roleSet = new Set((role ?? []).map((r) => r.role));
       if (roleSet.has("employee") || roleSet.has("manager") || roleSet.has("platform_admin")) {
         return { skip: true } as const;
       }
 
-      // Fetch onboarding_completed
-      const { data: settings } = await supabase
+      // Fetch onboarding_completed. CRITICAL: a transient read failure must NOT
+      // be interpreted as "not onboarded" — that wrongly pushes fully-onboarded
+      // owners into the onboarding funnel. Throw so React Query retries.
+      const { data: settings, error: settingsError } = await supabase
         .from("shop_settings")
         .select("onboarding_completed")
         .eq("user_id", userId)
         .maybeSingle();
 
+      if (settingsError) throw settingsError;
+
+      // No error but no row at all (should not happen for existing owners since
+      // the signup trigger always creates shop_settings). Skip the funnel rather
+      // than forcing onboarding on an indeterminate state.
+      if (!settings) {
+        return { skip: true } as const;
+      }
+
       // Fetch active subscription (including trialing)
-      const { data: sub } = await supabase
+      const { data: sub, error: subError } = await supabase
         .from("shop_subscriptions")
         .select("status, expires_at")
         .eq("user_id", userId)
@@ -56,7 +71,10 @@ function useOnboardingStatus(userId: string | undefined) {
         .limit(1)
         .maybeSingle();
 
-      const onboardingCompleted = (settings as any)?.onboarding_completed === true;
+      if (subError) throw subError;
+
+      // Only a definitively-read row drives the onboarding redirect.
+      const onboardingCompleted = (settings as any).onboarding_completed === true;
 
       // Check subscription: expired if exists but past expiry date
       let subscriptionExpired = false;
@@ -82,6 +100,9 @@ function useOnboardingStatus(userId: string | undefined) {
     // Cache the funnel-gating check briefly so it isn't re-fetched (3 queries)
     // on every navigation. This sharply reduces DB load during login storms.
     staleTime: 30 * 1000,
+    // Retry transient failures with backoff so a momentary read error never
+    // gets cached as a (wrong) "not onboarded" verdict.
+    retry: 2,
   });
 }
 
