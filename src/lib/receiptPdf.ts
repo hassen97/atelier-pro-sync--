@@ -818,6 +818,25 @@ export async function generateClosingReportPdf(
     ["left", "right", "right"]
   );
 
+  if (data.byProduct && data.byProduct.length) {
+    drawTable(
+      "Ventes par produit",
+      ["Produit", "Qté", "Total"],
+      data.byProduct.map((p) => [p.product_name, String(p.quantity), format(p.revenue)]),
+      ["left", "right", "right"]
+    );
+  }
+
+  if (data.repairsRows && data.repairsRows.length) {
+    drawTable(
+      "Réparations payées",
+      ["Réparation", "Client", "Montant"],
+      data.repairsRows.map((r) => [r.label, r.customer || "—", format(r.amount)]),
+      ["left", "left", "right"]
+    );
+  }
+
+
   drawTable(
     "Modes de paiement",
     ["Mode", "Total"],
