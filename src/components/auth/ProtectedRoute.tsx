@@ -2,12 +2,15 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAllowedPages } from "@/hooks/useTeam";
 import { useIsPlatformAdmin } from "@/hooks/useAdmin";
+import { useMaintenanceModeFlag } from "@/hooks/useSystemHealth";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+
+const MaintenancePage = lazy(() => import("@/pages/Maintenance"));
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
