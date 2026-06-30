@@ -167,6 +167,21 @@ export function MainLayout() {
               )}
             </Button>
 
+            {/* Manual "check for update" */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCheckUpdate}
+              disabled={checkingUpdate}
+              aria-label="Vérifier les mises à jour"
+              title="Vérifier les mises à jour"
+              className="h-9 w-9"
+            >
+              <RefreshCw className={cn("h-4 w-4", checkingUpdate && "animate-spin")} />
+            </Button>
+
+
+
             {/* Messages button with unread badge */}
             <Button
               variant="ghost"
