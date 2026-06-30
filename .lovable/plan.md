@@ -1,46 +1,74 @@
-# 3D Loader Fixes + AI Logo Optimization
+# Per-User POS Category Customization & Reordering
 
-## Part 1 — 3D Loader Fixes (`src/components/auth/BlueprintCanvas.tsx`)
+Let shop owners and employees personalize the color, text size, and order of POS category buttons — strictly per-user, never affecting others in the shop. Applies to both main categories and subcategories, kept in separate drag zones.
 
-**Z-fighting / double logo**
-- The `LogoPlane` currently always falls back to the bundled `repairpro-logo.png` (the "R" logo). Change the canvas so the default "R" logo is only ever mounted when there is **no** `logoUrl`. When a custom `logoUrl` exists, render only the custom logo texture — never both. This guarantees a single textured mesh in the scene.
+## Important architecture notes (read first)
 
-**Circle mask + material**
-- Replace `<planeGeometry args={[1, 1]} />` with `<circleGeometry args={[1, 64]} />` so square JPGs are masked into a clean circle immediately.
-- Replace the current `meshBasicMaterial` (additive blending) with `<meshStandardMaterial map={texture} transparent />` so transparent PNGs and circle-masked JPGs render correctly with the scene lighting. Keep the existing aspect-ratio scaling and the gentle float/pulse animation.
+- There is **no `product_categories` table**. The real tables are `categories` (main, with a `type` column = `product`/`repair`) and `subcategories` (separate table, linked via `category_id`). The plan targets these.
+- The POS today builds category buttons from **product name strings**, not category IDs. To attach per-user preferences (keyed by ID) and to reorder, the POS will switch to fetching the real `categories` (type `product`) and `subcategories` rows that have IDs. Filtering of products stays by name match so existing data keeps working.
+- Because preferences must cover both main categories and subcategories (two source tables), the preference row stores `category_id` plus a `category_kind` discriminator (`main` | `sub`) instead of a single cross-table foreign key.
 
-The CSS fallback (`BlueprintLoaderFallback.tsx`) and `BlueprintLoader.tsx` already pass a single `logoUrl`, so no change is needed there beyond the canvas itself.
+## Phase 1: Database
 
-## Part 2 — AI Logo Optimization Workflow (Lovable AI, no extra setup)
+New table `user_category_preferences`:
 
-### Backend — new Edge Function `optimize-logo`
-- Accepts a temporary image (the just-selected file, sent as a base64 data URL or a signed URL from a temp upload).
-- Calls the Lovable AI image gateway (`https://ai.gateway.lovable.dev/v1/images/generations`) using a Gemini image-editing model with the source image plus a prompt to: sharpen/clean the logo and remove the background to produce a transparent PNG.
-- Returns the optimized PNG as base64.
-- Handles gateway errors explicitly: `429` (rate limit) and `402` (credits exhausted) surface clear messages to the UI.
-- Uses `LOVABLE_API_KEY` (already configured) and CORS headers.
+```text
+id            uuid  pk default gen_random_uuid()
+user_id       uuid  not null  (auth.users)
+category_id   uuid  not null  (id from categories OR subcategories)
+category_kind text  not null  ('main' | 'sub')
+bg_color      text  null      (e.g. 'blue-500' token name)
+text_size     text  null      ('normal' | 'large')
+display_order int   null
+updated_at    timestamptz default now()
+unique (user_id, category_id)
+```
 
-### Frontend — Settings page (`src/pages/Settings.tsx` + new component)
-- Add a prominent button **"Optimiser et Rendre Transparent (IA)"** next to the logo upload input.
-- Add the French hint below the upload button:
-  > *Cette fonction optimise, upscale et supprime le fond de votre logo pour un rendu 3D parfait. Le format transparent (PNG ou SVG) est recommandé.*
-- New component `LogoOptimizerDialog.tsx`:
-  - Lets the user pick / reuse the logo image, sends it to `optimize-logo`, shows a loading state.
-  - On completion, shows a **side-by-side comparison**: original JPG vs optimized transparent PNG, both over a CSS checkerboard background.
-  - Two actions:
-    - **"Utiliser ce logo"** — uploads the optimized PNG to the `shop-logos` bucket and saves it as `logo_url` (replacing the current logo), then closes.
-    - **"Télécharger"** — triggers a client-side download of the high-quality PNG.
+- GRANTs for `authenticated` and `service_role`.
+- RLS: a user can SELECT / INSERT / UPDATE / DELETE only rows where `user_id = auth.uid()`.
+- `updated_at` auto-update trigger.
 
-### Data / storage
-- Reuses the existing public `shop-logos` bucket and the existing `logo_url` field on `shop_settings`. No schema migration required.
+No changes to `categories` or `subcategories`.
 
-## Technical notes
-- Lovable AI image editing produces best-effort alpha transparency; results vary per logo. The comparison preview lets the user accept or reject before saving, so a poor result never overwrites the live logo.
-- Optimized PNG is saved under `${user.id}/logo-optimized-<timestamp>.png` with a cache-busting query param, consistent with the current upload flow.
-- All AI calls stay server-side in the edge function; the key is never exposed to the browser.
+## Phase 2: Data hook
 
-## Files touched
-- `src/components/auth/BlueprintCanvas.tsx` — circle geometry, standard material, single-logo logic
-- `supabase/functions/optimize-logo/index.ts` — new edge function
-- `src/components/settings/LogoOptimizerDialog.tsx` — new comparison/optimization UI
-- `src/pages/Settings.tsx` — new button + hint wiring
+New hook `useCategoryPreferences` (`src/hooks/useCategoryPreferences.ts`):
+- Query: fetch the current user's rows from `user_category_preferences`.
+- `useUpsertCategoryPreference`: upsert color/text-size for one category (conflict target `user_id,category_id`).
+- `useReorderCategoryPreferences`: batch upsert `display_order` for an affected list after a drag.
+- Uses `useEffectiveUserId()` per project convention; writes always set `user_id` to the authenticated user.
+
+## Phase 3: POS rendering refactor
+
+In `src/pages/POS.tsx`:
+- Fetch main categories from `useCategories('product')` and subcategories from `useSubcategories()` (filtered to the selected main category) — both give IDs.
+- Merge with preferences: each category button gets `bg_color`, `text_size`, and `display_order` from the user's preference if present; otherwise default styling and a fallback order by `created_at`.
+- Sort each list (main, sub) by `display_order`.
+- Keep product filtering by category/subcategory name so the existing product grid behavior is unchanged.
+
+## Phase 4: Edit Mode + Customize modal
+
+- Add an **"Options / Personnaliser"** toggle button near the category row. When ON, buttons enter Edit Mode (show an edit icon + drag handle, subtle highlight).
+- New component `CategoryCustomizeDialog`: a grid of high-contrast POS color swatches (blue-500, red-500, emerald-500, amber-500, violet-500, etc. as semantic tokens — no hardcoded hex in components), a Normal/Large text-size toggle, and Save → fires the upsert. A "Réinitialiser" option clears the preference back to default.
+- Clicking a category in Edit Mode opens this dialog; clicking normally still filters products.
+
+## Phase 5: Drag-and-drop reordering
+
+- Add `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`.
+- Two separate `SortableContext` containers: one for main categories, one for subcategories — dragging is constrained within each list (no cross-list drops).
+- Drag handle shown only in Edit Mode.
+- On drop: reorder locally for instant feedback, then persist new `display_order` for the moved item and recompute order for the others in that list via `useReorderCategoryPreferences`.
+- Smooth reorder transitions via dnd-kit's animation defaults.
+
+## Technical details
+
+- Colors stored as token names and mapped to Tailwind classes via a small lookup, so they respect the design system and dark mode.
+- All preference writes scoped to `auth.uid()`; RLS guarantees isolation between employees and the owner.
+- Subcategory list re-sorts per selected main category using the same preference set (filtered by `category_kind = 'sub'`).
+- New categories with no preference fall back to default color/size and creation-date ordering.
+
+## Files
+
+- New: migration for `user_category_preferences`; `src/hooks/useCategoryPreferences.ts`; `src/components/pos/CategoryCustomizeDialog.tsx`; `src/components/pos/SortableCategoryButton.tsx`.
+- Edit: `src/pages/POS.tsx`.
+- Dependencies: `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`.
