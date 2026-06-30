@@ -248,9 +248,10 @@ export default function Auth() {
           }
         }
 
-        // Minimum display so the animation reads as intentional, then navigate.
+        // Minimum display so the 3D animation has time to load and play out
+        // before we navigate to the dashboard.
         const elapsed = Date.now() - ownerLoaderStart;
-        const minDisplay = 1100;
+        const minDisplay = 3200;
         if (elapsed < minDisplay) {
           await new Promise((r) => setTimeout(r, minDisplay - elapsed));
         }
