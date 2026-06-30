@@ -24,6 +24,16 @@ interface ExpenseAgg {
   category: string;
   amount: number;
 }
+interface ProductAgg {
+  product_name: string;
+  quantity: number;
+  revenue: number;
+}
+interface RepairRow {
+  label: string;
+  customer: string | null;
+  amount: number;
+}
 
 function methodLabel(m: string | null | undefined): string {
   switch ((m || "").toLowerCase()) {
