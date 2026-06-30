@@ -621,7 +621,9 @@ export interface ClosingPdfData {
   closedBy?: string | null;
   isDuplicate?: boolean;
   byCategory: { category: string; revenue: number; items: number }[];
+  byProduct?: { product_name: string; quantity: number; revenue: number }[];
   byPaymentMethod: { method: string; revenue: number }[];
+  repairsRows?: { label: string; customer: string | null; amount: number }[];
   returns: { product_name: string; quantity: number; refund_amount: number }[];
   expenses: { category: string; amount: number }[];
   totals: {
