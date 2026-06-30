@@ -49,7 +49,7 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
   const { settings } = useShopSettingsContext();
   const { data: report, isLoading } = useClosingReport(open);
   const closeSession = useCloseSession();
-  const [busy, setBusy] = useState<"pdf" | "thermal" | "close" | null>(null);
+  const [busy, setBusy] = useState<"pdf" | "thermal" | "excel" | "close" | null>(null);
 
   const t = report?.totals;
   const sales = t?.sales ?? 0;
