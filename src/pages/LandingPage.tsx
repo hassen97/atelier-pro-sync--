@@ -14,7 +14,8 @@ import {
   Sparkles, Mail, Loader2
 } from "lucide-react";
 import { SEO } from "@/components/seo/SEO";
-import { checkForUpdateOnLoad } from "@/lib/swUpdate";
+import { getUpdateStatus, applyUpdateNow } from "@/lib/swUpdate";
+import { UpdateCheckOverlay } from "@/components/landing/UpdateCheckOverlay";
 import repairProLogo from "@/assets/repairpro-logo.png";
 
 /* ── animation variants ── */
@@ -52,7 +53,9 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState("");
-  const [checkingVersion, setCheckingVersion] = useState(true);
+  const [updatePhase, setUpdatePhase] = useState<
+    "checking" | "current" | "update" | "done"
+  >("checking");
   const { user } = useAuth();
   const navigate = useNavigate();
   const { scrollYProgress } = useScroll();
@@ -60,16 +63,27 @@ export default function LandingPage() {
   const { data: plans } = usePublicPlans();
   const joinWaitlist = useJoinWaitlist();
 
-  // On open: check for a newer deployment BEFORE rendering the app. Time-boxed
-  // so a slow network never strands the visitor on the splash; reloads once
-  // into the latest version if an update is detected.
+  // On open: run a status-returning update check, then drive the 3D overlay.
+  //  - "current": play a brief confirmation beat, then reveal the landing page.
+  //  - "update":  show a blocking refresh prompt (mandatory) until the user
+  //               clears the cache and reloads into the latest version.
   useEffect(() => {
     let active = true;
-    checkForUpdateOnLoad(2500).finally(() => {
-      if (active) setCheckingVersion(false);
-    });
+    let timer: ReturnType<typeof setTimeout>;
+    getUpdateStatus(2500)
+      .then((status) => {
+        if (!active) return;
+        if (status === "update") {
+          setUpdatePhase("update");
+        } else {
+          setUpdatePhase("current");
+          timer = setTimeout(() => active && setUpdatePhase("done"), 1500);
+        }
+      })
+      .catch(() => active && setUpdatePhase("done"));
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, []);
 
@@ -115,18 +129,16 @@ export default function LandingPage() {
 
   const displayPlans = plans || [];
 
-  // Quick splash while we verify the visitor is on the latest deployment.
-  if (checkingVersion) {
+  // 3D update-check overlay while we verify the visitor is on the latest build.
+  if (updatePhase !== "done") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-        <img src={repairProLogo} alt="RepairPro" className="h-12 w-auto animate-pulse" />
-        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Chargement de la dernière version…
-        </div>
-      </div>
+      <UpdateCheckOverlay
+        state={updatePhase}
+        onRefresh={() => applyUpdateNow()}
+      />
     );
   }
+
 
   return (
     <main className="landing-page min-h-screen relative" style={{ scrollBehavior: "smooth" }}>

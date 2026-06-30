@@ -265,3 +265,35 @@ export async function checkForUpdateOnLoad(timeoutMs = 2500): Promise<void> {
   // Give the reload a moment so the splash stays up instead of flashing content.
   await new Promise((r) => setTimeout(r, 3000));
 }
+
+/**
+ * Status-returning update check used by the landing-page 3D overlay. Unlike
+ * `checkForUpdateOnLoad`, this NEVER reloads on its own — it returns the result
+ * so the UI can play a distinct "up to date" vs "update found" animation and,
+ * for updates, ask the user to refresh the cached data.
+ *
+ * Returns "current" on timeout / error / preview / iframe so a visitor is never
+ * stranded on the splash.
+ */
+export async function getUpdateStatus(
+  timeoutMs = 2500,
+): Promise<"current" | "update"> {
+  if (!updateChecksAllowed()) return "current";
+
+  // If a previous "update found" cycle already triggered the one-time reload,
+  // we are now on the fresh build — treat as current and clear the guard.
+  if (sessionStorage.getItem(LANDING_RELOAD_GUARD)) {
+    sessionStorage.removeItem(LANDING_RELOAD_GUARD);
+    return "current";
+  }
+
+  try {
+    const current = getCurrentEntrySignature();
+    const deployed = await getDeployedEntrySignature(timeoutMs);
+    if (!current || !deployed) return "current";
+    return current === deployed ? "current" : "update";
+  } catch {
+    return "current";
+  }
+}
+
