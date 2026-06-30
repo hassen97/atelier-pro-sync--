@@ -300,8 +300,9 @@ Deno.serve(async (req) => {
       sessionId,
       openedAt,
       byCategory,
+      byProduct,
       byPaymentMethod,
-      repairs: { total: repairsTotal, count: (repairPays || []).length },
+      repairs: { total: repairsTotal, count: (repairPays || []).length, rows: repairRows },
       returns: { total: returnsTotal, count: returnRows.length, rows: returnRows },
       expenses: { total: expensesTotal, rows: expenseRows },
       totals: {
