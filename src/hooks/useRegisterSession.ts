@@ -229,6 +229,8 @@ export interface RegisterHistoryRow {
   snapshot_reparations: number;
   snapshot_depenses: number;
   snapshot_net: number;
+  report_data: ClosingReport | null;
+  closed_by_name: string | null;
 }
 
 /**
@@ -248,7 +250,7 @@ export function useRegisterHistory() {
       const { data, error } = await supabase
         .from("register_sessions")
         .select(
-          "id, closed_at, snapshot_ventes, snapshot_reparations, snapshot_depenses, snapshot_net"
+          "id, closed_at, snapshot_ventes, snapshot_reparations, snapshot_depenses, snapshot_net, report_data, closed_by_name"
         )
         .eq("shop_id", effectiveUserId)
         .eq("status", "closed")
@@ -262,6 +264,8 @@ export function useRegisterHistory() {
         snapshot_reparations: Number(r.snapshot_reparations || 0),
         snapshot_depenses: Number(r.snapshot_depenses || 0),
         snapshot_net: Number(r.snapshot_net || 0),
+        report_data: (r as any).report_data ?? null,
+        closed_by_name: ((r as any).closed_by_name as string | null) ?? null,
       }));
     },
     enabled: !!effectiveUserId,
