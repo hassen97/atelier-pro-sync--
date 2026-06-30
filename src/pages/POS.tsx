@@ -27,6 +27,25 @@ import { LoyaltyRedeemCard } from "@/components/pos/LoyaltyRedeemCard";
 import { CloseRegisterDialog } from "@/components/pos/CloseRegisterDialog";
 import { useCanCloseRegister } from "@/hooks/useRegisterSession";
 import { toast } from "sonner";
+import { Settings2 } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { useCategories, useSubcategories } from "@/hooks/useCategories";
+import {
+  useCategoryPreferences,
+  useReorderCategoryPreferences,
+  type CategoryKind,
+} from "@/hooks/useCategoryPreferences";
+import { SortableCategoryButton, type MergedCategory } from "@/components/pos/SortableCategoryButton";
+import { CategoryCustomizeDialog } from "@/components/pos/CategoryCustomizeDialog";
 
 interface CartItem {
   id: string;
