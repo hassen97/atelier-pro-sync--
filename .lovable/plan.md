@@ -1,77 +1,79 @@
-# Referral Growth Engine
+# Demo Mode + Landing Page CTA Revamp
 
-A complete viral referral loop: shops invite shops, the system tracks joins automatically, and you approve 30-day reward extensions from a Bloomberg-style admin terminal.
+## Goal
+Let anyone test RepairPro instantly via a "Demo" button — no signup — exploring a realistic, **read-only** shop. Replace the waitlist on the landing page with three clear actions: **Demo**, **Inscription** (Sign up), **Connexion** (Login).
 
-## Architecture note (how it fits the existing app)
-This app uses **flat routes** (`/dashboard`, `/pos`…) and a **single-page admin** at `/admin` that swaps internal "views" rather than nested URLs. To stay consistent and avoid breaking the routing/sidebar system:
-- The owner page ships at **`/referrals`** (added to the app sidebar), not `/dashboard/referrals`.
-- The admin command center ships as a new **"Growth Engine" view** inside `/admin` (new sidebar entry), not a separate `/super-admin/growth-engine` URL.
-
-Functionally identical to the request — just wired into the conventions already in place.
+## Approach (why this shape)
+A single shared demo account is auto-logged-in on click and runs in a locked **read-only "Mode Démo"**. Because nothing can be modified, sharing one account is as safe as an isolated one — without creating/cleaning a new account on every visit. A daily auto-reset re-seeds the demo data so it always looks fresh.
 
 ---
 
-## Module 1 — Core Engine (Database & Trigger)
+## Module 1 — The Demo Account & Sample Data
 
-New table `public.referrals`:
-- `referrer_id` (uuid → auth.users) — who sent the invite
-- `referred_id` (uuid, nullable) — the new shop's user id (captured at signup)
-- `referred_email` (text)
-- `status` enum `referral_status` = `pending` | `joined` | `rewarded`
-- `ip_fingerprint` (text) — referred party's hashed device/IP footprint
-- `reward_granted_at`, `rewarded_by` (audit), plus `created_at`/`updated_at`
+A backend function provisions (once, idempotently) a dedicated demo account:
+- Auth user `demo` (internal email `demo@repairpro.local`) with a fixed password held only on the server.
+- Profile marked as verified and flagged as the demo account.
+- Shop settings: name "RepairPro Démo", `onboarding_completed = true` (so it skips the onboarding funnel), country/currency TN/TND.
+- An active subscription (Pro) so all modules are unlocked.
+- Seeded realistic sample data scoped to the demo user: a handful of customers, products (with stock + a couple out-of-stock), suppliers, repairs across statuses, paid sales, and expenses — enough to make the Dashboard, POS, Repairs, Inventory, Stats and Profit pages look alive.
 
-Supporting change:
-- Add `referral_code` (short unique slug) to `profiles`, auto-generated for every shop owner — this is the value embedded in their unique link (`/auth?ref=CODE`).
-- Add `signup_fingerprint` to `profiles` so the admin radar can compare referrer vs referred footprints.
+The demo account's user id is stored in platform settings (`demo_user_id`) so the frontend can recognize it (this key is publicly readable, like the existing `admin_whatsapp`).
 
-Trigger (the "cookie check" adapted to Postgres reality — triggers can't read cookies, so the referral is recorded at signup and the trigger confirms the join):
-- `AFTER UPDATE ON shop_settings`: when `onboarding_completed` flips `false → true`, find any `referrals` row where `referred_id = NEW.user_id AND status = 'pending'` and flip it to `joined`. This is the moment a referral truly "counts".
+## Module 2 — One-Click Demo Login
 
-RLS & grants:
-- Owners can read referrals where `referrer_id = auth.uid()` and insert their own `referred_id = auth.uid()` row at signup.
-- `platform_admin` full access; `service_role` full access (for the edge function).
+A backend function `demo-login`:
+- Ensures the demo account exists (calls the provisioner if needed).
+- Mints a fresh session for the demo user server-side and returns the tokens.
+- The frontend sets the session and navigates to `/dashboard`.
 
-## Module 2 — Viral User UI (`/referrals`)
+No credentials are exposed in the frontend; the demo password lives only in the function.
 
-A clean, owner-only page (gated to shop owners, hidden for employees), matching the Premium Dark SaaS aesthetic:
-- **Unique link capture**: on landing/auth visit, `?ref=CODE` is saved to `localStorage`. On successful signup, the client inserts a `pending` referral (referrer resolved from the code, `referred_id` = new user, hashed fingerprint).
-- **Big gradient button** "Copier mon lien unique" — copies `https://<domain>/auth?ref=CODE` with a success toast.
-- **"Partager sur WhatsApp"** button — deep-links `wa.me/?text=…` with a pre-written, high-converting FR message aimed at other shop owners.
-- **Bento-box stats grid**: Invitations envoyées (total), Boutiques inscrites (`joined` + `rewarded`), Mois gratuits gagnés (`rewarded` count). Data via a new `useReferrals` hook.
+## Module 3 — Read-Only "Mode Démo"
 
-## Module 3 — Admin Command Center ("Growth Engine" view)
+- A `useDemoMode` hook returns `true` when the logged-in user's id matches `demo_user_id`.
+- Demo mode forces the whole app read-only by feeding into the existing read-only plumbing (`useReadOnlyGuard` / impersonation `isReadOnly`), so all mutation buttons already wired to the guard are blocked with a "Mode lecture seule" toast.
+- A persistent top banner (reusing the existing `ReadOnlyBanner` style) shows: "Mode Démo — lecture seule" with a **"Créer mon compte"** button linking to `/auth?tab=register`.
+- Safety net: a daily scheduled reset re-runs the provisioner to wipe and re-seed the demo account's data, healing anything that ever slips through.
 
-New admin view, dark + neon, consistent with the existing Ultra Admin terminal:
-- **Telemetry row**: 3 glowing KPI cards — Total Invites, Conversion Rate % (`joined+rewarded / total`), Pending Rewards (`joined` not yet rewarded).
-- **The Ledger**: high-performance table of every referral — referrer (username/email), referred email, status badge, date, fingerprint.
-- **One-Click Fulfillment**: "Approuver la récompense" on each `joined` row → calls a new edge function that extends the referrer's active subscription by **30 days** (or creates one) and sets status `rewarded`, with audit fields.
-- **Anti-Fraud Radar**: any row whose referred `ip_fingerprint` matches the referrer's `signup_fingerprint` is highlighted red with a warning badge; the approve button requires confirmation on flagged rows.
+## Module 4 — Landing Page: remove waitlist, add 3 buttons
 
-## Edge Function — `approve-referral-reward`
-- Auth: validates caller is `platform_admin` (service-role client, `getUser` pattern used by `admin-manage-users`).
-- Input (zod): `referralId`.
-- Logic: load referral → guard status is `joined` → extend referrer's active `shop_subscriptions.expires_at` by 30 days (or insert active sub if none) → set referral `status='rewarded'`, `reward_granted_at`, `rewarded_by` → return updated totals.
+In `src/pages/LandingPage.tsx`:
+- Remove both waitlist email forms (hero section and final CTA section) and the `useJoinWaitlist` usage, plus the nav "Rejoindre la liste" buttons (desktop + mobile menu).
+- **Hero**: replace the email form with three buttons in a row (stacking on mobile):
+  1. **Essayer la démo** → triggers one-click demo login (primary glow button).
+  2. **Créer un compte** → `/auth?tab=register`.
+  3. **Connexion** → `/auth`.
+- **Navbar**: keep "Connexion" (ghost) and add "Essayer la démo" (primary). 
+- **Final CTA section**: replace the waitlist form with the same Demo + Inscription buttons.
+- A small loading state on the Demo button while the session is being created.
+
+The waitlist table, its hook, and the admin waitlist views are left intact (only removed from the public landing page).
 
 ---
 
-## Technical details / files
+## Technical Details
 
-**Migration** (`referrals` table, `referral_status` enum, `profiles.referral_code` + `signup_fingerprint`, trigger `on_onboarding_referral`, RLS, GRANTs, backfill `referral_code` for existing owners).
+**Database (migration)**
+- Add `is_demo boolean default false` to `profiles` (used to flag and to optionally tighten RLS later).
+- Insert/ensure `platform_settings` key `demo_user_id` (value set by the provisioner) and confirm anon read policy covers it.
 
-**New files**
-- `src/hooks/useReferrals.ts` — owner stats + link, admin ledger query, approve mutation (invokes edge fn).
-- `src/pages/Referrals.tsx` — owner viral page.
-- `src/components/admin/AdminGrowthEngineView.tsx` — admin terminal view.
-- `src/lib/fingerprint.ts` — lightweight hashed device/IP footprint helper.
-- `supabase/functions/approve-referral-reward/index.ts` — fulfillment function.
+**Edge functions**
+- `demo-provision` (admin client): create demo auth user if missing → set profile/shop_settings/subscription → delete + re-insert sample rows for the demo user → upsert `demo_user_id` in platform_settings. Idempotent; reused by the daily reset.
+- `demo-login`: ensures provisioned, generates a session for the demo user, returns tokens. CORS enabled, input validated, `verify_jwt = false`.
+- Schedule a daily cron to call `demo-provision` in reset mode.
 
-**Edited files**
-- `src/App.tsx` — add `/referrals` lazy route inside the protected `MainLayout` group.
-- `src/components/layout/AppSidebar.tsx` + `src/hooks/useTeam.ts` (`ALL_PAGES`) — add "Parrainage" nav entry.
-- `src/pages/Auth.tsx` — read `?ref=`, persist to localStorage, and after signup insert the `pending` referral row with fingerprint.
-- `src/pages/AdminDashboard.tsx` + `src/components/admin/AdminSidebar.tsx` — register the `growth_engine` view + sidebar item.
+**Frontend**
+- `src/hooks/useDemoMode.ts`: fetch `demo_user_id`, compare to `user.id`.
+- Wire demo read-only into `ImpersonationContext`/`useReadOnlyGuard` so `isReadOnly` is also true in demo mode.
+- `src/components/layout/ReadOnlyBanner.tsx`: show demo variant with "Créer mon compte" CTA.
+- `src/lib/demo.ts`: helper that calls `demo-login`, sets the session, and redirects.
+- `src/pages/LandingPage.tsx`: remove waitlist UI/logic, add the 3-button CTAs in navbar, hero, and final section.
 
-**Notes**
-- Fingerprint is a hash (no raw IP/PII stored client-side); exact IP-match radar is best-effort from the device footprint. If you want true server-side IP capture, that requires routing signup through an edge function — flagged as an optional follow-up.
-- Rewards are **manual** (admin one-click) per the spec; the trigger only marks `joined`, never auto-rewards.
+**Out of scope**
+- No changes to the Returns/RMA system, billing logic, or existing waitlist admin tooling.
+
+## Verification
+- Click Demo on the landing page → lands on a populated dashboard as "RepairPro Démo".
+- Attempting any edit (POS sale, add product, change repair) shows the read-only toast and is blocked.
+- Landing page no longer shows any waitlist email field; the three buttons route correctly.
+- Typecheck passes; demo banner shows with working "Créer mon compte" CTA.
