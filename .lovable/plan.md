@@ -1,45 +1,62 @@
-# Plan: Dark mode persistence + update checks
+# Plan: 3D update-check animation on landing open
 
-Three changes: (1) make the dark/light theme stick after refresh, (2) add a manual "Check for update" button beside the theme toggle, (3) replace the 2-day-old toast-style hash check with an automatic update check that runs when the main landing page opens.
+Replace the current text+spinner splash on the landing page with a polished 3D scene that visibly communicates three states: **checking**, **up to date** (brief, then auto-enter), and **update found** (mandatory refresh that clears cached data). Reuses the existing Three.js stack (`@react-three/fiber` + `drei`) already used by the login loader, with the same WebGL/lazy-load safety guards.
 
-## 1. Dark mode persists after refresh
+## Behavior
 
-Currently the header just toggles a CSS class with no storage, so every refresh resets to light.
+```text
+Landing opens
+   │
+   ▼
+[ CHECKING ]  glowing blue orb pulsing  ── "Vérification de la dernière version…"
+   │
+   ├── up to date ──►  [ UP TO DATE ]  orb morphs → green checkmark + ring burst
+   │                    ~1.5s, then auto-fade into the landing page
+   │
+   └── update found ─► [ UPDATE FOUND ] amber pulsing sync ring (rotating)
+                        "Nouvelle version disponible"
+                        Mandatory button: "Rafraîchir maintenant"
+                          → clears caches + reloads into the new version
+                        (no dismiss / no way past it until refreshed)
+```
 
-- Add a tiny inline script in `index.html` `<head>` that reads `localStorage["theme"]` and applies the `dark` class **before first paint** (prevents a light flash on reload).
-- In `MainLayout.tsx`, initialize `darkMode` state from `localStorage`/the current `<html>` class instead of always `false`, and on toggle write the choice (`"dark"` / `"light"`) to `localStorage` so it survives refresh and is shared across pages.
+Network safety: the check is still time-boxed (~2.5s). If the check times out or errors, it is treated as **up to date** so a visitor is never stranded — the brief checkmark plays and the site loads.
 
-Result: a shop owner who picks dark mode stays in dark mode after refresh and across navigation.
+## Visual direction (senior UX/UI)
 
-## 2. Manual "Check for update" button (beside theme toggle)
+- **Checking**: a single emissive sphere (icosahedron, smooth) in brand blue `#3B82F6`, slow rotation + soft scale "breathing", faint particle/wireframe halo. Subtle dark backdrop matching the Premium Dark theme (zinc-950) with a radial blue glow.
+- **Up to date**: the orb shifts color to emerald `#10B981`, a 3D checkmark draws in, and a thin ring expands outward and fades — a satisfying "confirmed" beat. Caption "Vous êtes à jour ✓". Auto-advances after ~1.5s.
+- **Update found**: orb shifts to amber `#F59E0B`, two concentric rings rotate/pulse (a "sync" feel), with a clear headline + subtext explaining a refresh is required to load the newest version and clear cached data. Primary glowing button only.
+- Motion uses gentle easing; respects `prefers-reduced-motion` by falling back to the lightweight CSS version (no spinning 3D).
+- Graceful fallback: if WebGL is unavailable or the 3D chunk fails, a CSS-only equivalent (colored pulsing logo + checkmark/sync icon) renders instead — same three states, same copy.
 
-- Add a refresh-style icon button in the `MainLayout` header, right next to the sun/moon toggle.
-- Clicking it shows a "Recherche de mises à jour…" toast, then:
-  - **Update found:** toast "Mise à jour disponible" with an **Actualiser** action that reloads into the new version.
-  - **Already current:** toast "Vous êtes à jour ✓".
-- The check asks the service worker for the newest deployment and compares the build version; a small helper for this is added to `src/lib/swUpdate.ts` and reused by the button.
+## Technical implementation
 
-## 3. Automatic update check when the landing page opens (replaces the old toast check)
+**1. `src/lib/swUpdate.ts` — expose status instead of auto-reloading on landing**
+- Add `getUpdateStatus(timeoutMs = 2500): Promise<"current" | "update"`> that runs the same hashed-entry comparison as `checkForUpdateOnLoad` but **returns the result** rather than reloading. Returns `"current"` on timeout/error/preview/iframe.
+- Keep `applyUpdateNow()` (already clears caches + reloads once) as the action the refresh button calls.
+- Leave `checkForUpdateOnLoad` in place for backward compatibility but the landing page will switch to `getUpdateStatus` so it can drive the UI (the old function auto-reloaded, which conflicts with showing an "update found" prompt).
 
-The current mechanism (added 2 days ago) waits in the background and pops a toast. You want the check to happen up front when someone opens the site.
+**2. New `src/components/landing/UpdateCheckCanvas.tsx` (lazy-loaded 3D)**
+- React Three Fiber scene accepting a `state: "checking" | "current" | "update"` prop.
+- Single orb mesh whose color/emissive animates per state; checkmark mesh + expanding ring for `current`; dual rotating rings for `update`. Uses `useFrame` for animation; `dpr={[1,1.5]}`, `powerPreference: "low-power"` like `BlueprintCanvas`.
 
-- On the **main landing page** load, before showing the normal content, run a quick version check against the latest deployed `index.html`/build stamp.
-- While checking, show a brief **"Chargement de la dernière version…"** splash (your "block with quick splash" choice). The check is time-boxed (~2.5s max) so a slow network never leaves users stuck on the splash.
-- If a newer version is detected, caches are cleared and the page reloads **once** into the latest version before the app runs. A one-time guard prevents any reload loop.
-- If it is already current (or the check times out), the landing page renders normally.
+**3. New `src/components/landing/UpdateCheckOverlay.tsx`**
+- Full-screen overlay that owns the state machine and copy. Lazy-loads `UpdateCheckCanvas` inside a `Suspense` + WebGL check + error boundary (mirroring `BlueprintLoader`), with a CSS fallback for reduced-motion / no-WebGL.
+- Props: `state`, and `onRefresh` (calls `applyUpdateNow`). Renders the mandatory "Rafraîchir maintenant" button only in the `update` state. Calls an `onDone` after the ~1.5s success beat in the `current` state.
 
-This keeps the existing background toast available inside the app as a safety net, but the primary update gate now happens at the landing page entry point.
-
-## Technical notes
-
-- Reuse and extend `src/lib/swUpdate.ts` (no new SW file) — it already guards against running inside the Lovable preview/iframe; the new manual check and landing splash respect those same guards so the editor preview is never affected.
-- Theme: `localStorage` key `theme`; inline head script + `MainLayout` stay in sync; no design-token or color changes.
-- Landing splash: lightweight overlay rendered by `LandingPage.tsx`, controlled by a small `checkForUpdateOnLoad()` helper with a hard timeout and a `sessionStorage` reload guard.
-- `__APP_VERSION__` (build timestamp from `vite.config.ts`) is the version signal compared during checks.
+**4. `src/pages/LandingPage.tsx`**
+- Replace the current `checkForUpdateOnLoad` effect + plain splash (lines ~63–74 and ~118–129) with:
+  - state `phase: "checking" | "current" | "update" | "done"`.
+  - On mount call `getUpdateStatus(2500)`; set `update` or play the `current` success beat then set `done`.
+  - While `phase !== "done"`, render `<UpdateCheckOverlay …/>` instead of the page; once `done`, render the landing normally.
+- Preview/iframe guard already short-circuits `getUpdateStatus` to `"current"`, so the editor preview just flashes the brief success beat (or we skip straight to `done` in preview to avoid noise).
 
 ## Files touched
 
-- `index.html` — pre-paint theme script.
-- `src/components/layout/MainLayout.tsx` — persistent dark mode + manual update button.
-- `src/lib/swUpdate.ts` — `checkForUpdate()` (manual) and `checkForUpdateOnLoad()` (landing) helpers.
-- `src/pages/LandingPage.tsx` — splash + on-open update check.
+- `src/lib/swUpdate.ts` — add `getUpdateStatus()` (status-returning check).
+- `src/components/landing/UpdateCheckCanvas.tsx` — new 3D scene (orb / checkmark / sync rings).
+- `src/components/landing/UpdateCheckOverlay.tsx` — new overlay + state copy + buttons + fallbacks.
+- `src/pages/LandingPage.tsx` — drive the three-state overlay on open.
+
+No database, backend, or design-token changes. No new dependencies (Three.js stack already installed).
