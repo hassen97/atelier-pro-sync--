@@ -14,7 +14,8 @@ import {
   Sparkles, Mail, Loader2
 } from "lucide-react";
 import { SEO } from "@/components/seo/SEO";
-import { checkForUpdateOnLoad } from "@/lib/swUpdate";
+import { getUpdateStatus, applyUpdateNow } from "@/lib/swUpdate";
+import { UpdateCheckOverlay } from "@/components/landing/UpdateCheckOverlay";
 import repairProLogo from "@/assets/repairpro-logo.png";
 
 /* ── animation variants ── */
