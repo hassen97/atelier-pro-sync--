@@ -29,7 +29,12 @@ import { useUnreadMessageCount } from "@/hooks/useCommunity";
 export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark"),
+  );
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   // Defer the language chooser so it never intercepts the first paint after login.
   const [deferredReady, setDeferredReady] = useState(false);
   const isMobile = useIsMobile();
