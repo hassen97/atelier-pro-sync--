@@ -38,6 +38,7 @@ export function RegisterHistoryTab() {
   const { data: sessions, isLoading } = useRegisterHistory();
   const [detail, setDetail] = useState<RegisterHistoryRow | null>(null);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const [xlsBusy, setXlsBusy] = useState<string | null>(null);
 
   const shopName = (settings as any).shop_name || "Boutique";
 
