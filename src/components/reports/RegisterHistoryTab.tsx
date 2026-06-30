@@ -306,6 +306,30 @@ export function RegisterHistoryTab() {
                   </Section>
                 )}
 
+                {rd.byProduct && rd.byProduct.length > 0 && (
+                  <Section title="Ventes par produit">
+                    {rd.byProduct.map((p, i) => (
+                      <Row
+                        key={`${p.product_name}-${i}`}
+                        left={`${p.product_name} x${p.quantity}`}
+                        right={format(p.revenue)}
+                      />
+                    ))}
+                  </Section>
+                )}
+
+                {rd.repairs?.rows && rd.repairs.rows.length > 0 && (
+                  <Section title="Réparations payées">
+                    {rd.repairs.rows.map((r, i) => (
+                      <Row
+                        key={`${r.label}-${i}`}
+                        left={r.customer ? `${r.label} — ${r.customer}` : r.label}
+                        right={format(r.amount)}
+                      />
+                    ))}
+                  </Section>
+                )}
+
                 {rd.byPaymentMethod.length > 0 && (
                   <Section title="Modes de paiement">
                     {rd.byPaymentMethod.map((p) => (
