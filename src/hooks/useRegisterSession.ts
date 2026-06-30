@@ -11,6 +11,44 @@ export interface SessionTotals {
   net: number;
 }
 
+export interface ClosingReportCategory {
+  category: string;
+  revenue: number;
+  items: number;
+}
+export interface ClosingReportPayment {
+  method: string;
+  revenue: number;
+  count: number;
+}
+export interface ClosingReportReturn {
+  product_name: string;
+  quantity: number;
+  refund_amount: number;
+  refund_method: string | null;
+}
+export interface ClosingReportExpense {
+  category: string;
+  amount: number;
+}
+export interface ClosingReport {
+  sessionId: string | null;
+  openedAt: string | null;
+  byCategory: ClosingReportCategory[];
+  byPaymentMethod: ClosingReportPayment[];
+  repairs: { total: number; count: number };
+  returns: { total: number; count: number; rows: ClosingReportReturn[] };
+  expenses: { total: number; rows: ClosingReportExpense[] };
+  totals: {
+    sales: number;
+    repairs: number;
+    returns: number;
+    expenses: number;
+    net: number;
+    itemsSold: number;
+  };
+}
+
 /**
  * Returns the currently open register session for the shop, creating one if
  * none exists. The shop is identified by the effective (owner) user id.
