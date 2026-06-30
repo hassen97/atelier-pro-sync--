@@ -51,10 +51,22 @@ export function RegisterHistoryTab() {
       value: format(c.revenue),
       meta: `${c.items}`,
     }));
+  const prodRows = (row: RegisterHistoryRow): ClosingBreakdownRow[] =>
+    (row.report_data?.byProduct || []).map((p) => ({
+      label: p.product_name,
+      value: format(p.revenue),
+      meta: `${p.quantity}`,
+    }));
   const payRows = (row: RegisterHistoryRow): ClosingBreakdownRow[] =>
     (row.report_data?.byPaymentMethod || []).map((p) => ({
       label: p.method,
       value: format(p.revenue),
+    }));
+  const repairBreakdown = (row: RegisterHistoryRow): ClosingBreakdownRow[] =>
+    (row.report_data?.repairs.rows || []).map((rp) => ({
+      label: rp.label,
+      value: format(rp.amount),
+      meta: rp.customer || undefined,
     }));
 
   const handleReprint = (row: RegisterHistoryRow) => {
