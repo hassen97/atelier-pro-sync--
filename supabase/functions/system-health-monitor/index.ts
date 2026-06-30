@@ -25,7 +25,9 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const cronSecret = Deno.env.get("HEALTH_MONITOR_SECRET");
+    const cronSecret =
+      Deno.env.get("HEALTH_CRON_SECRET") ||
+      Deno.env.get("HEALTH_MONITOR_SECRET");
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
 
