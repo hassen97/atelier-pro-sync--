@@ -103,29 +103,7 @@ export default function LandingPage() {
     }
   };
 
-  const handleWaitlistSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = waitlistEmail.trim();
-    if (!email || !email.includes("@")) return;
 
-    // Derive a candidate username from the local part of the email
-    const localPart = email.split("@")[0] || "";
-    let username = localPart.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/^_+|_+$/g, "");
-    if (username.length < 3) username = (username + "_user").slice(0, 20);
-    if (username.length > 20) username = username.slice(0, 20);
-
-    const goToSignup = () => {
-      setWaitlistEmail("");
-      const params = new URLSearchParams({ tab: "register", email, username });
-      navigate(`/auth?${params.toString()}`);
-    };
-
-    joinWaitlist.mutate(email, {
-      // Redirect on success AND on duplicate (already on the waitlist)
-      onSuccess: goToSignup,
-      onError: goToSignup,
-    });
-  };
 
   const displayPlans = plans || [];
 
