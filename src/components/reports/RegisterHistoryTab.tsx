@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Printer, History, Wallet, FileDown, Eye, Loader2 } from "lucide-react";
+import { Printer, History, Wallet, FileDown, Eye, Loader2, Sheet } from "lucide-react";
 import {
   Table,
   TableBody,
