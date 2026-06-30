@@ -239,6 +239,19 @@ export function RegisterHistoryTab() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleExcel(row)}
+                          disabled={xlsBusy === row.id || !row.report_data}
+                          title="Exporter en Excel"
+                        >
+                          {xlsBusy === row.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Sheet className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleReprint(row)}
                           title="Réimprimer (80mm)"
                         >
