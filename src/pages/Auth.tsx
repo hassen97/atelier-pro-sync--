@@ -145,6 +145,8 @@ export default function Auth() {
       }
 
       const { data: sessionData } = await supabase.auth.getSession();
+      let isOwnerLogin = false;
+      let userIdForLogo: string | null = null;
       if (sessionData.session?.user) {
         const userId = sessionData.session.user.id;
 
@@ -188,14 +190,51 @@ export default function Auth() {
           setError("Votre compte est verrouillé par l'administrateur. Veuillez le contacter.");
           return;
         }
+
+        // Owner login → show the 3D "Digital Blueprint" transition.
+        isOwnerLogin = !isEmployee;
+        userIdForLogo = userId;
       }
+
       // Invalidate onboarding cache to force fresh fetch
       queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
       const searchParams = new URLSearchParams(location.search);
       const redirect = searchParams.get("redirect");
       const from = redirect || (location.state as { from?: Location })?.from?.pathname || "/dashboard";
+
+      // Premium 3D loader for shop owners going to the dashboard.
+      if (isOwnerLogin && from === "/dashboard") {
+        const startedAt = Date.now();
+        setLoaderLogo(repairProLogo);
+        setShowLoader(true);
+
+        // Fetch the shop logo (best-effort) so it appears in the blueprint.
+        if (userIdForLogo) {
+          try {
+            const { data: shop } = await supabase
+              .from("shop_settings")
+              .select("logo_url")
+              .eq("user_id", userIdForLogo)
+              .maybeSingle();
+            if (shop?.logo_url) setLoaderLogo(shop.logo_url);
+          } catch {
+            /* keep default logo */
+          }
+        }
+
+        // Minimum display so the animation reads as intentional, then navigate.
+        const elapsed = Date.now() - startedAt;
+        const minDisplay = 1100;
+        if (elapsed < minDisplay) {
+          await new Promise((r) => setTimeout(r, minDisplay - elapsed));
+        }
+        navigate(from, { replace: true });
+        return;
+      }
+
       navigate(from, { replace: true });
     } catch (err) {
+      setShowLoader(false);
       setError(
         (err as Error)?.message ||
           "Connexion au serveur impossible. Vérifiez votre connexion et réessayez.",
