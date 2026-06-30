@@ -356,6 +356,7 @@ export default function Auth() {
 
   return (
     <main className="min-h-screen flex items-center justify-center relative overflow-hidden bg-zinc-950 p-4">
+      <BlueprintLoader visible={showLoader} logoUrl={loaderLogo} />
       <SEO
         title="Connexion / Inscription — RepairPro"
         description="Connectez-vous à RepairPro ou créez votre compte d'atelier de réparation mobile."
