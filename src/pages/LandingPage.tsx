@@ -143,14 +143,25 @@ export default function LandingPage() {
             <a href="#pricing" className="text-sm transition-colors" style={{ color: "hsl(240 5% 55%)" }} onMouseEnter={e => (e.currentTarget.style.color = "hsl(0 0% 98%)")} onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 5% 55%)")}>
               Tarifs
             </a>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={startDemo}
+              disabled={demoLoading}
+              className="text-sm"
+              style={{ color: "hsl(217 91% 70%)" }}
+            >
+              {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><PlayCircle className="mr-1.5 h-4 w-4" /> Démo</>}
+            </Button>
             <Link to="/auth">
               <Button variant="ghost" size="sm" className="text-sm" style={{ color: "hsl(240 5% 65%)" }}>Connexion</Button>
             </Link>
-            <a href="#waitlist">
+            <Link to="/auth?tab=register">
               <Button size="sm" className="lp-glow-btn rounded-full px-5 text-sm font-medium" style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 45%))", color: "white" }}>
-                Rejoindre la liste
+                Créer un compte
               </Button>
-            </a>
+            </Link>
+
           </div>
 
           <button className="md:hidden p-2 relative z-10" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu" style={{ color: "hsl(240 5% 65%)" }}>
