@@ -52,6 +52,7 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [checkingVersion, setCheckingVersion] = useState(true);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { scrollYProgress } = useScroll();
