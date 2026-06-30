@@ -139,6 +139,21 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/admin" replace />;
   }
 
+  // Maintenance mode: block non-admins with a full maintenance page.
+  if (!isPlatformAdmin && maintenanceOn) {
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        }
+      >
+        <MaintenancePage />
+      </Suspense>
+    );
+  }
+
   if (!isPlatformAdmin && (pagesLoading || onboardingLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
