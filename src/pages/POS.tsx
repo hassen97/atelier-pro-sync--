@@ -528,6 +528,12 @@ export default function POS() {
 
       <CloseRegisterDialog open={closeRegisterOpen} onOpenChange={setCloseRegisterOpen} />
 
+      <CategoryCustomizeDialog
+        open={!!customizeTarget}
+        onOpenChange={(o) => { if (!o) setCustomizeTarget(null); }}
+        category={customizeTarget}
+      />
+
       <div className="grid gap-6 lg:grid-cols-4 lg:h-[calc(100%-5rem)]">
         {/* Products & Repairs Section - Full Width */}
         <Tabs defaultValue="products" className="lg:col-span-3 flex flex-col min-h-0">
