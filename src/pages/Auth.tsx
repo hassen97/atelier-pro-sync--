@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { SEO } from "@/components/seo/SEO";
+import { BlueprintLoader } from "@/components/auth/BlueprintLoader";
 import repairProLogo from "@/assets/repairpro-logo.png";
 
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY || "";
@@ -43,6 +44,9 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // 3D "Digital Blueprint" login transition
+  const [showLoader, setShowLoader] = useState(false);
+  const [loaderLogo, setLoaderLogo] = useState<string | null>(null);
   const [adminWhatsapp, setAdminWhatsapp] = useState("");
   const [signupCooldown, setSignupCooldown] = useState(0);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -141,6 +145,8 @@ export default function Auth() {
       }
 
       const { data: sessionData } = await supabase.auth.getSession();
+      let isOwnerLogin = false;
+      let userIdForLogo: string | null = null;
       if (sessionData.session?.user) {
         const userId = sessionData.session.user.id;
 
@@ -184,14 +190,51 @@ export default function Auth() {
           setError("Votre compte est verrouillé par l'administrateur. Veuillez le contacter.");
           return;
         }
+
+        // Owner login → show the 3D "Digital Blueprint" transition.
+        isOwnerLogin = !isEmployee;
+        userIdForLogo = userId;
       }
+
       // Invalidate onboarding cache to force fresh fetch
       queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
       const searchParams = new URLSearchParams(location.search);
       const redirect = searchParams.get("redirect");
       const from = redirect || (location.state as { from?: Location })?.from?.pathname || "/dashboard";
+
+      // Premium 3D loader for shop owners going to the dashboard.
+      if (isOwnerLogin && from === "/dashboard") {
+        const startedAt = Date.now();
+        setLoaderLogo(repairProLogo);
+        setShowLoader(true);
+
+        // Fetch the shop logo (best-effort) so it appears in the blueprint.
+        if (userIdForLogo) {
+          try {
+            const { data: shop } = await supabase
+              .from("shop_settings")
+              .select("logo_url")
+              .eq("user_id", userIdForLogo)
+              .maybeSingle();
+            if (shop?.logo_url) setLoaderLogo(shop.logo_url);
+          } catch {
+            /* keep default logo */
+          }
+        }
+
+        // Minimum display so the animation reads as intentional, then navigate.
+        const elapsed = Date.now() - startedAt;
+        const minDisplay = 1100;
+        if (elapsed < minDisplay) {
+          await new Promise((r) => setTimeout(r, minDisplay - elapsed));
+        }
+        navigate(from, { replace: true });
+        return;
+      }
+
       navigate(from, { replace: true });
     } catch (err) {
+      setShowLoader(false);
       setError(
         (err as Error)?.message ||
           "Connexion au serveur impossible. Vérifiez votre connexion et réessayez.",
@@ -313,6 +356,7 @@ export default function Auth() {
 
   return (
     <main className="min-h-screen flex items-center justify-center relative overflow-hidden bg-zinc-950 p-4">
+      <BlueprintLoader visible={showLoader} logoUrl={loaderLogo} />
       <SEO
         title="Connexion / Inscription — RepairPro"
         description="Connectez-vous à RepairPro ou créez votre compte d'atelier de réparation mobile."

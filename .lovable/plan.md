@@ -1,81 +1,74 @@
-# God Mode — Alerts, Emergency Maintenance & Maintenance Mode
+## Goal
 
-Three capabilities layered onto the existing "Santé Système" admin view:
+Show a premium 3D "Digital Blueprint" loading screen the moment a shop owner clicks **Login**, while authentication and the first dashboard data load happen in the background — then fade smoothly into the dashboard. It must never slow down login: the 3D libraries load lazily and a lightweight CSS-only version covers any delay or WebGL failure.
 
-1. **Automatic alerts** (email + webhook) when slow queries or dead-tuple bloat cross configurable thresholds.
-2. **Manual emergency action** to run `VACUUM ANALYZE` or `ANALYZE` (admin chooses per run) on a bloated table directly from the dashboard.
-3. **Enforced maintenance mode** — when ON, only platform admins can use the app; everyone else sees a full maintenance page.
+## How it behaves
 
-Defaults (no value was given, so these are seeded and editable in the dashboard): slow query **> 5s**, dead-tuple ratio **> 30%**, and a minimum table size of **50 MB** so tiny tables don't generate noise.
+```text
+Click "Connexion"
+   │
+   ▼
+Full-screen loader appears INSTANTLY (CSS glowing logo pulse)
+   │  (auth runs in background)
+   ├─ 3D bundle ready within 500ms? ─► swap CSS pulse → 3D holographic logo
+   │                                   (rotation + glowing pulse)
+   └─ slower / WebGL fails / no logo ─► keep beautiful CSS fallback
+   │
+   ▼
+Auth success + dashboard data prefetched
+   │
+   ▼
+Loader fades out → navigate to /dashboard (fades in)
+```
 
----
+If login fails, the loader disappears and the existing error message shows as today.
 
-## Phase 1 — Backend (database)
+## What gets built
 
-One migration adding:
+### 1. New dependencies (React 18 compatible versions)
+- `@react-three/fiber@^8.18`
+- `@react-three/drei@^9.122.0`
+- `three@^0.160`
 
-- **`detect_health_issues(slow_threshold_s, bloat_ratio, min_size_mb)`** — `SECURITY DEFINER`, returns JSON `{ slow_queries: [...], bloated_tables: [...] }`. Authorization: allowed when `auth.uid()` is a `platform_admin` **or** when `auth.uid()` is null (service-role/cron context); raises otherwise. Granted to `authenticated` and `service_role`. Used by both the cron monitor and the dashboard "test" button.
-- **`is_maintenance_mode()`** — `SECURITY DEFINER` returning boolean from the `maintenance_mode` row. Granted to `authenticated` and `anon` so the app can check the flag without exposing the whole `platform_settings` table.
-- **Seed `platform_settings` rows** (key-value, matching existing convention): `health_alerts_enabled` (`false`), `health_alert_email` (empty — falls back to existing `admin_notify_email`), `health_alert_webhook_url` (empty), `health_slow_query_threshold_s` (`5`), `health_bloat_ratio_threshold` (`30`), `health_bloat_min_size_mb` (`50`), `health_alert_last_sent_at` (internal dedup).
+These are only ever pulled into the bundle through a lazy import, so the main login screen stays light.
 
-A generated secret `HEALTH_MONITOR_SECRET` is created so the cron job can authenticate to the monitor function.
+### 2. `src/components/auth/BlueprintLoaderFallback.tsx` (CSS-only, zero deps)
+- Full-screen `bg-zinc-950` overlay matching the auth theme (grid + blue radial glows).
+- The shop logo (or the default RepairPro logo) centered with a glowing/pulsing animation using existing Tailwind animation tokens (`pulse`, custom glow via `box-shadow`/`drop-shadow`).
+- A short status line ("Préparation de votre atelier…").
+- This renders immediately and is also the Suspense fallback + WebGL/error fallback.
 
-## Phase 2 — Edge functions
+### 3. `src/components/auth/BlueprintCanvas.tsx` (the heavy 3D part, lazy-loaded)
+- A `@react-three/fiber` `<Canvas>` (low DPR cap, `frameloop` tuned) sized to the overlay.
+- `useTexture` (drei) loads `logo_url` and caches it in the browser; the image is also preloaded so it appears instantly.
+- **Logo:** a single low-poly `planeGeometry` displaying the logo texture with a transparent, emissive/holographic material (additive glow) — keeps it as a glass-morphism blueprint.
+- **Blueprint accent:** one low-poly wireframe `icosahedronGeometry` behind the logo for the "tech blueprint" vibe.
+- Animation via `useFrame`: subtle Y-axis rotation + a sine-based glowing pulse (emissive intensity / scale). Geometry stays minimal for 60 FPS on cheap Android tablets.
+- Internal WebGL error boundary: if context creation throws, it signals the parent to drop back to the CSS fallback.
 
-**`system-health-monitor`** (new)
-- Accepts either a platform-admin JWT (dashboard "Tester l'alerte" button) **or** a matching `x-cron-secret` header (cron).
-- Reads alert settings, calls `detect_health_issues`, and if any threshold is breached: POSTs a JSON payload to the configured webhook URL (Slack/Discord/custom) **and** sends an email to the alert recipient via the existing email queue (`enqueue_email`), falling back to `admin_notify_email`.
-- Dedup: skips re-sending if `health_alert_last_sent_at` is within a cooldown window (e.g. 30 min); updates it on send. Returns a summary so the dashboard test button can report what was triggered.
+### 4. `src/components/auth/BlueprintLoader.tsx` (orchestrator)
+- Props: `logoUrl: string | null`, `visible: boolean`, optional `onReady`.
+- Renders `BlueprintLoaderFallback` immediately.
+- Uses `React.lazy(() => import("./BlueprintCanvas"))` inside `<Suspense fallback={<BlueprintLoaderFallback />}>`.
+- A **500ms timer + WebGL capability check**: only mount the lazy 3D canvas if WebGL is supported and the bundle resolves in time; otherwise stay on the CSS fallback. (The CSS fallback is always visible underneath, so the swap is seamless and there is never a blank frame.)
+- Wrapped in an error boundary so any 3D failure silently falls back to CSS.
+- Fade in/out controlled by `visible` using existing `animate-fade-in` / opacity transitions.
 
-**`admin-db-maintenance`** (new)
-- Requires a platform-admin JWT (same role check pattern as `admin-manage-users`).
-- Connects via the `SUPABASE_DB_URL` secret using a Postgres driver (so `VACUUM` runs outside a transaction, which RPC/PostgREST can't do).
-- Validates the requested table name against the live list from `pg_stat_user_tables` (whitelist — no string injection) and the requested mode (`vacuum_analyze` | `analyze`), then runs `VACUUM (ANALYZE) <table>` or `ANALYZE <table>`.
+### 5. Integrate into `src/pages/Auth.tsx`
+- Add `showLoader` state. In `handleLogin`, set `showLoader = true` right after the button is pressed (before/around `signIn`) so the overlay appears instantly.
+- After successful sign-in, fetch the shop's `logo_url` (single lightweight query on `shop_settings.logo_url` for the signed-in user) and pass it to the loader. Default to the bundled RepairPro logo if none.
+- Prefetch the dashboard's primary data via `queryClient` so the dashboard paints immediately when we navigate (this is the "fetch dashboard data in the background" step).
+- Keep a small minimum display time (~900ms) so the animation reads as intentional, then `navigate("/dashboard")`.
+- On any auth error: set `showLoader = false` and show the existing error UI unchanged — no behavior regression.
+- Render `<BlueprintLoader visible={showLoader} logoUrl={...} />` as a top-level overlay in the Auth page.
 
-**Cron**: a `pg_cron` + `pg_net` job (created via the insert tool since it embeds the project URL + secret) calls `system-health-monitor` every 5 minutes with the `x-cron-secret` header.
+## Scope / assumptions
+- Applies to the **owner login** path (the "fully setup shop" case). Employee login and registration keep today's plain spinner unless you want it everywhere.
+- Logo source is the existing `shop_settings.logo_url` (a PNG/image), shown on a textured plane — not vector extrusion — which is the reliable, low-poly approach.
+- No backend/schema changes. Frontend-only.
 
-## Phase 3 — Frontend
-
-**`src/hooks/useSystemHealth.ts`** — add:
-- `useHealthAlertSettings()` query + `useSaveHealthAlertSettings()` mutation (read/write the `platform_settings` rows).
-- `useTestHealthAlert()` — invokes `system-health-monitor` with the admin session.
-- `useRunMaintenance()` — invokes `admin-db-maintenance` with `{ table, mode }`, then invalidates the table-sizes query so bloat numbers refresh.
-- `useMaintenanceModeFlag()` — calls `is_maintenance_mode()` (for the global guard), polled lightly.
-
-**`src/components/admin/AdminSystemHealthView.tsx`**
-- New **"Alertes automatiques"** card: enable switch, alert email, webhook URL, three threshold inputs (slow seconds, bloat %, min size MB), Save button, and a "Tester l'alerte" button that surfaces the monitor's result.
-- Bloat table: add an actions column with a small dropdown per row — **VACUUM ANALYZE** and **ANALYZE** — with a confirm step and a spinner while running (`useRunMaintenance`). Surfaced on every row but emphasized on bloated (>20%) rows.
-
-**Maintenance enforcement**
-- New `src/pages/Maintenance.tsx` — branded full-screen "maintenance en cours" page (dark God Mode aesthetic, sign-out button).
-- `src/components/auth/ProtectedRoute.tsx`: after the existing admin check, read `useMaintenanceModeFlag()`. If maintenance is ON and the user is **not** a platform admin, render the maintenance page instead of the requested route. Platform admins pass through unaffected. The flag check is gated so it never delays admin routing.
-- The existing maintenance toggle in the "Zone de danger" card stays as the on/off control.
-
-## Phase 4 — Validation
-
-- Run the migration; confirm the two functions compile and `detect_health_issues` returns data for an admin and is rejected for a non-admin.
-- Verify `admin-db-maintenance` runs `ANALYZE` on a real table and rejects unknown table names / non-admins.
-- Confirm the alert card persists settings and the test button reports webhook/email outcomes.
-- Toggle maintenance mode and confirm a non-admin session is routed to the maintenance page while an admin keeps full access.
-- Typecheck the changed components/hook.
-
----
-
-## Technical notes
-
-- `VACUUM` cannot run inside a function or transaction, which is why the emergency action uses a direct DB connection in an edge function rather than an RPC.
-- `detect_health_issues` and `is_maintenance_mode` are `SECURITY DEFINER` with explicit `SET search_path` and an in-function authorization check, consistent with the existing `get_db_table_sizes` / `has_role` pattern.
-- Alerts reuse the existing email queue and admin notify email so no new email infrastructure is introduced; the webhook is a plain JSON POST.
-- Maintenance mode is read through a dedicated `SECURITY DEFINER` boolean function so non-admins can detect it without broad `platform_settings` read access.
-
-## Files
-
-- **Migration** (new): `detect_health_issues`, `is_maintenance_mode`, seed settings rows.
-- **Insert** (new): `pg_cron` job for the monitor.
-- `supabase/functions/system-health-monitor/index.ts` (new).
-- `supabase/functions/admin-db-maintenance/index.ts` (new).
-- `src/hooks/useSystemHealth.ts`: alert settings, test, maintenance, run-maintenance hooks.
-- `src/components/admin/AdminSystemHealthView.tsx`: alerts card + per-table VACUUM/ANALYZE actions.
-- `src/pages/Maintenance.tsx` (new): maintenance page.
-- `src/components/auth/ProtectedRoute.tsx`: enforce maintenance mode for non-admins.
-- A generated `HEALTH_MONITOR_SECRET` secret.
+## Performance guarantees addressed
+- **Lazy loading:** 3D libs load only via `React.lazy` after the login click, never blocking the login form's initial render. They'll also land in their own Vite chunk (manualChunks can be extended for `three`/`@react-three`).
+- **Texture caching:** `useTexture` + browser image cache; preloaded logo URL for instant reuse on return logins.
+- **Graceful fallback:** CSS-only pulse for >500ms load, unsupported WebGL, or any 3D error.
+- **Low poly:** one plane + one icosahedron, capped DPR → 60 FPS target on low-end tablets.
