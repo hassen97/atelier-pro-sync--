@@ -2362,12 +2362,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      close_register_session:
-        | { Args: { _shop_id: string }; Returns: string }
-        | {
-            Args: { _closed_by_name?: string; _report?: Json; _shop_id: string }
-            Returns: string
-          }
+      close_register_session: {
+        Args: { _closed_by_name?: string; _report?: Json; _shop_id: string }
+        Returns: string
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
