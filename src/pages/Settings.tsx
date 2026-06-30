@@ -579,7 +579,7 @@ export default function Settings() {
                   onOpenChange={setLogoOptimizerOpen}
                   userId={user.id}
                   currentLogoUrl={settings.logo_url}
-                  onSaved={(url) => saveSettings({ logo_url: url })}
+                  onSaved={async (url) => { await saveSettings({ logo_url: url }); }}
                 />
               )}
 
