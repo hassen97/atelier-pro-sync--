@@ -125,8 +125,9 @@ Deno.serve(async (req) => {
         sessionId: null,
         openedAt: null,
         byCategory: [],
+        byProduct: [] as ProductAgg[],
         byPaymentMethod: [],
-        repairs: { total: 0, count: 0 },
+        repairs: { total: 0, count: 0, rows: [] as RepairRow[] },
         returns: { total: 0, count: 0, rows: [] as ReturnRow[] },
         expenses: { total: 0, rows: [] as ExpenseAgg[] },
         totals: {
