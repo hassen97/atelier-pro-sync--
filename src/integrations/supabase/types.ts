@@ -2328,6 +2328,14 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      detect_health_issues: {
+        Args: {
+          bloat_ratio?: number
+          min_size_mb?: number
+          slow_threshold_s?: number
+        }
+        Returns: Json
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -2376,6 +2384,7 @@ export type Database = {
         Args: { _conv_id: string; _user_id: string }
         Returns: boolean
       }
+      is_maintenance_mode: { Args: never; Returns: boolean }
       is_team_member: {
         Args: { _member_id: string; _owner_id: string }
         Returns: boolean
