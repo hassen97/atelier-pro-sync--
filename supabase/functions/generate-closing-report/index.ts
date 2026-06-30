@@ -165,13 +165,14 @@ Deno.serve(async (req) => {
       saleItems = (items as any[]) || [];
     }
 
-    // Resolve product -> category names
+    // Resolve product -> category names and product display names
     const productIds = [...new Set(saleItems.map((i) => i.product_id).filter(Boolean))] as string[];
     const productCat = new Map<string, string | null>();
+    const productName = new Map<string, string>();
     if (productIds.length) {
       const { data: products } = await admin
         .from("products")
-        .select("id, category_id")
+        .select("id, name, category_id")
         .in("id", productIds);
       const catIds = [...new Set((products || []).map((p) => p.category_id).filter(Boolean))] as string[];
       const catName = new Map<string, string>();
@@ -182,11 +183,13 @@ Deno.serve(async (req) => {
       (products || []).forEach((p) => {
         const cid = p.category_id as string | null;
         productCat.set(p.id as string, cid ? catName.get(cid) || "Sans catégorie" : "Sans catégorie");
+        productName.set(p.id as string, (p.name as string) || "Article");
       });
     }
 
-    // ---- Aggregate by category + total items ----
+    // ---- Aggregate by category + by product + total items ----
     const catMap = new Map<string, CategoryAgg>();
+    const prodMap = new Map<string, ProductAgg>();
     let itemsSold = 0;
     for (const it of saleItems) {
       const cat = (it.product_id && productCat.get(it.product_id)) || "Sans catégorie";
@@ -197,8 +200,16 @@ Deno.serve(async (req) => {
       agg.revenue += line;
       agg.items += qty;
       catMap.set(cat, agg);
+
+      const pname = (it.product_id && productName.get(it.product_id)) || "Article divers";
+      const pkey = (it.product_id as string) || pname;
+      const pagg = prodMap.get(pkey) || { product_name: pname, quantity: 0, revenue: 0 };
+      pagg.quantity += qty;
+      pagg.revenue += line;
+      prodMap.set(pkey, pagg);
     }
     const byCategory = [...catMap.values()].sort((a, b) => b.revenue - a.revenue);
+    const byProduct = [...prodMap.values()].sort((a, b) => b.revenue - a.revenue);
 
     // ---- Aggregate by payment method (sales only) ----
     const payMap = new Map<string, PaymentAgg>();
