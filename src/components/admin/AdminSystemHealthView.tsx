@@ -295,7 +295,8 @@ export function AdminSystemHealthView() {
                   <th className="py-2 px-4 font-medium text-right">Taille</th>
                   <th className="py-2 px-4 font-medium text-right">Lignes</th>
                   <th className="py-2 px-4 font-medium text-right">Mortes</th>
-                  <th className="py-2 pl-4 font-medium text-right">Bloat</th>
+                  <th className="py-2 px-4 font-medium text-right">Bloat</th>
+                  <th className="py-2 pl-4 font-medium text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
