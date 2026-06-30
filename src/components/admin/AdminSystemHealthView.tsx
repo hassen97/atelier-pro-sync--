@@ -73,6 +73,22 @@ export function AdminSystemHealthView() {
   const maintenance = useMaintenanceMode();
   const setMaintenance = useSetMaintenanceMode();
 
+  const alertSettings = useHealthAlertSettings();
+  const saveAlerts = useSaveHealthAlertSettings();
+  const testAlert = useTestHealthAlert();
+  const runMaintenance = useRunMaintenance();
+
+  // Local editable copy of the alert settings form
+  const [form, setForm] = useState<HealthAlertSettings | null>(null);
+  useEffect(() => {
+    if (alertSettings.data) setForm(alertSettings.data);
+  }, [alertSettings.data]);
+
+  // Per-table maintenance confirmation
+  const [pending, setPending] = useState<
+    { table: string; mode: "vacuum_analyze" | "analyze" } | null
+  >(null);
+
   const tables = sizes.data ?? [];
   const totalSizeMb = tables.reduce((sum, t) => sum + Number(t.total_size_mb || 0), 0);
   const slowCount = slow.data?.length ?? 0;
