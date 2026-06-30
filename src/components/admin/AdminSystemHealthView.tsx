@@ -555,6 +555,38 @@ export function AdminSystemHealthView() {
           )}
         </div>
       </div>
+
+      {/* Maintenance confirmation */}
+      <AlertDialog
+        open={!!pending}
+        onOpenChange={(o) => !o && setPending(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pending?.mode === "vacuum_analyze"
+                ? "Lancer VACUUM ANALYZE ?"
+                : "Lancer ANALYZE ?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pending?.mode === "vacuum_analyze"
+                ? `Récupère l'espace des lignes mortes et rafraîchit les statistiques de « ${pending?.table} ». L'opération peut générer de la charge sur la table.`
+                : `Rafraîchit uniquement les statistiques du planificateur pour « ${pending?.table} ». Opération légère.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pending) runMaintenance.mutate(pending);
+                setPending(null);
+              }}
+            >
+              Confirmer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
