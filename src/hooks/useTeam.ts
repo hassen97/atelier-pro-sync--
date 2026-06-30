@@ -53,6 +53,7 @@ export const ALL_PAGES = [
   { href: "/settings", label: "Paramètres" },
   { href: "/communaute", label: "Entraide" },
   { href: "/messages", label: "Messages" },
+  { href: "/referrals", label: "Parrainage" },
 ] as const;
 
 // Check if current user is a super_admin (owner)

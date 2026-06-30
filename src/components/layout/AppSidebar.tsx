@@ -23,6 +23,7 @@ import {
   Cloud,
   KeyRound,
   Activity,
+  Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,7 @@ const navigation = [
   { nameKey: "nav.community" as const, href: "/communaute", icon: Users2 },
   { nameKey: "nav.services" as const, href: "/services", icon: Cloud },
   { nameKey: "nav.messages" as const, href: "/messages", icon: MessageCircle },
+  { nameKey: "nav.customers" as const, href: "/referrals", icon: Gift, labelOverride: "Parrainage" },
 ];
 
 const bottomNav = [

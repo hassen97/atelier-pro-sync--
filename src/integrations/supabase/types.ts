@@ -1087,7 +1087,9 @@ export type Database = {
           last_online_at: string | null
           last_verification_reminder_sent_at: string | null
           phone: string | null
+          referral_code: string | null
           registration_ip: string | null
+          signup_fingerprint: string | null
           updated_at: string
           user_id: string
           username: string | null
@@ -1112,7 +1114,9 @@ export type Database = {
           last_online_at?: string | null
           last_verification_reminder_sent_at?: string | null
           phone?: string | null
+          referral_code?: string | null
           registration_ip?: string | null
+          signup_fingerprint?: string | null
           updated_at?: string
           user_id: string
           username?: string | null
@@ -1137,7 +1141,9 @@ export type Database = {
           last_online_at?: string | null
           last_verification_reminder_sent_at?: string | null
           phone?: string | null
+          referral_code?: string | null
           registration_ip?: string | null
+          signup_fingerprint?: string | null
           updated_at?: string
           user_id?: string
           username?: string | null
@@ -1181,6 +1187,45 @@ export type Database = {
           updated_at?: string
           user_agent?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          id: string
+          ip_fingerprint: string | null
+          referred_email: string | null
+          referred_id: string | null
+          referrer_id: string
+          reward_granted_at: string | null
+          rewarded_by: string | null
+          status: Database["public"]["Enums"]["referral_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_fingerprint?: string | null
+          referred_email?: string | null
+          referred_id?: string | null
+          referrer_id: string
+          reward_granted_at?: string | null
+          rewarded_by?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_fingerprint?: string | null
+          referred_email?: string | null
+          referred_id?: string | null
+          referrer_id?: string
+          reward_granted_at?: string | null
+          rewarded_by?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2382,6 +2427,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      generate_referral_code: { Args: never; Returns: string }
       get_active_connections: {
         Args: never
         Returns: {
@@ -2456,6 +2502,7 @@ export type Database = {
         | "manager"
         | "employee"
         | "platform_admin"
+      referral_status: "pending" | "joined" | "rewarded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2590,6 +2637,7 @@ export const Constants = {
         "employee",
         "platform_admin",
       ],
+      referral_status: ["pending", "joined", "rewarded"],
     },
   },
 } as const

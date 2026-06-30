@@ -54,6 +54,7 @@ const Team = lazyWithRetry(() => import("./pages/Team"));
 const Services = lazyWithRetry(() => import("./pages/Services"));
 const Vault = lazyWithRetry(() => import("./pages/Vault"));
 const PanicAnalyzer = lazyWithRetry(() => import("./pages/PanicAnalyzer"));
+const Referrals = lazyWithRetry(() => import("./pages/Referrals"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -139,6 +140,7 @@ const App = () => (
                   <Route path="/services" element={<Services />} />
                   <Route path="/vault" element={<Vault />} />
                   <Route path="/panic-analyzer" element={<PanicAnalyzer />} />
+                  <Route path="/referrals" element={<Referrals />} />
                 </Route>
                 
                 <Route path="*" element={<NotFound />} />

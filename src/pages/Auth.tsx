@@ -15,6 +15,7 @@ import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { SEO } from "@/components/seo/SEO";
 import { BlueprintLoader, preloadBlueprint } from "@/components/auth/BlueprintLoader";
 import repairProLogo from "@/assets/repairpro-logo.png";
+import { saveReferralCode, getSavedReferralCode, clearReferralCode, computeFingerprint } from "@/lib/fingerprint";
 
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY || "";
 const REMEMBER_ME_KEY = "repairpro_remember_me";
@@ -105,6 +106,13 @@ export default function Auth() {
     }
     if (email) setRegisterEmail(email);
     if (username) setRegisterUsername(username);
+    // Capture referral code from ?ref= and persist it for signup
+    const ref = params.get("ref");
+    if (ref) {
+      saveReferralCode(ref);
+      setAuthTab("register");
+      setLoginRole("owner");
+    }
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -356,6 +364,42 @@ export default function Auth() {
       }
     } else {
       setSuccess("Votre compte a été créé avec succès ! Vous pouvez maintenant vous connecter.");
+
+      // Referral capture + device fingerprint (best-effort, never blocks signup).
+      // Runs while the just-created session is still active (before signOut).
+      try {
+        const fingerprint = await computeFingerprint();
+        const { data: { user: newUser } } = await supabase.auth.getUser();
+        if (newUser) {
+          // Store the new user's signup fingerprint for the anti-fraud radar
+          await supabase
+            .from("profiles")
+            .update({ signup_fingerprint: fingerprint })
+            .eq("user_id", newUser.id);
+
+          const refCode = getSavedReferralCode();
+          if (refCode) {
+            const { data: referrer } = await supabase
+              .from("profiles")
+              .select("user_id")
+              .eq("referral_code", refCode)
+              .maybeSingle();
+            if (referrer && (referrer as any).user_id && (referrer as any).user_id !== newUser.id) {
+              await supabase.from("referrals").insert({
+                referrer_id: (referrer as any).user_id,
+                referred_id: newUser.id,
+                referred_email: registerEmail.trim() || null,
+                ip_fingerprint: fingerprint,
+                status: "pending",
+              });
+            }
+            clearReferralCode();
+          }
+        }
+      } catch (refErr) {
+        console.error("[Auth] referral capture error:", refErr);
+      }
+
       // Notify the platform admin (best-effort, never blocks)
       try {
         await supabase.functions.invoke("notify-admin-signup", {
