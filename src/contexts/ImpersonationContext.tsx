@@ -88,8 +88,11 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     navigate("/admin", { replace: true });
   }, [navigate]);
 
+  const { isDemo } = useDemoMode();
+
   const isImpersonating = verified && !!impersonatedUserId;
-  const isReadOnly = isImpersonating && modeParam === "readonly";
+  // The shared public demo account is always strictly read-only.
+  const isReadOnly = (isImpersonating && modeParam === "readonly") || isDemo;
 
   return (
     <ImpersonationContext.Provider
@@ -97,6 +100,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
         impersonatedUserId: isImpersonating ? impersonatedUserId : null,
         isImpersonating,
         isReadOnly,
+        isDemo,
         isVerifying,
         impersonatedShopName: shopName,
         exitImpersonation,
