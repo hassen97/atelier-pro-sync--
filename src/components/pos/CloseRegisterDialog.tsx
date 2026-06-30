@@ -274,6 +274,54 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
                 </div>
               )}
 
+              {/* Product breakdown */}
+              {report && report.byProduct && report.byProduct.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                    <Boxes className="h-3.5 w-3.5" /> Ventes par produit
+                  </p>
+                  <div className="rounded-lg border divide-y">
+                    {report.byProduct.map((p, i) => (
+                      <div
+                        key={`${p.product_name}-${i}`}
+                        className="flex items-center justify-between px-3 py-2 text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {p.product_name}{" "}
+                          <span className="text-xs opacity-70">x{p.quantity}</span>
+                        </span>
+                        <span className="font-mono font-medium">{format(p.revenue)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Repairs breakdown */}
+              {report && report.repairs.rows.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                    <Wrench className="h-3.5 w-3.5" /> Réparations payées
+                  </p>
+                  <div className="rounded-lg border divide-y">
+                    {report.repairs.rows.map((r, i) => (
+                      <div
+                        key={`${r.label}-${i}`}
+                        className="flex items-center justify-between px-3 py-2 text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {r.label}
+                          {r.customer ? (
+                            <span className="text-xs opacity-70"> — {r.customer}</span>
+                          ) : null}
+                        </span>
+                        <span className="font-mono font-medium">{format(r.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Payment method breakdown */}
               {report && report.byPaymentMethod.length > 0 && (
                 <div className="space-y-1.5">
