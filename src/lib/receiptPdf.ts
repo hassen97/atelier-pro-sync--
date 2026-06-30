@@ -511,7 +511,9 @@ export interface RegisterZReportData {
   returns?: string | null; // pre-formatted refund total
   itemsSold?: number;
   byCategory?: ClosingBreakdownRow[];
+  byProduct?: ClosingBreakdownRow[];
   byPaymentMethod?: ClosingBreakdownRow[];
+  repairsRows?: ClosingBreakdownRow[];
 }
 
 export function printRegisterZReport(
