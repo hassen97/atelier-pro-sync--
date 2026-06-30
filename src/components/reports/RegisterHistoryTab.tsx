@@ -27,6 +27,7 @@ import {
   generateClosingReportPdf,
   type ClosingBreakdownRow,
 } from "@/lib/receiptPdf";
+import { generateClosingReportExcel } from "@/lib/closingReportExcel";
 import { format as formatDate } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
