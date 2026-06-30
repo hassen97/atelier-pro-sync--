@@ -3,20 +3,20 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { usePublicPlans } from "@/hooks/useSubscriptionPlans";
-import { useJoinWaitlist } from "@/hooks/useWaitlist";
+import { useDemoLogin } from "@/hooks/useDemoLogin";
 import {
   Package, Wrench, Truck, RotateCcw,
   Menu, X, ChevronRight, Check, Smartphone,
   Shield, BarChart3, Users, Zap, ArrowRight,
-  Sparkles, Mail, Loader2
+  Sparkles, PlayCircle, LogIn, UserPlus, Loader2
 } from "lucide-react";
 import { SEO } from "@/components/seo/SEO";
 import { getUpdateStatus, applyUpdateNow } from "@/lib/swUpdate";
 import { UpdateCheckOverlay } from "@/components/landing/UpdateCheckOverlay";
 import repairProLogo from "@/assets/repairpro-logo.png";
+
 
 /* ── animation variants ── */
 const fadeUp = {
