@@ -595,8 +595,18 @@ ${
     : ""
 }
 ${
+  prodRows
+    ? `<p class="z-section">Ventes par produit</p>${prodRows}<div class="sep"></div>`
+    : ""
+}
+${
   payRows
     ? `<p class="z-section">Modes de paiement</p>${payRows}<div class="sep"></div>`
+    : ""
+}
+${
+  repairRows
+    ? `<p class="z-section">Réparations payées</p>${repairRows}<div class="sep"></div>`
     : ""
 }
 <div class="z-row"><span>VENTES:</span><span class="val">${escHtml(data.sales)}</span></div>
