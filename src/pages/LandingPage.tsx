@@ -60,6 +60,19 @@ export default function LandingPage() {
   const { data: plans } = usePublicPlans();
   const joinWaitlist = useJoinWaitlist();
 
+  // On open: check for a newer deployment BEFORE rendering the app. Time-boxed
+  // so a slow network never strands the visitor on the splash; reloads once
+  // into the latest version if an update is detected.
+  useEffect(() => {
+    let active = true;
+    checkForUpdateOnLoad(2500).finally(() => {
+      if (active) setCheckingVersion(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll, { passive: true });
