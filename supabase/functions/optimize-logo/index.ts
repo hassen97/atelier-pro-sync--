@@ -1,13 +1,63 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/images/generations";
 const MODEL = "google/gemini-3.1-flash-image";
 
 const PROMPT =
-  "Edit this logo image: remove the background completely so it becomes fully transparent (alpha channel), " +
-  "clean up artifacts, sharpen the edges and upscale it to a crisp high-resolution version. " +
-  "Keep the original colors, shapes and proportions of the logo unchanged. " +
-  "Output a transparent PNG with only the logo subject, no background, no added shadows, no extra elements.";
+  "Edit this logo image for a clean cutout. Sharpen and clean up the logo, upscale it to crisp high resolution, " +
+  "and place the logo subject perfectly centered on a PURE SOLID WHITE (#FFFFFF) background with generous margin. " +
+  "Keep the original colors, shapes and proportions of the logo unchanged. Do NOT add any shadow, gradient, glow, " +
+  "border, watermark or extra element. The background must be a single flat pure-white color so it can be removed.";
+
+/**
+ * Flood-fill from the image borders, turning connected near-white pixels
+ * transparent. This removes the white background while preserving white
+ * areas that are enclosed inside the logo.
+ */
+function removeWhiteBackground(img: Image): Image {
+  const w = img.width;
+  const h = img.height;
+  const bmp = img.bitmap; // Uint8ClampedArray RGBA
+  const visited = new Uint8Array(w * h);
+  const stack: number[] = [];
+
+  const isWhite = (idx: number) => {
+    const o = idx * 4;
+    return bmp[o] > 238 && bmp[o + 1] > 238 && bmp[o + 2] > 238;
+  };
+
+  const pushIf = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    const idx = y * w + x;
+    if (visited[idx]) return;
+    visited[idx] = 1;
+    if (isWhite(idx)) stack.push(idx);
+  };
+
+  // Seed from all border pixels
+  for (let x = 0; x < w; x++) {
+    pushIf(x, 0);
+    pushIf(x, h - 1);
+  }
+  for (let y = 0; y < h; y++) {
+    pushIf(0, y);
+    pushIf(w - 1, y);
+  }
+
+  while (stack.length) {
+    const idx = stack.pop()!;
+    bmp[idx * 4 + 3] = 0; // set alpha to 0
+    const x = idx % w;
+    const y = (idx / w) | 0;
+    pushIf(x + 1, y);
+    pushIf(x - 1, y);
+    pushIf(x, y + 1);
+    pushIf(x, y - 1);
+  }
+
+  return img;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -84,8 +134,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Decode, remove the flat white background → true alpha transparency, re-encode.
+    let outBase64 = b64;
+    try {
+      const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const decoded = await Image.decode(raw);
+      const transparent = removeWhiteBackground(decoded);
+      const png = await transparent.encode(); // PNG with alpha
+      outBase64 = btoa(String.fromCharCode(...new Uint8Array(png)));
+    } catch (e) {
+      console.error("background removal failed, returning raw AI image", e);
+    }
+
     return new Response(
-      JSON.stringify({ pngBase64: b64, dataUrl: `data:image/png;base64,${b64}` }),
+      JSON.stringify({ pngBase64: outBase64, dataUrl: `data:image/png;base64,${outBase64}` }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
