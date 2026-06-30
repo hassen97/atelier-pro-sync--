@@ -215,34 +215,42 @@ export default function LandingPage() {
             — le tout depuis une seule plateforme pensée pour les ateliers en Tunisie et en France.
           </motion.p>
 
-          {/* Waitlist CTA */}
-          <motion.div variants={fadeUp} id="waitlist" className="mt-10 mx-auto max-w-md">
-            <form onSubmit={handleWaitlistSubmit} className="flex gap-2">
-              <div className="relative flex-1">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "hsl(240 5% 40%)" }} />
-                <Input
-                  type="email"
-                  placeholder="votre@email.com"
-                  value={waitlistEmail}
-                  onChange={e => setWaitlistEmail(e.target.value)}
-                  className="pl-10 h-12 rounded-full text-sm"
-                  style={{ background: "hsla(240, 6%, 10%, 0.8)", border: "1px solid hsla(0, 0%, 100%, 0.1)", color: "hsl(0 0% 98%)" }}
-                  required
-                />
-              </div>
+          {/* CTA: 3 actions — Démo / Créer un compte / Connexion */}
+          <motion.div variants={fadeUp} className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Button
+              size="lg"
+              onClick={startDemo}
+              disabled={demoLoading}
+              className="lp-glow-btn rounded-full px-7 h-12 text-sm font-semibold w-full sm:w-auto"
+              style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+            >
+              {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><PlayCircle className="mr-2 h-5 w-5" /> Essayer la démo</>}
+            </Button>
+            <Link to="/auth?tab=register" className="w-full sm:w-auto">
               <Button
-                type="submit"
-                disabled={joinWaitlist.isPending}
-                className="lp-glow-btn rounded-full px-6 h-12 text-sm font-medium shrink-0"
-                style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+                size="lg"
+                variant="outline"
+                className="rounded-full px-7 h-12 text-sm font-medium w-full"
+                style={{ background: "hsla(240, 6%, 10%, 0.6)", borderColor: "hsla(0, 0%, 100%, 0.12)", color: "hsl(0 0% 98%)" }}
               >
-                {joinWaitlist.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Rejoindre <ArrowRight className="ml-1.5 h-4 w-4" /></>}
+                <UserPlus className="mr-2 h-4 w-4" /> Créer un compte
               </Button>
-            </form>
-            <p className="mt-3 text-xs" style={{ color: "hsl(240 5% 40%)" }}>
-              Rejoignez la liste d'attente — soyez parmi les premiers alertés au lancement.
-            </p>
+            </Link>
+            <Link to="/auth" className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                variant="ghost"
+                className="rounded-full px-7 h-12 text-sm font-medium w-full"
+                style={{ color: "hsl(240 5% 70%)" }}
+              >
+                <LogIn className="mr-2 h-4 w-4" /> Connexion
+              </Button>
+            </Link>
           </motion.div>
+          <motion.p variants={fadeUp} className="mt-3 text-xs" style={{ color: "hsl(240 5% 40%)" }}>
+            Testez gratuitement avec des données d'exemple — aucune inscription requise.
+          </motion.p>
+
 
           {/* Dashboard Mockup */}
           <motion.div variants={fadeUp} className="mt-16 sm:mt-20">
