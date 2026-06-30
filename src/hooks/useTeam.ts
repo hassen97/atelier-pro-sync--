@@ -114,14 +114,15 @@ export function useMyTeamInfo(options: { enabled?: boolean } = {}) {
 export function useEffectiveUserId() {
   const { user } = useAuth();
   const { data: teamInfo } = useMyTeamInfo();
-  const { data: isOwner } = useIsOwner();
   const { impersonatedUserId } = useImpersonation();
 
   if (!user) return null;
   // If platform_admin is impersonating, use the impersonated user's ID
   if (impersonatedUserId) return impersonatedUserId;
-  // If user is a team member, use the owner's user_id
-  if (teamInfo?.owner_id && !isOwner) return teamInfo.owner_id;
+  // If user is an active team member, always use the owner's user_id — even if
+  // the member also carries a stray `super_admin` role. Team membership takes
+  // precedence so employees never get scoped to their own (empty) shop.
+  if (teamInfo?.owner_id) return teamInfo.owner_id;
   // Otherwise use own user_id
   return user.id;
 }
@@ -431,15 +432,16 @@ export function useAllowedPages(options: { enabled?: boolean } = {}) {
 
   if (isLoading) return { allowedPages: null, isLoading: true, isTeamMember: false };
 
-  // Owner or standalone user: all pages
-  if (isOwner || !teamInfo) {
-    return { allowedPages: null, isLoading: false, isTeamMember: false };
+  // Active team membership takes precedence over a (possibly stray) owner role:
+  // an employee with a leftover super_admin role must still get filtered pages.
+  if (teamInfo) {
+    // Map legacy "/" entries to "/dashboard" for compatibility
+    const pages = (teamInfo.allowed_pages || []).map((p: string) => p === "/" ? "/dashboard" : p);
+    // Always include dashboard access
+    const allPages = pages.includes("/dashboard") ? pages : ["/dashboard", ...pages];
+    return { allowedPages: allPages, isLoading: false, isTeamMember: true };
   }
 
-  // Team member: filtered pages
-  // Map legacy "/" entries to "/dashboard" for compatibility
-  const pages = (teamInfo.allowed_pages || []).map((p: string) => p === "/" ? "/dashboard" : p);
-  // Always include dashboard access
-  const allPages = pages.includes("/dashboard") ? pages : ["/dashboard", ...pages];
-  return { allowedPages: allPages, isLoading: false, isTeamMember: true };
+  // Owner or standalone user: all pages
+  return { allowedPages: null, isLoading: false, isTeamMember: false };
 }
