@@ -67,12 +67,16 @@ export function BlueprintLoader({ visible, logoUrl, message }: BlueprintLoaderPr
     }
   }, [visible]);
 
-  // Only enable the 3D canvas if WebGL works AND we've waited a beat (500ms),
-  // so a slow bundle never delays the perceived loader — the CSS one is instant.
+  // Enable the 3D canvas as soon as the loader shows (the bundle is preloaded
+  // on the Auth page, so it's already cached). The CSS fallback stays underneath
+  // as a seamless backdrop until the canvas paints. A tiny tick lets the overlay
+  // mount first to avoid a flash.
   useEffect(() => {
     if (!visible) return;
     if (!isWebGLAvailable()) return;
-    const t = setTimeout(() => setAllow3D(true), 500);
+    // Make sure the chunk is requested even if the page didn't preload it.
+    preloadBlueprint();
+    const t = setTimeout(() => setAllow3D(true), 50);
     return () => clearTimeout(t);
   }, [visible]);
 
