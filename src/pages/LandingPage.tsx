@@ -115,6 +115,19 @@ export default function LandingPage() {
 
   const displayPlans = plans || [];
 
+  // Quick splash while we verify the visitor is on the latest deployment.
+  if (checkingVersion) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+        <img src={repairProLogo} alt="RepairPro" className="h-12 w-auto animate-pulse" />
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Chargement de la dernière version…
+        </div>
+      </div>
+    );
+  }
+
   return (
     <main className="landing-page min-h-screen relative" style={{ scrollBehavior: "smooth" }}>
       <SEO
