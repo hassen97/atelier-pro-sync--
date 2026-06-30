@@ -67,6 +67,18 @@ export function CloseRegisterDialog({ open, onOpenChange }: CloseRegisterDialogP
       value: format(c.revenue),
       meta: `${c.items}`,
     }));
+  const prodRows = (r: ClosingReport): ClosingBreakdownRow[] =>
+    (r.byProduct || []).map((p) => ({
+      label: p.product_name,
+      value: format(p.revenue),
+      meta: `${p.quantity}`,
+    }));
+  const repairBreakdown = (r: ClosingReport): ClosingBreakdownRow[] =>
+    (r.repairs.rows || []).map((rp) => ({
+      label: rp.label,
+      value: format(rp.amount),
+      meta: rp.customer || undefined,
+    }));
   const payRows = (r: ClosingReport): ClosingBreakdownRow[] =>
     r.byPaymentMethod.map((p) => ({ label: p.method, value: format(p.revenue) }));
 
