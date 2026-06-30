@@ -493,6 +493,12 @@ ${data.phone ? `<p class="field"><span class="bold">Tél:</span> ${escHtml(data.
 
 // ── Register Z-Report (Clôture de caisse / end-of-day closing) ──
 
+export interface ClosingBreakdownRow {
+  label: string;
+  value: string; // pre-formatted currency
+  meta?: string; // optional extra (e.g. item count)
+}
+
 export interface RegisterZReportData {
   shopName: string;
   dateTime: string; // formatted date & time
@@ -501,6 +507,11 @@ export interface RegisterZReportData {
   expenses: string;
   net: string;
   isReprint?: boolean; // when true, prints a duplicate marker
+  closedBy?: string | null;
+  returns?: string | null; // pre-formatted refund total
+  itemsSold?: number;
+  byCategory?: ClosingBreakdownRow[];
+  byPaymentMethod?: ClosingBreakdownRow[];
 }
 
 export function printRegisterZReport(
@@ -513,6 +524,24 @@ export function printRegisterZReport(
     ? "RAPPORT DE CLÔTURE (DUPLICATA)"
     : "RAPPORT DE CLÔTURE";
 
+  const catRows = (data.byCategory || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}${
+          r.meta ? ` (${escHtml(r.meta)})` : ""
+        }</span><span class="val">${escHtml(r.value)}</span></div>`
+    )
+    .join("");
+
+  const payRows = (data.byPaymentMethod || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}</span><span class="val">${escHtml(
+          r.value
+        )}</span></div>`
+    )
+    .join("");
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -523,10 +552,13 @@ export function printRegisterZReport(
   .z-shop { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 2px; }
   .z-title { font-size: 15px; font-weight: bold; text-align: center; letter-spacing: 1px; margin: 2px 0; }
   .z-meta { font-size: 11px; text-align: center; margin: 1px 0; }
+  .z-section { font-size: 11px; font-weight: bold; text-align: left; margin: 3px 0 1px; text-transform: uppercase; }
   .z-row { display: flex; justify-content: space-between; font-size: 13px; margin: 2px 0; gap: 3mm; }
   .z-row .val { text-align: right; white-space: nowrap; }
   .z-total { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; margin: 3px 0; gap: 3mm; }
   .z-status { font-size: 13px; font-weight: bold; text-align: center; margin: 3px 0; }
+  .z-sign { font-size: 12px; margin-top: 8mm; }
+  .z-sign-line { border-top: 1px solid #000; margin-top: 10mm; padding-top: 1mm; }
 </style>
 </head>
 <body class="thermal-print-root"><main class="thermal-print-container">
@@ -537,19 +569,297 @@ export function printRegisterZReport(
 <p class="z-shop">${escHtml(data.shopName)}</p>
 <p class="z-meta">${escHtml(data.dateTime)}</p>
 <div class="sep"></div>
+${
+  catRows
+    ? `<p class="z-section">Ventes par catégorie</p>${catRows}<div class="sep"></div>`
+    : ""
+}
+${
+  payRows
+    ? `<p class="z-section">Modes de paiement</p>${payRows}<div class="sep"></div>`
+    : ""
+}
 <div class="z-row"><span>VENTES:</span><span class="val">${escHtml(data.sales)}</span></div>
 <div class="z-row"><span>RÉPARATIONS:</span><span class="val">${escHtml(data.repairs)}</span></div>
+${
+  data.returns
+    ? `<div class="z-row"><span>RETOURS:</span><span class="val">-${escHtml(data.returns)}</span></div>`
+    : ""
+}
 <div class="z-row"><span>DÉPENSES:</span><span class="val">-${escHtml(data.expenses)}</span></div>
+${
+  typeof data.itemsSold === "number"
+    ? `<div class="z-row"><span>ARTICLES VENDUS:</span><span class="val">${data.itemsSold}</span></div>`
+    : ""
+}
 <div class="sep"></div>
 <div class="z-total"><span>TOTAL EN CAISSE:</span><span class="val">${escHtml(data.net)}</span></div>
 <div class="sep-bold"></div>
 <p class="z-status">Statut: Clôturé</p>
+<div class="sep"></div>
+${data.closedBy ? `<p class="z-meta">Clôturé par: ${escHtml(data.closedBy)}</p>` : ""}
+<div class="z-sign">
+  <span>Signature de l'employé:</span>
+  <div class="z-sign-line"></div>
+</div>
 <div class="sep-bold"></div>
 
 </main></body>
 </html>`;
 
-  printThermalHtml(html, "width=380,height=560");
+  printThermalHtml(html, "width=380,height=720");
+}
+
+// ── A4 PDF closing report (jsPDF) ──
+
+export interface ClosingPdfData {
+  shopName: string;
+  address?: string | null;
+  phone?: string | null;
+  logoUrl?: string | null;
+  dateTime: string;
+  closedBy?: string | null;
+  isDuplicate?: boolean;
+  byCategory: { category: string; revenue: number; items: number }[];
+  byPaymentMethod: { method: string; revenue: number }[];
+  returns: { product_name: string; quantity: number; refund_amount: number }[];
+  expenses: { category: string; amount: number }[];
+  totals: {
+    sales: number;
+    repairs: number;
+    returns: number;
+    expenses: number;
+    net: number;
+    itemsSold: number;
+  };
+}
+
+async function loadImageDataUrl(
+  url: string
+): Promise<{ dataUrl: string; w: number; h: number } | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve({ w: 0, h: 0 });
+      img.src = dataUrl;
+    });
+    return { dataUrl, w: dims.w, h: dims.h };
+  } catch {
+    return null;
+  }
+}
+
+export async function generateClosingReportPdf(
+  data: ClosingPdfData,
+  format: (n: number) => string
+) {
+  const { default: jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pageW = 210;
+  const margin = 16;
+  const contentW = pageW - margin * 2;
+  let y = margin;
+
+  const black = (): [number, number, number] => [17, 17, 17];
+  const grey = (): [number, number, number] => [110, 110, 110];
+
+  // ---- Header: logo + shop details ----
+  if (data.logoUrl) {
+    const img = await loadImageDataUrl(data.logoUrl);
+    if (img && img.w && img.h) {
+      const maxH = 18;
+      const ratio = img.w / img.h;
+      const h = maxH;
+      const w = Math.min(h * ratio, 40);
+      try {
+        doc.addImage(img.dataUrl, "PNG", margin, y, w, h);
+      } catch {
+        /* ignore unsupported image */
+      }
+    }
+  }
+
+  doc.setTextColor(...black());
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text(data.shopName, pageW - margin, y + 6, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...grey());
+  let infoY = y + 11;
+  if (data.address) {
+    doc.text(data.address, pageW - margin, infoY, { align: "right" });
+    infoY += 4;
+  }
+  if (data.phone) {
+    doc.text(`Tél: ${data.phone}`, pageW - margin, infoY, { align: "right" });
+    infoY += 4;
+  }
+
+  y = Math.max(y + 20, infoY + 2);
+
+  // ---- Title ----
+  doc.setDrawColor(17, 17, 17);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, pageW - margin, y);
+  y += 8;
+  doc.setTextColor(...black());
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(
+    data.isDuplicate ? "RAPPORT DE CLÔTURE (DUPLICATA)" : "RAPPORT DE CLÔTURE",
+    margin,
+    y
+  );
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...grey());
+  doc.text(`Date de clôture: ${data.dateTime}`, margin, y);
+  y += 8;
+
+  // ---- Summary box ----
+  const summary: [string, string][] = [
+    ["Total Ventes", format(data.totals.sales)],
+    ["Total Réparations", format(data.totals.repairs)],
+    ["Total Retours", `- ${format(data.totals.returns)}`],
+    ["Total Dépenses", `- ${format(data.totals.expenses)}`],
+    ["Articles vendus", String(data.totals.itemsSold)],
+  ];
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.2);
+  const boxTop = y;
+  const rowH = 7;
+  summary.forEach(([label, value], i) => {
+    const ry = boxTop + i * rowH;
+    doc.setTextColor(...black());
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(label, margin + 2, ry + 5);
+    doc.setFont("helvetica", "bold");
+    doc.text(value, pageW - margin - 2, ry + 5, { align: "right" });
+    doc.line(margin, ry + rowH, pageW - margin, ry + rowH);
+  });
+  y = boxTop + summary.length * rowH + 4;
+
+  // Net highlight
+  doc.setFillColor(17, 17, 17);
+  doc.rect(margin, y, contentW, 10, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("NET EN CAISSE", margin + 3, y + 6.7);
+  doc.text(format(data.totals.net), pageW - margin - 3, y + 6.7, { align: "right" });
+  y += 16;
+
+  // ---- Generic table renderer ----
+  const drawTable = (
+    titleText: string,
+    headers: string[],
+    rows: string[][],
+    aligns: ("left" | "right")[]
+  ) => {
+    if (!rows.length) return;
+    if (y > 250) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setTextColor(...black());
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(titleText, margin, y);
+    y += 5;
+
+    const colW = contentW / headers.length;
+    doc.setFontSize(9);
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, y, contentW, 6, "F");
+    headers.forEach((h, i) => {
+      const align = aligns[i];
+      const x = align === "right" ? margin + colW * (i + 1) - 2 : margin + colW * i + 2;
+      doc.text(h, x, y + 4, { align });
+    });
+    y += 6;
+
+    doc.setFont("helvetica", "normal");
+    rows.forEach((r) => {
+      if (y > 280) {
+        doc.addPage();
+        y = margin;
+      }
+      r.forEach((cell, i) => {
+        const align = aligns[i];
+        const x = align === "right" ? margin + colW * (i + 1) - 2 : margin + colW * i + 2;
+        doc.text(cell, x, y + 4, { align });
+      });
+      doc.setDrawColor(230, 230, 230);
+      doc.line(margin, y + 5.5, pageW - margin, y + 5.5);
+      y += 6;
+    });
+    y += 6;
+  };
+
+  drawTable(
+    "Ventes par catégorie",
+    ["Catégorie", "Articles", "Total"],
+    data.byCategory.map((c) => [c.category, String(c.items), format(c.revenue)]),
+    ["left", "right", "right"]
+  );
+
+  drawTable(
+    "Modes de paiement",
+    ["Mode", "Total"],
+    data.byPaymentMethod.map((p) => [p.method, format(p.revenue)]),
+    ["left", "right"]
+  );
+
+  drawTable(
+    "Retours / Remboursements",
+    ["Article", "Qté", "Remboursé"],
+    data.returns.map((r) => [r.product_name, String(r.quantity), format(r.refund_amount)]),
+    ["left", "right", "right"]
+  );
+
+  drawTable(
+    "Dépenses",
+    ["Catégorie", "Montant"],
+    data.expenses.map((e) => [e.category, format(e.amount)]),
+    ["left", "right"]
+  );
+
+  // ---- Signature footer ----
+  if (y > 250) {
+    doc.addPage();
+    y = margin;
+  }
+  y = Math.max(y, 255);
+  doc.setDrawColor(17, 17, 17);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y, pageW - margin, y);
+  y += 7;
+  doc.setTextColor(...black());
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Clôturé par: ${data.closedBy || "—"}`, margin, y);
+  y += 14;
+  doc.setDrawColor(120, 120, 120);
+  doc.line(margin, y, margin + 70, y);
+  doc.setFontSize(9);
+  doc.setTextColor(...grey());
+  doc.text("Signature de l'employé", margin, y + 4);
+
+  const fileDate = data.dateTime.replace(/[^0-9]/g, "").slice(0, 8) || "rapport";
+  doc.save(`cloture-${fileDate}.pdf`);
 }
 
 export interface OrderReceiptItem {

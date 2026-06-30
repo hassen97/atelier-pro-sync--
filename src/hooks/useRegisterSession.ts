@@ -11,6 +11,44 @@ export interface SessionTotals {
   net: number;
 }
 
+export interface ClosingReportCategory {
+  category: string;
+  revenue: number;
+  items: number;
+}
+export interface ClosingReportPayment {
+  method: string;
+  revenue: number;
+  count: number;
+}
+export interface ClosingReportReturn {
+  product_name: string;
+  quantity: number;
+  refund_amount: number;
+  refund_method: string | null;
+}
+export interface ClosingReportExpense {
+  category: string;
+  amount: number;
+}
+export interface ClosingReport {
+  sessionId: string | null;
+  openedAt: string | null;
+  byCategory: ClosingReportCategory[];
+  byPaymentMethod: ClosingReportPayment[];
+  repairs: { total: number; count: number };
+  returns: { total: number; count: number; rows: ClosingReportReturn[] };
+  expenses: { total: number; rows: ClosingReportExpense[] };
+  totals: {
+    sales: number;
+    repairs: number;
+    returns: number;
+    expenses: number;
+    net: number;
+    itemsSold: number;
+  };
+}
+
 /**
  * Returns the currently open register session for the shop, creating one if
  * none exists. The shop is identified by the effective (owner) user id.
@@ -101,18 +139,59 @@ export function useSessionTotals() {
 }
 
 /**
+ * Fetches the detailed closing report for the currently open session via the
+ * `generate-closing-report` edge function. Used to power the preview modal and
+ * the PDF/thermal exports before the session is actually closed.
+ */
+export function useClosingReport(enabled = true) {
+  const effectiveUserId = useEffectiveUserId();
+
+  return useQuery({
+    queryKey: ["closing-report", effectiveUserId],
+    queryFn: async (): Promise<ClosingReport> => {
+      const { data, error } = await supabase.functions.invoke(
+        "generate-closing-report",
+        { body: { shop_id: effectiveUserId } }
+      );
+      if (error) throw error;
+      return data as ClosingReport;
+    },
+    enabled: enabled && !!effectiveUserId,
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
  * Closes the current open session and immediately opens a fresh one,
- * resetting the running totals to zero.
+ * resetting the running totals to zero. Persists the detailed report snapshot
+ * and the name of the employee who performed the closing.
  */
 export function useCloseSession() {
   const queryClient = useQueryClient();
   const effectiveUserId = useEffectiveUserId();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (args?: { report?: ClosingReport | null }) => {
       if (!effectiveUserId) throw new Error("Non authentifié");
+
+      // Resolve the closing employee's display name from the logged-in account.
+      let closedByName: string | null = null;
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth?.user?.id;
+      if (uid) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", uid)
+          .maybeSingle();
+        closedByName = profile?.full_name || auth?.user?.email || null;
+      }
+
       const { data, error } = await supabase.rpc("close_register_session", {
         _shop_id: effectiveUserId,
+        _report: (args?.report ?? null) as any,
+        _closed_by_name: closedByName,
       });
       if (error) throw error;
       return data;
@@ -120,6 +199,7 @@ export function useCloseSession() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["register-session"] });
       queryClient.invalidateQueries({ queryKey: ["session-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["closing-report"] });
       queryClient.invalidateQueries({ queryKey: ["register-history"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["sales"] });
@@ -149,6 +229,8 @@ export interface RegisterHistoryRow {
   snapshot_reparations: number;
   snapshot_depenses: number;
   snapshot_net: number;
+  report_data: ClosingReport | null;
+  closed_by_name: string | null;
 }
 
 /**
@@ -168,7 +250,7 @@ export function useRegisterHistory() {
       const { data, error } = await supabase
         .from("register_sessions")
         .select(
-          "id, closed_at, snapshot_ventes, snapshot_reparations, snapshot_depenses, snapshot_net"
+          "id, closed_at, snapshot_ventes, snapshot_reparations, snapshot_depenses, snapshot_net, report_data, closed_by_name"
         )
         .eq("shop_id", effectiveUserId)
         .eq("status", "closed")
@@ -182,6 +264,8 @@ export function useRegisterHistory() {
         snapshot_reparations: Number(r.snapshot_reparations || 0),
         snapshot_depenses: Number(r.snapshot_depenses || 0),
         snapshot_net: Number(r.snapshot_net || 0),
+        report_data: (r as any).report_data ?? null,
+        closed_by_name: ((r as any).closed_by_name as string | null) ?? null,
       }));
     },
     enabled: !!effectiveUserId,

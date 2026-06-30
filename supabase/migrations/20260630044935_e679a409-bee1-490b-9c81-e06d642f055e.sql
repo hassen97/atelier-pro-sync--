@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.close_register_session(uuid);
