@@ -573,6 +573,17 @@ export default function Settings() {
                 </div>
               </div>
 
+              {user && (
+                <LogoOptimizerDialog
+                  open={logoOptimizerOpen}
+                  onOpenChange={setLogoOptimizerOpen}
+                  userId={user.id}
+                  currentLogoUrl={settings.logo_url}
+                  onSaved={(url) => saveSettings({ logo_url: url })}
+                />
+              )}
+
+
 
               {/* Logo size on receipt — selector + live preview */}
               {settings.logo_url && (
