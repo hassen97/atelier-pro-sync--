@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Menu, Search, User, Moon, Sun, LogOut, Settings, MessageCircle } from "lucide-react";
+import { Menu, Search, User, Moon, Sun, LogOut, Settings, MessageCircle, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { checkForUpdate, applyUpdateNow } from "@/lib/swUpdate";
 import { useAuth } from "@/contexts/AuthContext";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { AppSidebar } from "./AppSidebar";
