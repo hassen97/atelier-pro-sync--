@@ -52,7 +52,6 @@ const stats = [
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [waitlistEmail, setWaitlistEmail] = useState("");
   const [updatePhase, setUpdatePhase] = useState<
     "checking" | "current" | "update" | "done"
   >("checking");
@@ -61,7 +60,8 @@ export default function LandingPage() {
   const { scrollYProgress } = useScroll();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
   const { data: plans } = usePublicPlans();
-  const joinWaitlist = useJoinWaitlist();
+  const { startDemo, loading: demoLoading } = useDemoLogin();
+
 
   // On open: run a status-returning update check, then drive the 3D overlay.
   //  - "current": play a brief confirmation beat, then reveal the landing page.
