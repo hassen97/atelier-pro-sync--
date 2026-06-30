@@ -549,19 +549,53 @@ export default function POS() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Rechercher un produit..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  <Button variant={selectedCategory === null ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(null); setSelectedSubcategory(null); }}>Tout</Button>
-                  {categories.map((cat) => (
-                    <Button key={cat} variant={selectedCategory === cat ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(cat); setSelectedSubcategory(null); }}>{cat}</Button>
-                  ))}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleMainDragEnd}>
+                    <div className="flex gap-2 flex-wrap items-center">
+                      <Button variant={selectedCategory === null ? "default" : "outline"} size="sm" onClick={() => { setSelectedCategory(null); setSelectedSubcategory(null); }}>Tout</Button>
+                      <SortableContext items={mainCategories.map((c) => c.id)} strategy={horizontalListSortingStrategy}>
+                        {mainCategories.map((cat) => (
+                          <SortableCategoryButton
+                            key={cat.id}
+                            category={cat}
+                            selected={selectedCategory === cat.name}
+                            editMode={editMode}
+                            onSelect={() => { setSelectedCategory(cat.name); setSelectedSubcategory(null); }}
+                            onCustomize={() => setCustomizeTarget(cat)}
+                          />
+                        ))}
+                      </SortableContext>
+                    </div>
+                  </DndContext>
+                  <Button
+                    variant={editMode ? "default" : "ghost"}
+                    size="sm"
+                    className="ml-auto shrink-0"
+                    onClick={() => setEditMode((v) => !v)}
+                  >
+                    <Settings2 className="h-4 w-4 mr-1.5" />
+                    {editMode ? "Terminé" : "Personnaliser"}
+                  </Button>
                 </div>
-                {selectedCategory && subcategories.length > 0 && (
-                  <div className="flex gap-2 flex-wrap pl-2 border-l-2 border-muted">
-                    <Button variant={selectedSubcategory === null ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(null)}>Toutes</Button>
-                    {subcategories.map((sub) => (
-                      <Button key={sub} variant={selectedSubcategory === sub ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(sub)}>{sub}</Button>
-                    ))}
-                  </div>
+                {selectedCategory && subCategories.length > 0 && (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSubDragEnd}>
+                    <div className="flex gap-2 flex-wrap pl-2 border-l-2 border-muted items-center">
+                      <Button variant={selectedSubcategory === null ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setSelectedSubcategory(null)}>Toutes</Button>
+                      <SortableContext items={subCategories.map((c) => c.id)} strategy={horizontalListSortingStrategy}>
+                        {subCategories.map((sub) => (
+                          <SortableCategoryButton
+                            key={sub.id}
+                            category={sub}
+                            selected={selectedSubcategory === sub.name}
+                            editMode={editMode}
+                            small
+                            onSelect={() => setSelectedSubcategory(sub.name)}
+                            onCustomize={() => setCustomizeTarget(sub)}
+                          />
+                        ))}
+                      </SortableContext>
+                    </div>
+                  </DndContext>
                 )}
               </div>
               <div className="flex-1 overflow-auto min-h-0">
