@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { AdminStatCard } from "./AdminStatCard";
 import {
   useDbTableSizes,
@@ -5,8 +6,32 @@ import {
   useSlowQueries,
   useMaintenanceMode,
   useSetMaintenanceMode,
+  useHealthAlertSettings,
+  useSaveHealthAlertSettings,
+  useTestHealthAlert,
+  useRunMaintenance,
+  type HealthAlertSettings,
 } from "@/hooks/useSystemHealth";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Activity,
   Database,
@@ -15,6 +40,11 @@ import {
   Loader2,
   Timer,
   ShieldAlert,
+  BellRing,
+  Send,
+  Wrench,
+  Save,
+  Webhook,
 } from "lucide-react";
 import {
   BarChart,
