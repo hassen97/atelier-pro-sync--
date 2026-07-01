@@ -15,7 +15,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, KeyRound, Lock, Unlock, Trash2, Settings2, Search, ArrowUp, ArrowDown, Phone, MessageCircle, CheckCircle, Megaphone, LogIn, Download, ArrowRightLeft, UserCog, Zap, CreditCard, Clock, Ban, ShieldCheck, AlertTriangle, SearchX, Store, Rocket } from "lucide-react";
+import { Plus, MoreHorizontal, MoreVertical, KeyRound, Lock, Unlock, Trash2, Settings2, Search, ArrowUp, ArrowDown, Phone, MessageCircle, CheckCircle, Megaphone, LogIn, Download, ArrowRightLeft, UserCog, Zap, CreditCard, Clock, Ban, ShieldCheck, AlertTriangle, SearchX, Store, Rocket } from "lucide-react";
 import { VerifiedBadge } from "@/components/verification/VerifiedBadge";
 import { ShopDetailSheet } from "./ShopDetailSheet";
 import { Input } from "@/components/ui/input";
