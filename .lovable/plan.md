@@ -1,54 +1,37 @@
-# Fix employee misclassification + redesign Employee Hub
+## Findings
 
-## Problem
+- `GOODS2026` can authenticate successfully, but their account is currently in a broken role state: it has both `super_admin` and `employee` roles.
+- Their team membership under GOODS PRO is marked `removed`, so the app treats them like a shop owner after login instead of an active employee.
+- This is not isolated: the database currently has 19 mixed owner+employee accounts, including 10 active employees and 9 removed-only employee records.
+- The team role trigger now exists, but there are duplicate triggers on `team_members`; this can cause fragile role syncing and should be consolidated.
 
-Accounts that are **employees** (goods2026, goods2027, goodspro1, goodsproeya, hichem2026… — 35 total) appear in the Super Admin **"Gestion des boutiques"** list as fake **"Setup Incomplet"** shop owners.
+## Plan
 
-**Root cause:** The `sync_team_member_role` database trigger — whose job is to strip the `super_admin` role off a team member — is **missing** from the `team_members` table. The function exists, but no trigger fires it. Every employee keeps the `super_admin` role that signup automatically grants, so the admin owner-list treats them as shops. (Confirmed: only `on_auth_user_created` exists; 35 accounts currently hold both `super_admin` and a team role.)
+1. **Repair current data safely**
+  - Remove stray `super_admin` roles from every account that has a team role (`employee`, `manager`, or `admin`) and is not a platform admin.
+  - Keep each employee’s real team role intact.
+  - For removed employees like `GOODS2026`, preserve their removed status unless the shop owner reactivates them; the login will then correctly show “employee account removed/not active” instead of entering an empty owner dashboard.
+2. **Fix login classification**
+  - Update the login role check so active team membership takes priority over `user_roles`.
+  - If someone logs in from the Employee tab and has an active team row, allow login even if a stray owner role exists.
+  - If someone has only removed team rows, block login with a clear message: the employee account is no longer active and the owner must reactivate it.
+  - Prevent removed employees from being treated as owners.
+3. **Harden protected routing**
+  - Update onboarding/route guards to consider active team membership before owner checks.
+  - This prevents employees from flashing the dashboard then disappearing or being redirected into the wrong owner/onboarding/subscription flow.
+4. **Consolidate backend role sync**
+  - Remove the duplicate team role trigger and keep one canonical trigger.
+  - Update `sync_team_member_role()` so:
+    - active team members never keep `super_admin`
+    - active team members always get their correct role
+    - removed team members do not regain owner behavior accidentally
+5. **Verify with the test account**
+  - Test the `GOODS2026` login flow.
+  - Confirm whether the expected result is active access or a clean “account removed” block.
+  - Re-check that mixed role accounts are reduced to zero and active employees no longer appear as shop owners.
 
-The "Setup (362)" bucket the user sees matches the environment where these 35 stray accounts live, inflating the count.
+## Important note
 
----
+`GOODS2026` is currently marked as a removed employee in the team table. If you want this exact account to login again, I will also reactivate their team membership under GOODS PRO during the fix.
 
-## Part 1 — Data integrity fix (database migration)
-
-1. **Recreate the missing trigger** on `public.team_members` so future employees never keep `super_admin`:
-   - `AFTER INSERT OR UPDATE` → executes existing `public.sync_team_member_role()`.
-2. **One-time cleanup** — remove the stray owner role from every account that is really an employee:
-   - Delete the `super_admin` role from any `user_id` that also holds an `employee`/`manager`/`admin` role, excluding `platform_admin` accounts.
-   - This reclassifies all 35 mislabeled accounts (13 active + 22 removed employees) out of the owners list. They keep their team role and continue to appear correctly in the Employee Hub.
-3. Safe because genuine shop owners are created with only `super_admin` (no team role), so they are untouched.
-
-## Part 2 — Defensive guard in `admin-manage-users` edge function
-
-Belt-and-suspenders so this can't recur even if roles drift again:
-- In the `list` action, exclude any `user_id` that is an **active** `team_members` row from the `owners` array.
-- Keep `total_owners` / `total_employees` stats consistent with the filtered list.
-
-## Part 3 — Redesign the Global Employee Hub (`AdminEmployeesView.tsx`)
-
-Bring it up to the same standard as the Shops page (`AdminShopsView.tsx`), keeping every existing action.
-
-**New structure (mirrors Shops page):**
-- **Filter tab strip:** `Tous` · `Actifs` · `En ligne` · `Suspendus` · `Retirés (removed)` — each with live counts, horizontally scrollable on mobile.
-- **Stat cards row:** total employees, active, online now, suspended, removed.
-- **Responsive layout:**
-  - Desktop: refined table (`hidden md:block`).
-  - Mobile: **card grid** (`md:block hidden` inverse) — currently the page is table-only and columns just disappear on phones (poor UX). Cards show avatar, name/@username, shop + owner, role badge, online/status dot, and an actions menu.
-- **New `AdminEmployeeDetailSheet`** (like `ShopDetailSheet`): opens on row/card tap — shows employee profile, assigned shop & owner, role, allowed pages/permissions, last-seen activity, account age, phone/WhatsApp, and inline action buttons.
-- **Shared `renderActionItems`** reused by table, cards, and sheet: keeps all current actions (generate password, reassign shop, promote/demote, lock/unlock, delete).
-- Preserve search, pagination, and the existing credentials/reassign modals.
-
-**Style tokens:** reuse the admin glass-card look, cyan/violet accents, badge color config already in the file — consistent with the Command Center.
-
----
-
-## Technical notes
-
-- Files touched:
-  - New migration (trigger + cleanup).
-  - `supabase/functions/admin-manage-users/index.ts` (list guard).
-  - `src/components/admin/AdminEmployeesView.tsx` (redesign).
-  - New `src/components/admin/AdminEmployeeDetailSheet.tsx`.
-- Migration auto-applies to the test environment; **publish** propagates the trigger, cleanup, and edge-function changes to the live site.
-- No changes to the shop-owner-facing team pages; this is admin-only.
+Check all other employees  from other shop owners
