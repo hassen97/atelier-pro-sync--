@@ -188,11 +188,33 @@ export default function Auth() {
 
         const roleSet = new Set((roles ?? []).map((r) => r.role));
         const isPlatformAdmin = roleSet.has("platform_admin");
-        const isOwner = roleSet.has("super_admin") || roleSet.has("admin");
-        const isEmployee = roleSet.has("employee") || roleSet.has("manager");
+
+        // Team membership is the source of truth for employee accounts. Some
+        // legacy employees may still carry stale role rows, so resolve the team
+        // row before deciding whether this is an owner or employee login.
+        const { data: teamRows, error: teamError } = await supabase
+          .from("team_members")
+          .select("id, status, role")
+          .eq("member_user_id", userId)
+          .order("created_at", { ascending: false });
+
+        if (teamError) throw teamError;
+
+        const activeTeamRow = (teamRows ?? []).find((row) => row.status === "active");
+        const hasTeamHistory = (teamRows ?? []).length > 0;
+        const hasTeamRole = roleSet.has("employee") || roleSet.has("manager") || roleSet.has("admin");
+        const isEmployee = !!activeTeamRow;
+        const isOwner = roleSet.has("super_admin") && !hasTeamRole && !hasTeamHistory;
 
         // Platform admins bypass the owner/employee tab guards entirely.
         if (!isPlatformAdmin) {
+          if (!activeTeamRow && (hasTeamRole || hasTeamHistory)) {
+            await supabase.auth.signOut();
+            setShowLoader(false);
+            setError("Ce compte employé n'est plus actif. Demandez au propriétaire de la boutique de le réactiver.");
+            return;
+          }
+
           if (loginRole === "employee" && isOwner) {
             await supabase.auth.signOut();
             setShowLoader(false);

@@ -27,20 +27,38 @@ function useOnboardingStatus(userId: string | undefined) {
     queryFn: async () => {
       if (!userId || isPlatformAdmin) return { skip: true } as const;
 
-      // Check if user is an employee (employees skip the funnel).
-      // Throw on a real error so React Query retries instead of mis-classifying
-      // the user (a swallowed error here could drop role info entirely).
+      // Active team membership is the source of truth for employees. Check it
+      // before role rows so stale roles can never route employees as owners.
+      const { data: teamRows, error: teamError } = await supabase
+        .from("team_members")
+        .select("id, status")
+        .eq("member_user_id", userId);
+
+      if (teamError) throw teamError;
+
+      const hasActiveTeam = (teamRows ?? []).some((row) => row.status === "active");
+      const hasTeamHistory = (teamRows ?? []).length > 0;
+
+      if (hasActiveTeam) return { skip: true } as const;
+      if (hasTeamHistory) return { skip: true, removedTeam: true } as const;
+
+      // Role fallback for legacy accounts without a team row. Throw on a real
+      // error so React Query retries instead of mis-classifying the user.
       const { data: role, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
-        .in("role", ["employee", "manager", "platform_admin"]);
+        .in("role", ["employee", "manager", "admin", "platform_admin"]);
 
       if (roleError) throw roleError;
 
       const roleSet = new Set((role ?? []).map((r) => r.role));
-      if (roleSet.has("employee") || roleSet.has("manager") || roleSet.has("platform_admin")) {
+      if (roleSet.has("platform_admin")) {
         return { skip: true } as const;
+      }
+
+      if (roleSet.has("employee") || roleSet.has("manager") || roleSet.has("admin")) {
+        return { skip: true, removedTeam: true } as const;
       }
 
       // Fetch onboarding_completed. CRITICAL: a transient read failure must NOT
@@ -107,7 +125,7 @@ function useOnboardingStatus(userId: string | undefined) {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const location = useLocation();
   const { data: isPlatformAdmin, isLoading: adminLoading } = useIsPlatformAdmin();
   const { allowedPages, isLoading: pagesLoading } = useAllowedPages({ enabled: !!user && isPlatformAdmin === false });
@@ -139,6 +157,13 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       toast.error("Accès non autorisé à cette page");
     }
   }, [isBlocked]);
+
+  useEffect(() => {
+    if (onboardingStatus && "removedTeam" in onboardingStatus && onboardingStatus.removedTeam) {
+      toast.error("Ce compte employé n'est plus actif. Demandez au propriétaire de la boutique de le réactiver.");
+      signOut();
+    }
+  }, [onboardingStatus, signOut]);
 
   if (loading || adminLoading || isVerifying) {
     return (
@@ -181,6 +206,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (onboardingStatus && "removedTeam" in onboardingStatus && onboardingStatus.removedTeam) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Déconnexion du compte employé inactif...</p>
         </div>
       </div>
     );
