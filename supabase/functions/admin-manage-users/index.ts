@@ -215,7 +215,7 @@ serve(async (req) => {
         const shopMap = new Map((shopSettings || []).map((s: any) => [s.user_id, { shop_name: s.shop_name, country: s.country, currency: s.currency, onboarding_completed: s.onboarding_completed }]));
 
         const owners = (profiles || [])
-          .filter((p: any) => roleMap.get(p.user_id) === "super_admin")
+          .filter((p: any) => roleMap.get(p.user_id) === "super_admin" && !activeMemberSet.has(p.user_id))
           .map((p: any) => ({
             ...p,
             role: roleMap.get(p.user_id),
