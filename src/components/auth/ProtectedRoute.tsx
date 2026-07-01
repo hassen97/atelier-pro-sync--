@@ -154,6 +154,13 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
   }, [isBlocked]);
 
+  useEffect(() => {
+    if (onboardingStatus && "removedTeam" in onboardingStatus && onboardingStatus.removedTeam) {
+      toast.error("Ce compte employé n'est plus actif. Demandez au propriétaire de la boutique de le réactiver.");
+      signOut();
+    }
+  }, [onboardingStatus, signOut]);
+
   if (loading || adminLoading || isVerifying) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -195,6 +202,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (onboardingStatus && "removedTeam" in onboardingStatus && onboardingStatus.removedTeam) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Déconnexion du compte employé inactif...</p>
         </div>
       </div>
     );
