@@ -465,8 +465,8 @@ export function AdminShopsView() {
         </div>
       )}
 
-      {/* Unified Table */}
-      <div className="admin-glass-card rounded-xl overflow-hidden">
+      {/* Unified Table — desktop only */}
+      <div className="admin-glass-card rounded-xl overflow-hidden hidden md:block">
         <Table>
           <TableHeader>
             <TableRow className="border-white/5 hover:bg-transparent">
