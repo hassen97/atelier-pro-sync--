@@ -288,17 +288,17 @@ export function AdminShopsView() {
       verified: all.filter((o: any) => o._status.key === "verified").length,
       trialing: all.filter((o: any) => o._status.key === "trialing").length,
       pro: all.filter((o: any) => o._status.key === "pro").length,
-      setup_incomplete: all.filter((o: any) => o._display.isIncomplete).length,
+      setup_incomplete: all.filter((o: any) => o._status.key === "setup_incomplete").length,
     };
   }, [owners, subMap]);
 
-  const filters: { key: FilterType; label: string; color?: string }[] = [
-    { key: "all", label: `Tous (${counts.all})` },
-    { key: "online", label: `En ligne (${counts.online})`, color: "text-emerald-400" },
-    { key: "verified", label: `Vérifiés (${counts.verified})`, color: "text-emerald-400" },
-    { key: "trialing", label: `Essai (${counts.trialing})`, color: "text-violet-400" },
-    { key: "pro", label: `Pro (${counts.pro})`, color: "text-amber-300" },
-    { key: "setup_incomplete", label: `Setup ⚠️ (${counts.setup_incomplete})` },
+  const filters: { key: FilterType; label: string; color?: string; count: number }[] = [
+    { key: "all", label: `Tous (${counts.all})`, count: counts.all },
+    { key: "online", label: `En ligne (${counts.online})`, color: "text-emerald-400", count: counts.online },
+    { key: "verified", label: `Vérifiés (${counts.verified})`, color: "text-emerald-400", count: counts.verified },
+    { key: "trialing", label: `Essai (${counts.trialing})`, color: "text-violet-400", count: counts.trialing },
+    { key: "pro", label: `Pro (${counts.pro})`, color: "text-amber-300", count: counts.pro },
+    { key: "setup_incomplete", label: `Setup ⚠️ (${counts.setup_incomplete})`, count: counts.setup_incomplete },
   ];
 
   // Selection
