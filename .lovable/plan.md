@@ -1,31 +1,72 @@
-# Fix: employees can't stay logged in (dashboard flashes then disappears)
+# Command Center Overhaul — "Gestion des boutiques"
 
-## Root cause
-Every self-signup gets the `super_admin` role from the `handle_new_user` DB trigger.
-**15 active employees still carry `super_admin`** alongside their employee/manager role.
+## Phase 0: Data model (foundation for Phase 1)
 
-Because `useIsOwner()` only checks for `super_admin`, those employees are treated as
-shop **owners**:
-- `useEffectiveUserId()` returns their *own* id → they load their own empty shop instead
-  of the employer's data.
-- `useAllowedPages()` returns "all pages" (no restriction).
-- The dashboard renders for a moment, then React Query resolves and the view collapses
-  into an empty / unauthorized state → "appears for a few seconds and disappears".
-- Bonus security hole: the `super_admin` role grants the "Super admins can manage roles"
-  RLS policy (privilege escalation).
+Add a real trial marker so trials stop masquerading as Pro.
 
-## Done (DB migration — already applied)
-- Removed the stray `super_admin` role from active team members who aren't shop owners.
-- Added trigger `sync_team_member_role` on `team_members`: when a member is added/
-  re-activated it strips any `super_admin` role and records their team role. Prevents
-  recurrence (e.g. adding an existing owner account as an employee).
+**Migration (`shop_subscriptions`):**
+- Add column `trial_ends_at timestamptz`.
+- Backfill existing rows:
+  - `status = 'trialing'` → `trial_ends_at = expires_at`.
+  - `status = 'active'` welcome trials (short window, `expires_at - started_at <= 8 days`) → `trial_ends_at = expires_at`.
+  - Genuine paid subscriptions (long window) → leave `trial_ends_at = NULL`.
+- Update the `handle_new_user` trigger so the 3-day welcome trial it creates also sets `trial_ends_at = now() + interval '3 days'`.
 
-## Remaining (needs Build mode — code change in `src/hooks/useTeam.ts`)
-Make the app resilient so **team membership always wins over a stray owner role**:
+## Phase 1: "Phantom Pro" classification fix
 
-1. `useEffectiveUserId()` — return `teamInfo.owner_id` whenever the user is an active
-   team member (drop the `&& !isOwner` condition).
-2. `useAllowedPages()` — if `teamInfo` exists, return the member's filtered pages
-   regardless of `isOwner`; only owners/standalone users get all pages.
+Update `src/components/admin/AdminShopsView.tsx` `getUnifiedStatus()` (and the mirrored `counts`) to a strict priority order:
 
-These guard against any future role drift even if a `super_admin` row reappears.
+1. **Setup ⚠️** — if `onboarding_completed === false`, categorize here first (no matter the subscription).
+2. **Essai** — if `sub.status === 'trialing'` **OR** `now < trial_ends_at`.
+3. **Pro** — only if `sub.status === 'active'` **AND** past trial (`trial_ends_at IS NULL || now >= trial_ends_at`).
+4. **Vérifié** — fallback (active/verified, no plan).
+
+`onboarding_completed` and `trial_ends_at` are not currently returned to the client, so:
+- **Edge function** `supabase/functions/admin-manage-users` (`list` action): add `onboarding_completed` to the `profiles` select and include it on each owner object.
+- Fetch/attach `trial_ends_at` via the existing `useAdminShopSubscriptions` query (add the column to its select in `src/hooks/useSubscription.ts`) and the `subMap`.
+- Replace the current `getDisplayName` "Setup Incomplet" heuristic (based on `shop_name === 'Mon Atelier'`) with the real `onboarding_completed === false` flag; keep the ⚠️ label styling.
+- Update `ShopOwner`/subscription TypeScript interfaces accordingly.
+
+Result: `Tous`, `En ligne`, `Vérifiés`, `Essai`, `Pro`, `Setup ⚠️` all count correctly and are mutually consistent.
+
+## Phase 2: Mobile-first UI overhaul
+
+All in `AdminShopsView.tsx` (+ a small `hide-scrollbar` utility in `index.css` if not present).
+
+**Filter chips:**
+- Wrap in `flex overflow-x-auto hide-scrollbar` with `whitespace-nowrap` so they scroll horizontally on mobile instead of wrapping.
+- Dim + disable any chip whose count is `0` (`opacity-40 pointer-events-none`), except keep "Tous" always active.
+
+**Responsive layout:**
+- Keep the existing `<Table>` but wrap it in `hidden md:block`.
+- Add a `md:hidden` grid of Cards (one per shop). Each card shows:
+  - Shop logo/avatar (initials fallback if no logo).
+  - Shop name + `@username`.
+  - Color-coded status badge (reusing `unified.color` / icon).
+  - Three-dot "Actions" dropdown (top-right) — same `DropdownMenu` items as the desktop row, extracted into a shared `ShopActionsMenu` sub-component so desktop and mobile stay in sync.
+- Card tap (outside the menu) opens the existing `ShopDetailSheet`.
+
+**Search & empty state:**
+- Change search placeholder to exactly `Rechercher une boutique...`.
+- When `filteredOwners.length === 0`, render a centered empty state with the Lucide `SearchX` icon and text `Aucun résultat pour ce filtre.` (replaces the current "Aucune boutique trouvée" cell and applies to the mobile grid too).
+
+## Phase 3: "Setup Rescue" WhatsApp action
+
+In the shared `ShopActionsMenu` (desktop + mobile), when a shop's status is **Setup ⚠️**, show a highlighted item **"Relancer via WhatsApp"** that opens:
+
+```
+https://wa.me/<digits>?text=<encoded message>
+```
+
+- `<digits>` = `(whatsapp_phone || phone)` stripped to digits; if neither exists, disable the item with a hint.
+- Pre-filled message:
+  > Salut, j'ai remarqué que vous n'avez pas terminé la configuration de votre boutique sur GoodsPro. Avez-vous besoin d'aide pour finaliser ?
+
+Opens in a new tab (`target="_blank"`).
+
+---
+
+## Technical notes
+- Files touched: `supabase/functions/admin-manage-users/index.ts`, `src/hooks/useAdmin.ts` (type), `src/hooks/useSubscription.ts`, `src/components/admin/AdminShopsView.tsx`, `src/index.css` (hide-scrollbar util), plus one DB migration.
+- No changes to bulk actions, dialogs, or the detail sheet beyond wiring the shared actions menu.
+- Backfill uses the `<= 8 days` window heuristic only for existing rows; new trials get an exact `trial_ends_at` from the updated trigger.
