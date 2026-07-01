@@ -53,8 +53,12 @@ function useOnboardingStatus(userId: string | undefined) {
       if (roleError) throw roleError;
 
       const roleSet = new Set((role ?? []).map((r) => r.role));
-      if (roleSet.has("employee") || roleSet.has("manager") || roleSet.has("admin") || roleSet.has("platform_admin")) {
+      if (roleSet.has("platform_admin")) {
         return { skip: true } as const;
+      }
+
+      if (roleSet.has("employee") || roleSet.has("manager") || roleSet.has("admin")) {
+        return { skip: true, removedTeam: true } as const;
       }
 
       // Fetch onboarding_completed. CRITICAL: a transient read failure must NOT
