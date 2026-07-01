@@ -27,14 +27,28 @@ function useOnboardingStatus(userId: string | undefined) {
     queryFn: async () => {
       if (!userId || isPlatformAdmin) return { skip: true } as const;
 
-      // Check if user is an employee (employees skip the funnel).
-      // Throw on a real error so React Query retries instead of mis-classifying
-      // the user (a swallowed error here could drop role info entirely).
+      // Active team membership is the source of truth for employees. Check it
+      // before role rows so stale roles can never route employees as owners.
+      const { data: teamRows, error: teamError } = await supabase
+        .from("team_members")
+        .select("id, status")
+        .eq("member_user_id", userId);
+
+      if (teamError) throw teamError;
+
+      const hasActiveTeam = (teamRows ?? []).some((row) => row.status === "active");
+      const hasTeamHistory = (teamRows ?? []).length > 0;
+
+      if (hasActiveTeam) return { skip: true } as const;
+      if (hasTeamHistory) return { skip: true, removedTeam: true } as const;
+
+      // Role fallback for legacy accounts without a team row. Throw on a real
+      // error so React Query retries instead of mis-classifying the user.
       const { data: role, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
-        .in("role", ["employee", "manager", "platform_admin"]);
+        .in("role", ["employee", "manager", "admin", "platform_admin"]);
 
       if (roleError) throw roleError;
 
