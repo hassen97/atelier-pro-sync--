@@ -588,16 +588,82 @@ export function AdminShopsView() {
                 </TableRow>
               );
             })}
-            {filteredOwners.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-slate-500 py-8">
-                  Aucune boutique trouvée
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Mobile card grid — < md */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:hidden">
+        {filteredOwners.map((owner: any) => {
+          const status = getOnlineStatus(owner.last_online_at);
+          const unified = owner._status;
+          const display = owner._display;
+          const StatusIcon = unified.icon;
+          const isSelected = selectedIds.has(owner.user_id);
+          const initials = (display.name || "?").trim().slice(0, 2).toUpperCase();
+          return (
+            <div
+              key={owner.user_id}
+              className={cn(
+                "admin-glass-card rounded-xl p-4 relative cursor-pointer transition-colors hover:bg-white/5",
+                owner.is_locked && "opacity-60",
+                isSelected && "ring-1 ring-[#00D4FF]/40"
+              )}
+              onClick={() => setSelectedShopId(owner.user_id)}
+            >
+              {/* Actions dropdown top-right */}
+              <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-white">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  {renderActionItems(owner, display)}
+                </DropdownMenu>
+              </div>
+
+              <div className="flex items-start gap-3 pr-9">
+                {/* Avatar */}
+                {owner.logo_url ? (
+                  <img src={owner.logo_url} alt={display.name} className="h-11 w-11 rounded-lg object-cover border border-white/10 shrink-0" />
+                ) : (
+                  <div className="h-11 w-11 rounded-lg bg-[#00D4FF]/15 text-[#00D4FF] flex items-center justify-center text-sm font-semibold shrink-0">
+                    {initials}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn("text-sm font-medium truncate", display.isIncomplete ? "text-amber-400" : "text-white")}>
+                      {display.name}
+                    </span>
+                    {owner.verification_status === "verified" && !display.isIncomplete && <VerifiedBadge />}
+                  </div>
+                  <p className="text-xs text-slate-500 truncate">@{owner.username}</p>
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", unified.color)}>
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {unified.label}
+                    </Badge>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                      <span className={cn("w-2 h-2 rounded-full", statusDot[status])} />
+                      {owner.repair_count} rép.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Shared empty state */}
+      {filteredOwners.length === 0 && (
+        <div className="admin-glass-card rounded-xl flex flex-col items-center justify-center py-14 text-center">
+          <SearchX className="h-10 w-10 text-slate-600 mb-3" />
+          <p className="text-sm text-slate-400">Aucun résultat pour ce filtre.</p>
+        </div>
+      )}
 
       {/* Bulk confirm dialog */}
       {confirmAction && confirmLabels[confirmAction] && (
