@@ -135,24 +135,23 @@ function MemberCard({ member }: { member: TeamMember }) {
           <AlertDialogTrigger asChild>
             <Button variant="destructive" size="sm">
               <UserMinus className="h-4 w-4 mr-1" />
-              Supprimer
+              Retirer
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Supprimer définitivement cet employé ?</AlertDialogTitle>
+              <AlertDialogTitle>Retirer ce membre ?</AlertDialogTitle>
               <AlertDialogDescription>
-                Le compte de {displayName} sera <strong>entièrement effacé</strong> : connexion, rôles,
-                accès et données associées. Aucune trace ne subsistera et cette action est irréversible.
+                {displayName} n'aura plus accès aux données de votre boutique.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Annuler</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => removeMember.mutate({ memberId: member.id, memberUserId: member.member_user_id })}
+                onClick={() => removeMember.mutate(member.id)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Supprimer définitivement
+                Retirer
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

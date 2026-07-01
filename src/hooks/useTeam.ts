@@ -261,24 +261,22 @@ export function useAddTeamMember() {
   });
 }
 
-// Remove team member — fully wipes the employee account (no leftovers).
-// This prevents orphaned auth/profile/role rows that previously caused
-// "removed" employees to break login for the whole shop.
+// Remove team member
 export function useRemoveTeamMember() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (member: { memberId: string; memberUserId: string }) => {
-      const { data, error } = await supabase.functions.invoke("wipe-employee", {
-        body: { employeeUserId: member.memberUserId },
-      });
+    mutationFn: async (memberId: string) => {
+      const { error } = await supabase
+        .from("team_members")
+        .update({ status: "removed" })
+        .eq("id", memberId);
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
-      toast.success("Employé supprimé définitivement");
+      toast.success("Membre retiré de l'équipe");
     },
-    onError: (err: any) => toast.error(err.message || "Erreur lors de la suppression du membre"),
+    onError: () => toast.error("Erreur lors du retrait du membre"),
   });
 }
 
