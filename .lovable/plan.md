@@ -1,72 +1,38 @@
-# Command Center Overhaul — "Gestion des boutiques"
+# Fix: Command Center showing "Aucun résultat" (0 shops)
 
-## Phase 0: Data model (foundation for Phase 1)
+## What's actually broken
 
-Add a real trial marker so trials stop masquerading as Pro.
+The page shows **Tous (0)** and every filter at 0. That means the owners list came back empty — not a filter/UI bug. I traced it to the data layer.
 
-**Migration (`shop_subscriptions`):**
-- Add column `trial_ends_at timestamptz`.
-- Backfill existing rows:
-  - `status = 'trialing'` → `trial_ends_at = expires_at`.
-  - `status = 'active'` welcome trials (short window, `expires_at - started_at <= 8 days`) → `trial_ends_at = expires_at`.
-  - Genuine paid subscriptions (long window) → leave `trial_ends_at = NULL`.
-- Update the `handle_new_user` trigger so the 3-day welcome trial it creates also sets `trial_ends_at = now() + interval '3 days'`.
-
-## Phase 1: "Phantom Pro" classification fix
-
-Update `src/components/admin/AdminShopsView.tsx` `getUnifiedStatus()` (and the mirrored `counts`) to a strict priority order:
-
-1. **Setup ⚠️** — if `onboarding_completed === false`, categorize here first (no matter the subscription).
-2. **Essai** — if `sub.status === 'trialing'` **OR** `now < trial_ends_at`.
-3. **Pro** — only if `sub.status === 'active'` **AND** past trial (`trial_ends_at IS NULL || now >= trial_ends_at`).
-4. **Vérifié** — fallback (active/verified, no plan).
-
-`onboarding_completed` and `trial_ends_at` are not currently returned to the client, so:
-- **Edge function** `supabase/functions/admin-manage-users` (`list` action): add `onboarding_completed` to the `profiles` select and include it on each owner object.
-- Fetch/attach `trial_ends_at` via the existing `useAdminShopSubscriptions` query (add the column to its select in `src/hooks/useSubscription.ts`) and the `subMap`.
-- Replace the current `getDisplayName` "Setup Incomplet" heuristic (based on `shop_name === 'Mon Atelier'`) with the real `onboarding_completed === false` flag; keep the ⚠️ label styling.
-- Update `ShopOwner`/subscription TypeScript interfaces accordingly.
-
-Result: `Tous`, `En ligne`, `Vérifiés`, `Essai`, `Pro`, `Setup ⚠️` all count correctly and are mutually consistent.
-
-## Phase 2: Mobile-first UI overhaul
-
-All in `AdminShopsView.tsx` (+ a small `hide-scrollbar` utility in `index.css` if not present).
-
-**Filter chips:**
-- Wrap in `flex overflow-x-auto hide-scrollbar` with `whitespace-nowrap` so they scroll horizontally on mobile instead of wrapping.
-- Dim + disable any chip whose count is `0` (`opacity-40 pointer-events-none`), except keep "Tous" always active.
-
-**Responsive layout:**
-- Keep the existing `<Table>` but wrap it in `hidden md:block`.
-- Add a `md:hidden` grid of Cards (one per shop). Each card shows:
-  - Shop logo/avatar (initials fallback if no logo).
-  - Shop name + `@username`.
-  - Color-coded status badge (reusing `unified.color` / icon).
-  - Three-dot "Actions" dropdown (top-right) — same `DropdownMenu` items as the desktop row, extracted into a shared `ShopActionsMenu` sub-component so desktop and mobile stay in sync.
-- Card tap (outside the menu) opens the existing `ShopDetailSheet`.
-
-**Search & empty state:**
-- Change search placeholder to exactly `Rechercher une boutique...`.
-- When `filteredOwners.length === 0`, render a centered empty state with the Lucide `SearchX` icon and text `Aucun résultat pour ce filtre.` (replaces the current "Aucune boutique trouvée" cell and applies to the mobile grid too).
-
-## Phase 3: "Setup Rescue" WhatsApp action
-
-In the shared `ShopActionsMenu` (desktop + mobile), when a shop's status is **Setup ⚠️**, show a highlighted item **"Relancer via WhatsApp"** that opens:
+**Root cause #1 (the blocker):** In the last update, the `admin-manage-users` edge function's `list` query was changed to select `onboarding_completed` **from the `profiles` table**:
 
 ```
-https://wa.me/<digits>?text=<encoded message>
+.select("... verification_status, onboarding_completed")   // from profiles
 ```
 
-- `<digits>` = `(whatsapp_phone || phone)` stripped to digits; if neither exists, disable the item with a hint.
-- Pre-filled message:
-  > Salut, j'ai remarqué que vous n'avez pas terminé la configuration de votre boutique sur GoodsPro. Avez-vous besoin d'aide pour finaliser ?
+But `onboarding_completed` does **not** live on `profiles` — I verified it only exists on `shop_settings` (confirmed in both your live and working databases). Because the code doesn't check the query error, the failed select makes `profiles` come back empty, so `owners = []` and every counter is 0. This is why the whole page went blank.
 
-Opens in a new tab (`target="_blank"`).
+**Root cause #2 (production only):** The new `trial_ends_at` column was added to `shop_subscriptions` in the working (development) database but is **not yet in your live database**. The front-end subscription query (`useAdminShopSubscriptions`) selects `trial_ends_at`, which errors on live. Publishing applies the migration, but I'll make the fix resilient regardless.
 
----
+## The fix
 
-## Technical notes
-- Files touched: `supabase/functions/admin-manage-users/index.ts`, `src/hooks/useAdmin.ts` (type), `src/hooks/useSubscription.ts`, `src/components/admin/AdminShopsView.tsx`, `src/index.css` (hide-scrollbar util), plus one DB migration.
-- No changes to bulk actions, dialogs, or the detail sheet beyond wiring the shared actions menu.
-- Backfill uses the `<= 8 days` window heuristic only for existing rows; new trials get an exact `trial_ends_at` from the updated trigger.
+### 1. Edge function `admin-manage-users` (`list` action)
+- Remove `onboarding_completed` from the `profiles` select (it doesn't exist there).
+- Add `onboarding_completed` to the existing `shop_settings` select that already feeds `shopMap`.
+- Attach `onboarding_completed` onto each owner object from `shopMap` (default to `true` when no shop_settings row exists, so brand-new/edge cases don't all show as "Setup").
+- Add a defensive error check/log on the `profiles` query so a future bad column fails loudly instead of silently returning zero shops.
+
+This keeps the exact `onboarding_completed` semantics the classification code already expects — no front-end logic change needed.
+
+### 2. Ensure `trial_ends_at` exists on live
+Re-run the Phase 0 migration so `shop_subscriptions.trial_ends_at` and the backfill/trigger are applied to the live database (it currently only exists in development). This makes the Essai/Pro split work and stops the front-end subscription query from erroring in production.
+
+### 3. Verify
+- Query the database to confirm `owners` returns the full list again and that `onboarding_completed`/`trial_ends_at` resolve.
+- Redeploy the edge function and confirm the counters (Tous, Essai, Pro, Setup ⚠️) populate with real numbers.
+
+## Files touched
+- `supabase/functions/admin-manage-users/index.ts` — move `onboarding_completed` to the `shop_settings` source, attach to owners, add error logging.
+- One migration to add/backfill `trial_ends_at` on the live database.
+
+No UI/layout changes — the Phase 2/3 mobile cards, filters, and WhatsApp rescue stay as-is; they'll simply have data to render again.

@@ -183,15 +183,21 @@ serve(async (req) => {
           console.warn("[admin-list] Self-heal step failed (continuing):", healErr);
         }
 
-        const { data: profiles } = await adminClient
+        const { data: profiles, error: profilesError } = await adminClient
           .from("profiles")
-          .select("user_id, full_name, username, created_at, is_locked, last_online_at, phone, whatsapp_phone, email, verification_status, onboarding_completed")
+          .select("user_id, full_name, username, created_at, is_locked, last_online_at, phone, whatsapp_phone, email, verification_status")
           .order("created_at", { ascending: false });
+
+        if (profilesError) {
+          console.error("[admin-list] profiles query failed:", profilesError);
+          return jsonResp({ error: "Failed to load shops", details: profilesError.message }, 500);
+        }
 
         const { data: roles } = await adminClient.from("user_roles").select("user_id, role");
         const { data: teamCounts } = await adminClient.from("team_members").select("owner_id").eq("status", "active");
         const { data: repairCounts } = await adminClient.from("repairs").select("user_id");
-        const { data: shopSettings } = await adminClient.from("shop_settings").select("user_id, shop_name, country, currency");
+        // onboarding_completed lives on shop_settings, not profiles.
+        const { data: shopSettings } = await adminClient.from("shop_settings").select("user_id, shop_name, country, currency, onboarding_completed");
 
         const roleMap = new Map((roles || []).map((r: any) => [r.user_id, r.role]));
         const teamCountMap = new Map<string, number>();
@@ -202,7 +208,7 @@ serve(async (req) => {
         (repairCounts || []).forEach((r: any) => {
           repairCountMap.set(r.user_id, (repairCountMap.get(r.user_id) || 0) + 1);
         });
-        const shopMap = new Map((shopSettings || []).map((s: any) => [s.user_id, { shop_name: s.shop_name, country: s.country, currency: s.currency }]));
+        const shopMap = new Map((shopSettings || []).map((s: any) => [s.user_id, { shop_name: s.shop_name, country: s.country, currency: s.currency, onboarding_completed: s.onboarding_completed }]));
 
         const owners = (profiles || [])
           .filter((p: any) => roleMap.get(p.user_id) === "super_admin")
@@ -214,6 +220,8 @@ serve(async (req) => {
             shop_name: shopMap.get(p.user_id)?.shop_name || "Mon Atelier",
             country: shopMap.get(p.user_id)?.country || "TN",
             currency: shopMap.get(p.user_id)?.currency || "TND",
+            // Default to true so shops without a settings row aren't all flagged "Setup".
+            onboarding_completed: shopMap.get(p.user_id)?.onboarding_completed ?? true,
           }));
 
         const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
