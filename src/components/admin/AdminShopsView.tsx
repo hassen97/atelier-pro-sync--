@@ -346,31 +346,37 @@ export function AdminShopsView() {
         </Button>
       </div>
 
-      {/* Status Filters */}
-      <div className="flex gap-2 flex-wrap">
-        {filters.map((f) => (
-          <Button
-            key={f.key}
-            variant={filter === f.key ? "default" : "outline"}
-            size="sm"
-            className={cn(
-              "text-xs",
-              filter === f.key
-                ? "bg-[#00D4FF]/20 text-[#00D4FF] border-[#00D4FF]/30"
-                : "border-white/10 text-slate-400 hover:text-white hover:bg-white/5"
-            )}
-            onClick={() => { setFilter(f.key); setSelectedIds(new Set()); }}
-          >
-            {f.label}
-          </Button>
-        ))}
+      {/* Status Filters — horizontally scrollable on mobile */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 py-0.5">
+        {filters.map((f) => {
+          const isEmpty = f.key !== "all" && f.count === 0;
+          const isActive = filter === f.key;
+          return (
+            <Button
+              key={f.key}
+              variant={isActive ? "default" : "outline"}
+              size="sm"
+              disabled={isEmpty}
+              className={cn(
+                "text-xs whitespace-nowrap shrink-0",
+                isActive
+                  ? "bg-[#00D4FF]/20 text-[#00D4FF] border-[#00D4FF]/30"
+                  : "border-white/10 text-slate-400 hover:text-white hover:bg-white/5",
+                isEmpty && "opacity-40 pointer-events-none"
+              )}
+              onClick={() => { setFilter(f.key); setSelectedIds(new Set()); }}
+            >
+              {f.label}
+            </Button>
+          );
+        })}
       </div>
 
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
         <Input
-          placeholder="Rechercher par boutique, nom, username, téléphone, email..."
+          placeholder="Rechercher une boutique..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus-visible:ring-[#00D4FF]/30"
