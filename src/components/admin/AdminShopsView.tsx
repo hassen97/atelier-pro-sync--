@@ -120,25 +120,47 @@ const statusDot: Record<string, string> = {
 };
 
 function getUnifiedStatus(owner: any, sub: any): { key: string; label: string; color: string; icon: any } {
-  // Verification gate removed — every owner is treated as verified.
+  // 1) Setup takes absolute priority — an owner who hasn't finished onboarding.
+  if (owner.onboarding_completed === false) {
+    return { key: "setup_incomplete", label: "Setup ⚠️", color: "border-amber-500/30 text-amber-400 bg-amber-500/10", icon: AlertTriangle };
+  }
+
   if (sub) {
-    const isExpired = sub.expires_at && new Date(sub.expires_at) < new Date();
-    if (!isExpired && sub.status === "trialing") {
+    const now = new Date();
+    const trialEnds = sub.trial_ends_at ? new Date(sub.trial_ends_at) : null;
+    const isExpired = sub.expires_at ? new Date(sub.expires_at) < now : false;
+    const inTrial = sub.status === "trialing" || (trialEnds ? now < trialEnds : false);
+
+    // 2) Trial: explicit trialing status OR still inside the trial window.
+    if (!isExpired && inTrial) {
       return { key: "trialing", label: "Essai", color: "border-violet-500/30 text-violet-400 bg-violet-500/10", icon: Clock };
     }
+    // 3) Pro: active AND past the trial period.
     if (!isExpired && sub.status === "active") {
       return { key: "pro", label: "Pro", color: "border-amber-400/30 text-amber-300 bg-amber-400/10", icon: CreditCard };
     }
   }
+
+  // 4) Fallback.
   return { key: "verified", label: "Vérifié", color: "border-emerald-500/30 text-emerald-400 bg-emerald-500/10", icon: CheckCircle };
 }
 
 function getDisplayName(owner: any): { name: string; isIncomplete: boolean } {
+  const isIncomplete = owner.onboarding_completed === false;
   const shopName = owner.shop_name;
   if (!shopName || shopName === "Mon Atelier") {
-    return { name: `⚠️ Setup Incomplet (@${owner.username || "?"})`, isIncomplete: true };
+    return { name: `⚠️ Setup Incomplet (@${owner.username || "?"})`, isIncomplete };
   }
-  return { name: shopName, isIncomplete: false };
+  return { name: shopName, isIncomplete };
+}
+
+const SETUP_RESCUE_MESSAGE =
+  "Salut, j'ai remarqué que vous n'avez pas terminé la configuration de votre boutique sur GoodsPro. Avez-vous besoin d'aide pour finaliser ?";
+
+function getWhatsAppRescueLink(owner: any): string | null {
+  const raw = (owner.whatsapp_phone || owner.phone || "").replace(/[^0-9]/g, "");
+  if (!raw) return null;
+  return `https://wa.me/${raw}?text=${encodeURIComponent(SETUP_RESCUE_MESSAGE)}`;
 }
 
 function useBulkAction() {
