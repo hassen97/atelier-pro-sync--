@@ -839,7 +839,7 @@ export function AdminEmployeesView() {
                 }
               }}
             >
-              {deleteEmployee.isPending ? "Suppression..." : "Supprimer"}
+              {deleteEmployee.isPending ? "Effacement..." : "Wipe total"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
