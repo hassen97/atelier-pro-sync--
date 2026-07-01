@@ -293,9 +293,9 @@ export function AdminEmployeesView() {
   });
 
   const deleteEmployee = useMutation({
-    mutationFn: async ({ memberId, employeeUserId }: { memberId: string; employeeUserId: string }) => {
-      const { data, error } = await supabase.functions.invoke("admin-manage-users", {
-        body: { action: "delete-employee", memberId, employeeUserId },
+    mutationFn: async ({ employeeUserId }: { memberId: string; employeeUserId: string }) => {
+      const { data, error } = await supabase.functions.invoke("wipe-employee", {
+        body: { employeeUserId },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -303,7 +303,7 @@ export function AdminEmployeesView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-employees"] });
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
-      toast.success("Employé supprimé avec succès");
+      toast.success("Employé complètement effacé — aucune trace restante");
       setDeleteTarget(null);
       setDetailTarget(null);
     },
