@@ -195,6 +195,10 @@ serve(async (req) => {
 
         const { data: roles } = await adminClient.from("user_roles").select("user_id, role");
         const { data: teamCounts } = await adminClient.from("team_members").select("owner_id").eq("status", "active");
+        // Defensive guard: anyone who is an ACTIVE team member is an employee, never a shop owner —
+        // exclude them from the owners list even if a stray super_admin role lingers.
+        const { data: activeMembers } = await adminClient.from("team_members").select("member_user_id").eq("status", "active");
+        const activeMemberSet = new Set((activeMembers || []).map((m: any) => m.member_user_id));
         const { data: repairCounts } = await adminClient.from("repairs").select("user_id");
         // onboarding_completed lives on shop_settings, not profiles.
         const { data: shopSettings } = await adminClient.from("shop_settings").select("user_id, shop_name, country, currency, onboarding_completed");
