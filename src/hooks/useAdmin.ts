@@ -20,6 +20,7 @@ export interface ShopOwner {
   whatsapp_phone: string | null;
   email: string | null;
   verification_status?: string;
+  onboarding_completed?: boolean;
 }
 
 export interface AdminStats {
