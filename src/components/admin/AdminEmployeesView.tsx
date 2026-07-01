@@ -433,7 +433,7 @@ export function AdminEmployeesView() {
         className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
         onClick={() => setDeleteTarget(emp)}
       >
-        <Trash2 className="h-4 w-4 mr-2" /> Supprimer l'employé
+        <Trash2 className="h-4 w-4 mr-2" /> Wipe employé (suppression totale)
       </DropdownMenuItem>
     </>
   );
