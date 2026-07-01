@@ -168,35 +168,17 @@ Deno.serve(async (req) => {
       // is intentionally ignored.
       ownerId = callerId;
     } else {
-      // Delegated path: an active team manager/admin may create employees on
-      // behalf of their shop owner. The owner_id is resolved server-side.
-      const { data: managerMembership, error: managerError } = await adminClient
-        .from("team_members")
-        .select("owner_id, role, status")
-        .eq("member_user_id", callerId)
-        .eq("status", "active")
-        .in("role", ["manager", "admin"])
-        .maybeSingle();
-
-      if (managerError) {
-        console.error("Manager membership lookup error:", managerError);
-      }
-
-      if (!managerMembership) {
-        console.error("Permission denied for user:", callerId);
-        return new Response(
-          JSON.stringify({
-            error:
-              "Erreur : Seuls les gérants (admin) et super admins peuvent créer des comptes employés.",
-          }),
-          {
-            status: 403,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      ownerId = managerMembership.owner_id as string;
+      console.error("Permission denied for user:", callerId);
+      return new Response(
+        JSON.stringify({
+          error:
+            "Erreur : Seuls les gérants (admin) et super admins peuvent créer des comptes employés.",
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const rawBody = await req.json();
