@@ -818,11 +818,12 @@ export function AdminEmployeesView() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cet employé ?</AlertDialogTitle>
+            <AlertDialogTitle>Wipe total de cet employé ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action supprimera définitivement le compte de{" "}
-              <strong>{deleteTarget?.full_name || deleteTarget?.username}</strong> et retirera
-              son accès à la boutique <strong>{deleteTarget?.shop_name}</strong>. Irréversible.
+              Cette action <strong>efface complètement</strong> le compte de{" "}
+              <strong>{deleteTarget?.full_name || deleteTarget?.username}</strong> : identifiants de connexion,
+              rôles, appartenances d'équipe, transactions, préférences et notifications. Aucune trace ne subsistera.
+              Il perdra tout accès à la boutique <strong>{deleteTarget?.shop_name}</strong>. Irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
