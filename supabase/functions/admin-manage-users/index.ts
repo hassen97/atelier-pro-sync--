@@ -208,7 +208,7 @@ serve(async (req) => {
         (repairCounts || []).forEach((r: any) => {
           repairCountMap.set(r.user_id, (repairCountMap.get(r.user_id) || 0) + 1);
         });
-        const shopMap = new Map((shopSettings || []).map((s: any) => [s.user_id, { shop_name: s.shop_name, country: s.country, currency: s.currency }]));
+        const shopMap = new Map((shopSettings || []).map((s: any) => [s.user_id, { shop_name: s.shop_name, country: s.country, currency: s.currency, onboarding_completed: s.onboarding_completed }]));
 
         const owners = (profiles || [])
           .filter((p: any) => roleMap.get(p.user_id) === "super_admin")
@@ -220,6 +220,8 @@ serve(async (req) => {
             shop_name: shopMap.get(p.user_id)?.shop_name || "Mon Atelier",
             country: shopMap.get(p.user_id)?.country || "TN",
             currency: shopMap.get(p.user_id)?.currency || "TND",
+            // Default to true so shops without a settings row aren't all flagged "Setup".
+            onboarding_completed: shopMap.get(p.user_id)?.onboarding_completed ?? true,
           }));
 
         const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
