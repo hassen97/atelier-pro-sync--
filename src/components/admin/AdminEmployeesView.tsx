@@ -25,13 +25,15 @@ import {
 import {
   MoreHorizontal, KeyRound, Trash2, Users, Search, Lock, Unlock,
   ShieldCheck, Copy, Check, RefreshCw, Store, UserCog, ChevronLeft, ChevronRight,
-  Wifi, WifiOff, Clock, Calendar,
+  Wifi, WifiOff, Clock, Calendar, UserX, UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import { EmployeeRecord } from "@/hooks/useAdmin";
+import { AdminEmployeeDetailSheet } from "./AdminEmployeeDetailSheet";
+
 
 const PAGE_SIZE = 50;
 
