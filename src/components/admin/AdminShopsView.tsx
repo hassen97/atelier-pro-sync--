@@ -334,6 +334,75 @@ export function AdminShopsView() {
     "bulk-revert-to-pending": { title: "Remettre en attente", desc: `Remettre ${selectedIds.size} propriétaire(s) en attente ?`, btn: "Remettre en attente" },
   };
 
+  // Shared dropdown items so desktop table + mobile cards stay in sync.
+  const renderActionItems = (owner: any, display: { name: string; isIncomplete: boolean }) => {
+    const isSetup = owner._status?.key === "setup_incomplete";
+    const rescueLink = getWhatsAppRescueLink(owner);
+    return (
+      <DropdownMenuContent align="end" className="bg-slate-900 border-white/10 text-white">
+        {isSetup && (
+          <>
+            <DropdownMenuItem
+              className="text-emerald-400 focus:text-emerald-300"
+              disabled={!rescueLink}
+              onClick={() => {
+                if (rescueLink) window.open(rescueLink, "_blank", "noopener,noreferrer");
+                else toast.error("Aucun numéro de téléphone pour cette boutique");
+              }}
+            >
+              <Rocket className="h-4 w-4 mr-2" /> Relancer via WhatsApp
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        <DropdownMenuItem className="text-[#00D4FF]" onClick={() => setGodModeTarget({ userId: owner.user_id, shopName: display.name })}>
+          <Zap className="h-4 w-4 mr-2" /> God Mode — Abonnement
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => setEditTarget({ userId: owner.user_id, name: owner.full_name || owner.username || "", country: owner.country || "TN", currency: owner.currency || "TND" })}>
+          <Settings2 className="h-4 w-4 mr-2" /> Modifier pays/devise
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setResetTarget({ userId: owner.user_id, name: owner.full_name || owner.username || "" })}>
+          <KeyRound className="h-4 w-4 mr-2" /> Réinitialiser mot de passe
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setAnnouncementTarget({ userId: owner.user_id, shopName: owner.shop_name })}>
+          <Megaphone className="h-4 w-4 mr-2" /> Envoyer une annonce
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={async () => {
+          const newRole = prompt("Nouveau rôle (super_admin ou employee) :", "employee");
+          if (!newRole || !["super_admin", "employee"].includes(newRole)) return;
+          const { error } = await supabase.functions.invoke("admin-manage-users", { body: { action: "change-role", userId: owner.user_id, newRole } });
+          if (error) toast.error("Erreur"); else toast.success("Rôle modifié");
+        }}>
+          <UserCog className="h-4 w-4 mr-2" /> Changer le rôle
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTransferSource(owner.user_id)}>
+          <ArrowRightLeft className="h-4 w-4 mr-2" /> Transférer les données
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={async () => {
+          toast.info("Export en cours...");
+          const { data, error } = await supabase.functions.invoke("admin-manage-users", { body: { action: "export-shop-data", userId: owner.user_id } });
+          if (error) { toast.error("Erreur d'export"); return; }
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a"); a.href = url; a.download = `backup-${owner.shop_name}-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url);
+          toast.success("Export téléchargé");
+        }}>
+          <Download className="h-4 w-4 mr-2" /> Sauvegarder (JSON)
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { window.location.href = `/?impersonate=${owner.user_id}&mode=readonly`; }}>
+          <LogIn className="h-4 w-4 mr-2" /> Accéder à la boutique
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="text-red-400" onClick={() => { if (confirm(`Supprimer ${owner.full_name || owner.username} ?`)) deleteOwner.mutate(owner.user_id); }}>
+          <Trash2 className="h-4 w-4 mr-2" /> Supprimer
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    );
+  };
+
+
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-3">
