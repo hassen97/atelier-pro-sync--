@@ -53,7 +53,7 @@ function useOnboardingStatus(userId: string | undefined) {
       if (roleError) throw roleError;
 
       const roleSet = new Set((role ?? []).map((r) => r.role));
-      if (roleSet.has("employee") || roleSet.has("manager") || roleSet.has("platform_admin")) {
+      if (roleSet.has("employee") || roleSet.has("manager") || roleSet.has("admin") || roleSet.has("platform_admin")) {
         return { skip: true } as const;
       }
 
@@ -121,7 +121,7 @@ function useOnboardingStatus(userId: string | undefined) {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const location = useLocation();
   const { data: isPlatformAdmin, isLoading: adminLoading } = useIsPlatformAdmin();
   const { allowedPages, isLoading: pagesLoading } = useAllowedPages({ enabled: !!user && isPlatformAdmin === false });
