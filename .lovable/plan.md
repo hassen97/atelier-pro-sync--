@@ -1,38 +1,54 @@
-# Fix: Command Center showing "Aucun résultat" (0 shops)
+# Fix employee misclassification + redesign Employee Hub
 
-## What's actually broken
+## Problem
 
-The page shows **Tous (0)** and every filter at 0. That means the owners list came back empty — not a filter/UI bug. I traced it to the data layer.
+Accounts that are **employees** (goods2026, goods2027, goodspro1, goodsproeya, hichem2026… — 35 total) appear in the Super Admin **"Gestion des boutiques"** list as fake **"Setup Incomplet"** shop owners.
 
-**Root cause #1 (the blocker):** In the last update, the `admin-manage-users` edge function's `list` query was changed to select `onboarding_completed` **from the `profiles` table**:
+**Root cause:** The `sync_team_member_role` database trigger — whose job is to strip the `super_admin` role off a team member — is **missing** from the `team_members` table. The function exists, but no trigger fires it. Every employee keeps the `super_admin` role that signup automatically grants, so the admin owner-list treats them as shops. (Confirmed: only `on_auth_user_created` exists; 35 accounts currently hold both `super_admin` and a team role.)
 
-```
-.select("... verification_status, onboarding_completed")   // from profiles
-```
+The "Setup (362)" bucket the user sees matches the environment where these 35 stray accounts live, inflating the count.
 
-But `onboarding_completed` does **not** live on `profiles` — I verified it only exists on `shop_settings` (confirmed in both your live and working databases). Because the code doesn't check the query error, the failed select makes `profiles` come back empty, so `owners = []` and every counter is 0. This is why the whole page went blank.
+---
 
-**Root cause #2 (production only):** The new `trial_ends_at` column was added to `shop_subscriptions` in the working (development) database but is **not yet in your live database**. The front-end subscription query (`useAdminShopSubscriptions`) selects `trial_ends_at`, which errors on live. Publishing applies the migration, but I'll make the fix resilient regardless.
+## Part 1 — Data integrity fix (database migration)
 
-## The fix
+1. **Recreate the missing trigger** on `public.team_members` so future employees never keep `super_admin`:
+   - `AFTER INSERT OR UPDATE` → executes existing `public.sync_team_member_role()`.
+2. **One-time cleanup** — remove the stray owner role from every account that is really an employee:
+   - Delete the `super_admin` role from any `user_id` that also holds an `employee`/`manager`/`admin` role, excluding `platform_admin` accounts.
+   - This reclassifies all 35 mislabeled accounts (13 active + 22 removed employees) out of the owners list. They keep their team role and continue to appear correctly in the Employee Hub.
+3. Safe because genuine shop owners are created with only `super_admin` (no team role), so they are untouched.
 
-### 1. Edge function `admin-manage-users` (`list` action)
-- Remove `onboarding_completed` from the `profiles` select (it doesn't exist there).
-- Add `onboarding_completed` to the existing `shop_settings` select that already feeds `shopMap`.
-- Attach `onboarding_completed` onto each owner object from `shopMap` (default to `true` when no shop_settings row exists, so brand-new/edge cases don't all show as "Setup").
-- Add a defensive error check/log on the `profiles` query so a future bad column fails loudly instead of silently returning zero shops.
+## Part 2 — Defensive guard in `admin-manage-users` edge function
 
-This keeps the exact `onboarding_completed` semantics the classification code already expects — no front-end logic change needed.
+Belt-and-suspenders so this can't recur even if roles drift again:
+- In the `list` action, exclude any `user_id` that is an **active** `team_members` row from the `owners` array.
+- Keep `total_owners` / `total_employees` stats consistent with the filtered list.
 
-### 2. Ensure `trial_ends_at` exists on live
-Re-run the Phase 0 migration so `shop_subscriptions.trial_ends_at` and the backfill/trigger are applied to the live database (it currently only exists in development). This makes the Essai/Pro split work and stops the front-end subscription query from erroring in production.
+## Part 3 — Redesign the Global Employee Hub (`AdminEmployeesView.tsx`)
 
-### 3. Verify
-- Query the database to confirm `owners` returns the full list again and that `onboarding_completed`/`trial_ends_at` resolve.
-- Redeploy the edge function and confirm the counters (Tous, Essai, Pro, Setup ⚠️) populate with real numbers.
+Bring it up to the same standard as the Shops page (`AdminShopsView.tsx`), keeping every existing action.
 
-## Files touched
-- `supabase/functions/admin-manage-users/index.ts` — move `onboarding_completed` to the `shop_settings` source, attach to owners, add error logging.
-- One migration to add/backfill `trial_ends_at` on the live database.
+**New structure (mirrors Shops page):**
+- **Filter tab strip:** `Tous` · `Actifs` · `En ligne` · `Suspendus` · `Retirés (removed)` — each with live counts, horizontally scrollable on mobile.
+- **Stat cards row:** total employees, active, online now, suspended, removed.
+- **Responsive layout:**
+  - Desktop: refined table (`hidden md:block`).
+  - Mobile: **card grid** (`md:block hidden` inverse) — currently the page is table-only and columns just disappear on phones (poor UX). Cards show avatar, name/@username, shop + owner, role badge, online/status dot, and an actions menu.
+- **New `AdminEmployeeDetailSheet`** (like `ShopDetailSheet`): opens on row/card tap — shows employee profile, assigned shop & owner, role, allowed pages/permissions, last-seen activity, account age, phone/WhatsApp, and inline action buttons.
+- **Shared `renderActionItems`** reused by table, cards, and sheet: keeps all current actions (generate password, reassign shop, promote/demote, lock/unlock, delete).
+- Preserve search, pagination, and the existing credentials/reassign modals.
 
-No UI/layout changes — the Phase 2/3 mobile cards, filters, and WhatsApp rescue stay as-is; they'll simply have data to render again.
+**Style tokens:** reuse the admin glass-card look, cyan/violet accents, badge color config already in the file — consistent with the Command Center.
+
+---
+
+## Technical notes
+
+- Files touched:
+  - New migration (trigger + cleanup).
+  - `supabase/functions/admin-manage-users/index.ts` (list guard).
+  - `src/components/admin/AdminEmployeesView.tsx` (redesign).
+  - New `src/components/admin/AdminEmployeeDetailSheet.tsx`.
+- Migration auto-applies to the test environment; **publish** propagates the trigger, cleanup, and edge-function changes to the live site.
+- No changes to the shop-owner-facing team pages; this is admin-only.
