@@ -236,7 +236,7 @@ export function AdminShopsView() {
     // Filter
     if (filter !== "all") {
       if (filter === "setup_incomplete") {
-        result = result.filter((o: any) => o._display.isIncomplete);
+        result = result.filter((o: any) => o._status.key === "setup_incomplete");
       } else if (filter === "online") {
         result = result.filter((o: any) => isOwnerOnline(o.last_online_at));
       } else {
