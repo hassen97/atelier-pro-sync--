@@ -10,7 +10,7 @@ export type Repair = Tables<"repairs">;
 export type RepairInsert = TablesInsert<"repairs">;
 export type RepairUpdate = TablesUpdate<"repairs">;
 
-export type RepairStatus = "pending" | "in_progress" | "completed" | "delivered" | "rejected";
+export type RepairStatus = "pending" | "in_progress" | "completed" | "delivered";
 
 export const REPAIRS_PAGE_SIZE = 100;
 
@@ -414,109 +414,6 @@ export function useDeleteRepair() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["profit"] });
       toast.success("Réparation supprimée");
-    },
-  });
-}
-
-/** Bulk-update the status of multiple repairs in one request. */
-export function useBulkUpdateRepairStatus() {
-  const queryClient = useQueryClient();
-  const effectiveUserId = useEffectiveUserId();
-
-  return useMutation({
-    mutationFn: async ({ ids, status }: { ids: string[]; status: RepairStatus }) => {
-      if (ids.length === 0) return { ids, status };
-      const { error } = await supabase
-        .from("repairs")
-        .update({ status, updated_at: new Date().toISOString() })
-        .in("id", ids);
-      if (error) throw error;
-      return { ids, status };
-    },
-    onMutate: async ({ ids, status }) => {
-      await queryClient.cancelQueries({ queryKey: ["repairs", effectiveUserId] });
-      const previousData = queryClient.getQueriesData({ queryKey: ["repairs", effectiveUserId] });
-      const idSet = new Set(ids);
-      queryClient.setQueriesData(
-        { queryKey: ["repairs", effectiveUserId] },
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((r: any) => (idSet.has(r.id) ? { ...r, status } : r)),
-          };
-        }
-      );
-      return { previousData };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previousData) {
-        context.previousData.forEach(([key, value]) => {
-          queryClient.setQueryData(key, value);
-        });
-      }
-      toast.error("Erreur lors de la mise à jour groupée");
-    },
-    onSuccess: ({ ids, status }) => {
-      queryClient.invalidateQueries({ queryKey: ["repairs"] });
-      queryClient.invalidateQueries({ queryKey: ["recent-repairs"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["profit"] });
-      const labels: Record<RepairStatus, string> = {
-        pending: "en attente",
-        in_progress: "en cours",
-        completed: "terminées",
-        delivered: "livrées",
-        rejected: "rejetées",
-      };
-      toast.success(`${ids.length} réparation${ids.length > 1 ? "s" : ""} ${labels[status]}`);
-    },
-  });
-}
-
-/** Bulk-delete multiple repairs in one request. */
-export function useBulkDeleteRepair() {
-  const queryClient = useQueryClient();
-  const effectiveUserId = useEffectiveUserId();
-
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      if (ids.length === 0) return ids;
-      const { error } = await supabase.from("repairs").delete().in("id", ids);
-      if (error) throw error;
-      return ids;
-    },
-    onMutate: async (ids) => {
-      await queryClient.cancelQueries({ queryKey: ["repairs", effectiveUserId] });
-      const previousData = queryClient.getQueriesData({ queryKey: ["repairs", effectiveUserId] });
-      const idSet = new Set(ids);
-      queryClient.setQueriesData(
-        { queryKey: ["repairs", effectiveUserId] },
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.filter((r: any) => !idSet.has(r.id)),
-            count: Math.max(0, (old.count ?? ids.length) - ids.length),
-          };
-        }
-      );
-      return { previousData };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previousData) {
-        context.previousData.forEach(([key, value]) => {
-          queryClient.setQueryData(key, value);
-        });
-      }
-      toast.error("Erreur lors de la suppression groupée");
-    },
-    onSuccess: (ids) => {
-      queryClient.invalidateQueries({ queryKey: ["repairs"] });
-      queryClient.invalidateQueries({ queryKey: ["recent-repairs"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["profit"] });
-      toast.success(`${ids.length} réparation${ids.length > 1 ? "s" : ""} supprimée${ids.length > 1 ? "s" : ""}`);
     },
   });
 }

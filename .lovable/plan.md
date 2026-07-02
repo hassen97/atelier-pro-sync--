@@ -1,48 +1,42 @@
-# Migrating your data to Live — the realistic plan
+# Customer Credentials Vault + Thermal Printing
 
-## The blocker (please read first)
+## Goal
+Bring back the ability for shop owners to store customer account credentials (iCloud, Gmail, etc.) per customer, and print a **single selected credential** on the thermal printer.
 
-You asked to move **everything** from Test into Live, and your own account **only exists in Test**. A CSV import cannot do this, for three hard reasons:
+## Important finding
+The `customer_vault` table already exists in the database (with 2 rows and full access rules), but there is currently **no UI anywhere in the app** to add, view, or print these credentials — it was removed previously. So this work rebuilds the vault tab as well as adds the print button.
 
-1. **Logins live in a separate, protected auth system.** Every row (customers, repairs, products, sales) is tied to a `user_id` that points to a login account. Those 370 Test accounts do **not** exist in Live, and I cannot recreate login accounts (with passwords/identities) by importing CSVs. If I loaded the data anyway, **nobody — including you — could log into Live**, and every record would point to a non-existent account.
+## Where it lives
+A new **"Coffre-fort"** tab inside the Customer Dossier dialog (`src/components/customers/CustomerDossierDialog.tsx`), next to Réparations / Achats / Garanties / Fidélité.
 
-2. **Live is not empty — it holds different real data.** Live already has **337 shops, 431 customers, 587 repairs, 3,728 products, 128 sales**, and none of them match the Test accounts. Bulk-loading 370 more shops on top would collide on unique IDs and risk **corrupting or duplicating real production data**.
+## What gets built
 
-3. **This is a platform/environment problem, not a code or data problem.** The mismatch (your real working data sitting in "Test", a different dataset in "Live", your account missing from Live) is a side effect of the **Test/Live split created during the workspace/ownership transfer**. Fixing which environment is the "real" one is a platform operation — it can't be patched by importing rows.
+### 1. Data hook — `src/hooks/useCustomerVault.ts`
+- `useCustomerVault(customerId)` — reads credentials for a customer (scoped via `useEffectiveUserId`, ordered newest first).
+- `useAddVaultCredential()` — inserts a new credential.
+- `useUpdateVaultCredential()` — edits an existing one.
+- `useDeleteVaultCredential()` — removes one.
+- Each entry uses the existing columns: `account_type`, `email_id`, `password`.
+- React Query invalidation on the `["customer-vault", customerId]` key, toast feedback (French), following the existing `useCustomers` patterns.
 
-Bottom line: there is **no safe SQL/CSV route** to make Test's data (and logins) become Live. Forcing it would break authentication and endanger the 337 real shops already in Live.
+### 2. Vault tab UI (in Customer Dossier dialog)
+- Tabs list grows from 4 to 5 columns; new tab labeled "Coffre".
+- Lists saved credentials as cards: account type, email/identifiant, and password (password masked by default with a show/hide eye toggle).
+- "Ajouter" form: account type (free text — iCloud, Gmail, etc.), email/ID, password.
+- Per-card actions: copy email, copy password, edit, delete, and a **Imprimer** (printer icon) button that prints that single credential.
+- A small confirmation before delete.
 
-## What I recommend instead
+### 3. Thermal print function — `src/lib/receiptPdf.ts`
+- New exported `generateCredentialSlip(...)` mirroring `generatePhoneLabel`.
+- Prints a single credential slip containing: shop name header, customer name, then the selected credential's account type, email/identifiant, and password. (Account-type/email/password only for the credential body, per your choice of "single selected credential".)
+- Uses the existing `getThermalPrintCss` + `printThermalHtml` helpers, supports 80mm/58mm widths.
+- Print button in the vault card calls this with the shop name from `useShopSettingsContext`.
 
-```text
-1. Protect everything (I can do this now)
-   - Test backup ...... already saved (test-db-backup.zip)
-   - Live backup ...... export all Live tables to CSV too, so BOTH
-                        environments are preserved before anything changes
-2. Get the split fixed the right way (support)
-   - The environment that holds YOUR real data + YOUR login is Test.
-   - Ask Lovable support to promote/restore Test as the single/Live
-     environment (or remove the Test/Live split) WITHOUT data loss.
-   - This is the only path that keeps logins working.
-3. Only after that: enable transactional email
-   - Once there's a single correct environment, the app-email
-     "Get started" button unblocks.
-```
+## Notes / decisions to confirm during build
+- Credentials are sensitive: passwords are masked in the UI by default and only revealed on demand. They are printed in plain text on the slip (that is the point of the feature).
+- No database migration is needed — the table and access rules already exist.
 
-## What I can safely do for you right now
-
-- **Export a full backup of the Live database** the same way I did for Test (all tables → CSV → zip), so you hold both environments before any change.
-- **Prepare a clear support summary** you can paste to Lovable support: the exact counts in each environment, the fact that your account/data is in Test, and the request to fix the split without losing data.
-
-## What I will NOT do
-
-- Insert Test's 370 shops/users into Live (breaks logins, collides with 337 real shops).
-- Delete the Test database (that's where your real data currently lives) until support confirms Live/single-env is correct.
-
-## Technical notes
-
-- Auth schema (`auth.users`) is managed and off-limits to migrations/imports, which is precisely why logins can't be transferred via CSV.
-- Data never syncs between Test and Live on publish — by design — so there's no built-in "push Test to Live" for data.
-- Verified counts: Live = 337 shops / 587 repairs / 3,728 products; Test backup = 370 shops / ~1,800 repairs / ~4,900 products; **zero** overlapping account IDs between them.
-
-If you approve, I'll generate the Live backup and the support summary. The environment fix itself has to be done by Lovable support.
+## Technical summary
+- New file: `src/hooks/useCustomerVault.ts`
+- Edit: `src/components/customers/CustomerDossierDialog.tsx` (add 5th tab + vault UI + print wiring)
+- Edit: `src/lib/receiptPdf.ts` (add `generateCredentialSlip`)

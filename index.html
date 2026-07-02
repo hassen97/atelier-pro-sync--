@@ -4,45 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Prevent the browser from caching the root HTML document so new
-         deployments are picked up immediately (belt-and-suspenders alongside
-         the NetworkFirst service-worker strategy). -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-
     <!-- Canonical URL is set per-route via react-helmet-async (see src/components/seo/SEO.tsx) -->
 
 
     <!-- Browser theme color -->
     <meta name="theme-color" content="#000000" />
 
-    <!-- Apply the saved theme before first paint to avoid a light-mode flash. -->
-    <script>
-      (function () {
-        try {
-          if (localStorage.getItem("theme") === "dark") {
-            document.documentElement.classList.add("dark");
-          }
-        } catch (e) {}
-      })();
-    </script>
-
-
-
     <!-- Preconnect for faster Google Fonts loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <!-- Google Fonts (non-blocking) -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <!-- Icons -->
-    <link rel="icon" href="/favicon.ico?v=3" sizes="any">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=3">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=3">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     <!-- PWA support (installable web app) -->
     <link rel="manifest" href="/manifest.json">
@@ -66,8 +45,6 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://www.getheavencoin.com/" />
     <meta property="og:image" content="https://www.getheavencoin.com/og-image.jpg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="fr_TN" />
     <meta property="og:site_name" content="RepairPro TN" />
 

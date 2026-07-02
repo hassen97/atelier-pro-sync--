@@ -57,7 +57,6 @@ export function useCreateExpense() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       queryClient.invalidateQueries({ queryKey: ["profit"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["session-totals"] });
       toast.success("Dépense créée avec succès");
     },
     onError: (error) => {

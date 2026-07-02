@@ -30,29 +30,6 @@ function isNetworkError(err: unknown): boolean {
     message.includes("aborted");
 }
 
-// Race a promise against a timeout. If it doesn't settle in time, reject with
-// an AbortError so callers treat it as a network error and fall through to the
-// resilient REST fallback (which has its own timeout + retries).
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      const err = new Error("Request timed out (aborted)");
-      err.name = "AbortError";
-      reject(err);
-    }, ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (err) => {
-        clearTimeout(timer);
-        reject(err);
-      },
-    );
-  });
-}
-
 // Fallback: Direct fetch to Supabase Auth REST API with timeout + retries
 async function authFetch(endpoint: string, body: Record<string, unknown>, maxRetries = 3): Promise<{ data: any; error: Error | null }> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -150,14 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Primary: Supabase JS client
       console.log("[Auth] signUp: attempting with Supabase client...");
       try {
-        const { data, error } = await withTimeout(
-          supabase.auth.signUp({
-            email: internalEmail,
-            password,
-            options: { data: metadata },
-          }),
-          12000,
-        );
+        const { data, error } = await supabase.auth.signUp({
+          email: internalEmail,
+          password,
+          options: { data: metadata },
+        });
         console.log("[Auth] signUp: client result", { error: error?.message });
         if (!error) return { error: null };
         if (!isNetworkError(error)) return { error };
@@ -195,13 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Primary: Supabase JS client
     console.log("[Auth] signIn: attempting with Supabase client...");
     try {
-      const { error } = await withTimeout(
-        supabase.auth.signInWithPassword({
-          email: internalEmail,
-          password,
-        }),
-        12000,
-      );
+      const { error } = await supabase.auth.signInWithPassword({
+        email: internalEmail,
+        password,
+      });
       console.log("[Auth] signIn: client result", { error: error?.message });
       if (!error) return { error: null };
       if (!isNetworkError(error)) return { error };

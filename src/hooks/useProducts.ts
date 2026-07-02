@@ -32,9 +32,8 @@ export function useProducts({ page = 0, search = "", categoryId }: UseProductsOp
         .from("products")
         .select(
           `id, name, sku, barcodes, description, cost_price, sell_price,
-           quantity, min_quantity, category_id, subcategory_id,
-           category:categories(id, name),
-           subcategory:subcategories(id, name)`,
+           quantity, min_quantity, category_id,
+           category:categories(id, name)`,
           { count: "exact" }
         )
         .eq("user_id", effectiveUserId)
@@ -81,7 +80,7 @@ export function useAllProducts() {
       while (hasMore) {
         const { data, error } = await supabase
           .from("products")
-          .select("id, name, sku, barcodes, sell_price, cost_price, quantity, min_quantity, category_id, subcategory_id, category:categories(id, name), subcategory:subcategories(id, name)")
+          .select("id, name, sku, barcodes, sell_price, cost_price, quantity, min_quantity, category_id, category:categories(id, name)")
           .eq("user_id", effectiveUserId)
           .order("name")
           .range(from, from + PAGE - 1);
@@ -109,7 +108,7 @@ export function useProduct(id: string | undefined) {
 
       const { data, error } = await supabase
         .from("products")
-        .select(`*, category:categories(id, name), subcategory:subcategories(id, name)`)
+        .select(`*, category:categories(id, name)`)
         .eq("id", id)
         .maybeSingle();
 
@@ -142,7 +141,6 @@ export function useCreateProduct() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
-      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       toast.success("Produit créé avec succès");
     },
@@ -201,7 +199,6 @@ export function useUpdateProduct() {
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["product", data.id] });
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
-      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       toast.success("Produit mis à jour");
     },
@@ -255,7 +252,6 @@ export function useUpdateProductStock() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
-      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
     },
   });
@@ -301,79 +297,8 @@ export function useDeleteProduct() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
-      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       toast.success("Produit supprimé");
-    },
-  });
-}
-
-/** Permanently delete multiple products at once by their IDs. */
-export function useBulkDeleteProducts() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      if (ids.length === 0) return 0;
-      const { error } = await supabase.from("products").delete().in("id", ids);
-      if (error) throw error;
-      return ids.length;
-    },
-    onSuccess: (count) => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["products-all"] });
-      queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
-      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["inventory-stats"] });
-      toast.success(`${count} produit${count > 1 ? "s" : ""} supprimé${count > 1 ? "s" : ""}`);
-    },
-    onError: (error) => {
-      console.error("Bulk delete failed:", error);
-      toast.error("Erreur lors de la suppression");
-    },
-  });
-}
-
-/** Assign a category and optional sub-category (or clear them) for multiple products at once. */
-export function useBulkUpdateCategory() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      ids,
-      categoryId,
-      subcategoryId = null,
-    }: {
-      ids: string[];
-      categoryId: string | null;
-      subcategoryId?: string | null;
-    }) => {
-      if (ids.length === 0) return 0;
-      const { error } = await supabase
-        .from("products")
-        .update({
-          category_id: categoryId,
-          subcategory_id: subcategoryId,
-          updated_at: new Date().toISOString(),
-        })
-        .in("id", ids);
-      if (error) throw error;
-      return ids.length;
-    },
-    onSuccess: (count) => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["products-all"] });
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
-      queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
-      queryClient.invalidateQueries({ queryKey: ["products-out-of-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      toast.success(`Catégorie mise à jour pour ${count} produit${count > 1 ? "s" : ""}`);
-    },
-    onError: (error) => {
-      console.error("Bulk category update failed:", error);
-      toast.error("Erreur lors de la mise à jour de la catégorie");
     },
   });
 }
@@ -399,44 +324,6 @@ export function useLowStockProducts() {
       );
     },
     enabled: !!effectiveUserId,
-  });
-}
-
-/** All out-of-stock (and low-stock) products — for the shortage/supplier view.
- *  Fetches in batches of 1000 to bypass the default row limit. */
-export function useOutOfStockProducts() {
-  const effectiveUserId = useEffectiveUserId();
-
-  return useQuery({
-    queryKey: ["products-out-of-stock", effectiveUserId],
-    queryFn: async () => {
-      if (!effectiveUserId) return [];
-
-      const PAGE = 1000;
-      let all: any[] = [];
-      let from = 0;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from("products")
-          .select("id, name, sku, barcodes, quantity, min_quantity, category_id, category:categories(id, name)")
-          .eq("user_id", effectiveUserId)
-          .lte("quantity", 5)
-          .order("name")
-          .range(from, from + PAGE - 1);
-
-        if (error) throw error;
-        all = all.concat(data ?? []);
-        hasMore = (data?.length ?? 0) === PAGE;
-        from += PAGE;
-      }
-
-      // Keep only products at/below their own threshold (covers out-of-stock + low stock)
-      return all.filter((p) => (p.quantity ?? 0) <= (p.min_quantity ?? 5)) as any[];
-    },
-    enabled: !!effectiveUserId,
-    staleTime: 30 * 1000,
   });
 }
 

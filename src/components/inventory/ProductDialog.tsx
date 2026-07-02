@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { Loader2 } from "lucide-react";
-import { useCategories, useSubcategories } from "@/hooks/useCategories";
+import { useCategories } from "@/hooks/useCategories";
 import { useCurrency } from "@/hooks/useCurrency";
 
 const productSchema = z.object({
@@ -31,7 +31,6 @@ const productSchema = z.object({
   sku: z.string().optional(),
   description: z.string().optional(),
   category_id: z.string().optional(),
-  subcategory_id: z.string().optional(),
   cost_price: z.coerce.number().min(0, "Le prix doit être positif"),
   sell_price: z.coerce.number().min(0, "Le prix doit être positif"),
   quantity: z.coerce.number().int().min(0, "La quantité doit être positive"),
@@ -49,7 +48,6 @@ interface ProductDialogProps {
     sku?: string | null;
     description?: string | null;
     category_id?: string | null;
-    subcategory_id?: string | null;
     cost_price: number;
     sell_price: number;
     quantity: number;
@@ -69,7 +67,6 @@ export function ProductDialog({
   const isEditing = !!product;
   const { currencyCode } = useCurrency();
   const { data: productCategories = [] } = useCategories("product");
-  const { data: allSubcategories = [] } = useSubcategories();
   const categoryOptions = useMemo(
     () => productCategories.map((c) => ({ value: c.id, label: c.name })),
     [productCategories]
@@ -82,7 +79,6 @@ export function ProductDialog({
       sku: "",
       description: "",
       category_id: "",
-      subcategory_id: "",
       cost_price: 0,
       sell_price: 0,
       quantity: 0,
@@ -90,17 +86,8 @@ export function ProductDialog({
     },
   });
 
-  const selectedCategoryId = form.watch("category_id");
-  const subcategoryOptions = useMemo(
-    () =>
-      (allSubcategories as { id: string; name: string; category_id: string }[])
-        .filter((s) => s.category_id === selectedCategoryId)
-        .map((s) => ({ value: s.id, label: s.name })),
-    [allSubcategories, selectedCategoryId]
-  );
-
   const defaultDraftValues = {
-    name: "", sku: "", description: "", category_id: "", subcategory_id: "",
+    name: "", sku: "", description: "", category_id: "",
     cost_price: 0, sell_price: 0, quantity: 0, min_quantity: 5,
   };
 
@@ -118,7 +105,6 @@ export function ProductDialog({
         sku: product.sku || "",
         description: product.description || "",
         category_id: product.category_id || "",
-        subcategory_id: product.subcategory_id || "",
         cost_price: Number(product.cost_price) || 0,
         sell_price: Number(product.sell_price) || 0,
         quantity: product.quantity || 0,
@@ -130,7 +116,6 @@ export function ProductDialog({
         sku: "",
         description: "",
         category_id: "",
-        subcategory_id: "",
         cost_price: 0,
         sell_price: 0,
         quantity: 0,
@@ -140,17 +125,7 @@ export function ProductDialog({
   }, [product, form]);
 
   const handleSubmit = async (data: ProductFormValues) => {
-    const cleanData = {
-      ...data,
-      category_id: data.category_id || undefined,
-      // Drop the subcategory if it doesn't belong to the chosen category
-      subcategory_id:
-        data.subcategory_id &&
-        subcategoryOptions.some((o) => o.value === data.subcategory_id)
-          ? data.subcategory_id
-          : undefined,
-    };
-    await onSubmit(cleanData);
+    await onSubmit(data);
     clearDraft();
     form.reset();
   };
@@ -211,11 +186,7 @@ export function ProductDialog({
                       <Combobox
                         options={categoryOptions}
                         value={field.value || ""}
-                        onValueChange={(val) => {
-                          field.onChange(val);
-                          // Reset subcategory when the parent category changes
-                          form.setValue("subcategory_id", "");
-                        }}
+                        onValueChange={field.onChange}
                         placeholder="Sélectionner catégorie"
                         searchPlaceholder="Rechercher catégorie..."
                         emptyText="Aucune catégorie"
@@ -226,31 +197,6 @@ export function ProductDialog({
                 )}
               />
             )}
-
-            {/* Subcategory (depends on selected category) */}
-            {selectedCategoryId && subcategoryOptions.length > 0 && (
-              <FormField
-                control={form.control}
-                name="subcategory_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sous-catégorie</FormLabel>
-                    <FormControl>
-                      <Combobox
-                        options={subcategoryOptions}
-                        value={field.value || ""}
-                        onValueChange={field.onChange}
-                        placeholder="Sélectionner sous-catégorie"
-                        searchPlaceholder="Rechercher sous-catégorie..."
-                        emptyText="Aucune sous-catégorie"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
 
             {/* Description */}
             <FormField

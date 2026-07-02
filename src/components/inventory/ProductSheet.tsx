@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Loader2, X, Wand2, Printer, Zap, CreditCard } from "lucide-react";
-import { useCategories, useSubcategories } from "@/hooks/useCategories";
+import { useCategories } from "@/hooks/useCategories";
 import { useCurrency } from "@/hooks/useCurrency";
 import { LabelPrintDialog } from "./LabelPrintDialog";
 import { useSuppliers, useCreateSupplierTransaction, useCreateSupplierPurchase, useUpdateSupplierBalance } from "@/hooks/useSuppliers";
@@ -36,7 +36,6 @@ const productSchema = z.object({
   barcodes: z.array(z.string()).default([]),
   description: z.string().optional(),
   category_id: z.string().optional(),
-  subcategory_id: z.string().optional(),
   cost_price: z.coerce.number().min(0),
   sell_price: z.coerce.number().min(0),
   quantity: z.coerce.number().int().min(0),
@@ -55,7 +54,6 @@ interface ProductSheetProps {
     barcodes?: string[];
     description?: string | null;
     category_id?: string | null;
-    subcategory_id?: string | null;
     cost_price: number;
     sell_price: number;
     quantity: number;
@@ -76,7 +74,6 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
     const isEditing = !!product;
     const { currencyCode } = useCurrency();
     const { data: productCategories = [] } = useCategories("product");
-    const { data: allSubcategories = [] } = useSubcategories();
     const categoryOptions = useMemo(
       () => productCategories.map((c) => ({ value: c.id, label: c.name })),
       [productCategories]
@@ -106,7 +103,6 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
         barcodes: [],
         description: "",
         category_id: "",
-        subcategory_id: "",
         cost_price: 0,
         sell_price: 0,
         quantity: 0,
@@ -119,14 +115,6 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
     const sellPrice = useWatch({ control: form.control, name: "sell_price" }) || 0;
     const margin = sellPrice > 0 ? ((sellPrice - costPrice) / sellPrice) * 100 : 0;
     const productName = useWatch({ control: form.control, name: "name" }) || "";
-    const selectedCategoryId = useWatch({ control: form.control, name: "category_id" }) || "";
-    const subcategoryOptions = useMemo(
-      () =>
-        (allSubcategories as { id: string; name: string; category_id: string }[])
-          .filter((s) => s.category_id === selectedCategoryId)
-          .map((s) => ({ value: s.id, label: s.name })),
-      [allSubcategories, selectedCategoryId]
-    );
 
     useImperativeHandle(ref, () => ({
       addBarcode: (code: string) => {
@@ -148,7 +136,6 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
             barcodes: existingBarcodes,
             description: product.description || "",
             category_id: product.category_id || "",
-            subcategory_id: product.subcategory_id || "",
             cost_price: Number(product.cost_price) || 0,
             sell_price: Number(product.sell_price) || 0,
             quantity: product.quantity || 0,
@@ -160,7 +147,6 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
             barcodes: prefillBarcode ? [prefillBarcode] : [],
             description: "",
             category_id: "",
-            subcategory_id: "",
             cost_price: 0,
             sell_price: 0,
             quantity: 0,
@@ -194,15 +180,7 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
 
     const handleSubmit = async (data: ProductSheetFormValues) => {
       // Convert empty string category_id to undefined so DB receives NULL
-      const cleanData = {
-        ...data,
-        category_id: data.category_id || undefined,
-        subcategory_id:
-          data.subcategory_id &&
-          subcategoryOptions.some((o) => o.value === data.subcategory_id)
-            ? data.subcategory_id
-            : undefined,
-      };
+      const cleanData = { ...data, category_id: data.category_id || undefined };
       await onSubmit(cleanData);
 
       // Handle credit purchase
@@ -343,10 +321,7 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
                           <Combobox
                             options={categoryOptions}
                             value={field.value || ""}
-                            onValueChange={(val) => {
-                              field.onChange(val);
-                              form.setValue("subcategory_id", "");
-                            }}
+                            onValueChange={field.onChange}
                             placeholder="Sélectionner catégorie"
                             searchPlaceholder="Rechercher catégorie..."
                             emptyText="Aucune catégorie"
@@ -357,31 +332,6 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
                     )}
                   />
                 )}
-
-                {/* Subcategory (depends on selected category) */}
-                {selectedCategoryId && subcategoryOptions.length > 0 && (
-                  <FormField
-                    control={form.control}
-                    name="subcategory_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sous-catégorie</FormLabel>
-                        <FormControl>
-                          <Combobox
-                            options={subcategoryOptions}
-                            value={field.value || ""}
-                            onValueChange={field.onChange}
-                            placeholder="Sélectionner sous-catégorie"
-                            searchPlaceholder="Rechercher sous-catégorie..."
-                            emptyText="Aucune sous-catégorie"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
 
                 {/* Description */}
                 <FormField
