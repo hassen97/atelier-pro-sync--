@@ -199,22 +199,82 @@ export function ExcelImportDialog({ open, onOpenChange, onImported }: ExcelImpor
     setImporting(true);
     setProgress(0);
 
+    const DEFAULT_CATEGORY = "Non classé";
+
+    // ─── Step 1: Resolve category names → category_id (case-insensitive) ────────
+    const categoryMap = new Map<string, string>(); // lowercased name → uuid
+    try {
+      // Collect distinct, non-empty category names from the file + the default
+      const wantedNames = new Map<string, string>(); // lowercased → original casing
+      for (const row of validRows) {
+        const raw = (row.category || "").trim();
+        const name = raw || DEFAULT_CATEGORY;
+        const key = name.toLowerCase();
+        if (!wantedNames.has(key)) wantedNames.set(key, name);
+      }
+      if (!wantedNames.has(DEFAULT_CATEGORY.toLowerCase())) {
+        wantedNames.set(DEFAULT_CATEGORY.toLowerCase(), DEFAULT_CATEGORY);
+      }
+
+      // Fetch existing product categories for this shop
+      const { data: existing, error: catFetchError } = await supabase
+        .from("categories")
+        .select("id, name")
+        .eq("user_id", effectiveUserId)
+        .eq("type", "product");
+      if (catFetchError) throw catFetchError;
+
+      for (const cat of existing || []) {
+        categoryMap.set(cat.name.trim().toLowerCase(), cat.id);
+      }
+
+      // Insert any categories that don't exist yet
+      const toCreate: { user_id: string; name: string; type: string }[] = [];
+      for (const [key, name] of wantedNames) {
+        if (!categoryMap.has(key)) {
+          toCreate.push({ user_id: effectiveUserId, name, type: "product" });
+        }
+      }
+      if (toCreate.length > 0) {
+        const { data: created, error: catInsertError } = await supabase
+          .from("categories")
+          .insert(toCreate)
+          .select("id, name");
+        if (catInsertError) throw catInsertError;
+        for (const cat of created || []) {
+          categoryMap.set(cat.name.trim().toLowerCase(), cat.id);
+        }
+      }
+    } catch (err) {
+      console.error("Category resolution error:", err);
+      toast.error("Erreur lors de la création des catégories. Import annulé.");
+      setImporting(false);
+      return;
+    }
+
+    const defaultCategoryId = categoryMap.get(DEFAULT_CATEGORY.toLowerCase()) || null;
+
     let success = 0;
     let failed = 0;
     const BATCH = 20;
 
     for (let i = 0; i < validRows.length; i += BATCH) {
-      const batch = validRows.slice(i, i + BATCH).map((row) => ({
-        user_id: effectiveUserId,
-        name: row.name,
-        sku: row.sku || null,
-        barcodes: row.barcode ? [row.barcode] : [],
-        cost_price: row.cost_price,
-        sell_price: row.sell_price,
-        quantity: row.quantity,
-        min_quantity: row.min_quantity,
-        description: row.description || null,
-      }));
+      const batch = validRows.slice(i, i + BATCH).map((row) => {
+        const catKey = (row.category || "").trim().toLowerCase();
+        const category_id = (catKey && categoryMap.get(catKey)) || defaultCategoryId;
+        return {
+          user_id: effectiveUserId,
+          name: row.name,
+          sku: row.sku || null,
+          barcodes: row.barcode ? [row.barcode] : [],
+          cost_price: row.cost_price,
+          sell_price: row.sell_price,
+          quantity: row.quantity,
+          min_quantity: row.min_quantity,
+          description: row.description || null,
+          category_id,
+        };
+      });
 
       const { error } = await supabase.from("products").insert(batch);
       if (error) {
@@ -230,6 +290,7 @@ export function ExcelImportDialog({ open, onOpenChange, onImported }: ExcelImpor
     setDone(true);
     setImportResult({ success, failed });
     queryClient.invalidateQueries({ queryKey: ["products"] });
+    queryClient.invalidateQueries({ queryKey: ["categories"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
     queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
 

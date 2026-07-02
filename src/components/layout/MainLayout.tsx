@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Menu, Search, User, Moon, Sun, LogOut, Settings, MessageCircle } from "lucide-react";
+import { Menu, Search, User, Moon, Sun, LogOut, Settings, MessageCircle, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { checkForUpdate, applyUpdateNow } from "@/lib/swUpdate";
 import { useAuth } from "@/contexts/AuthContext";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { AppSidebar } from "./AppSidebar";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ReadOnlyBanner } from "./ReadOnlyBanner";
 import { WhatsNewModal } from "@/components/announcements/WhatsNewModal";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { LanguageModal } from "@/components/i18n/LanguageModal";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,19 +29,71 @@ import { useUnreadMessageCount } from "@/hooks/useCommunity";
 export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark"),
+  );
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  // Defer the language chooser so it never intercepts the first paint after login.
+  const [deferredReady, setDeferredReady] = useState(false);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { data: unreadCount = 0 } = useUnreadMessageCount();
+
+  useEffect(() => {
+    const w = window as typeof window & {
+      requestIdleCallback?: (cb: () => void) => number;
+    };
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(() => setDeferredReady(true));
+      return () => (w as any).cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(() => setDeferredReady(true), 1200);
+    return () => clearTimeout(t);
+  }, []);
+
 
   const handleSignOut = async () => {
     await signOut();
   };
 
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle("dark");
+    const next = !darkMode;
+    setDarkMode(next);
+    document.documentElement.classList.toggle("dark", next);
+    try {
+      localStorage.setItem("theme", next ? "dark" : "light");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    const toastId = toast.loading("Recherche de mises à jour…");
+    try {
+      const hasUpdate = await checkForUpdate();
+      if (hasUpdate) {
+        toast("Mise à jour disponible", {
+          id: toastId,
+          description: "Une nouvelle version est prête.",
+          duration: Infinity,
+          action: {
+            label: "Actualiser",
+            onClick: () => applyUpdateNow(),
+          },
+        });
+      } else {
+        toast.success("Vous êtes à jour ✓", { id: toastId });
+      }
+    } catch {
+      toast.error("Vérification impossible", { id: toastId });
+    } finally {
+      setCheckingUpdate(false);
+    }
   };
 
   return (
@@ -97,6 +153,7 @@ export function MainLayout() {
           </div>
 
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <Button
               variant="ghost"
               size="icon"
@@ -109,6 +166,21 @@ export function MainLayout() {
                 <Moon className="h-4 w-4" />
               )}
             </Button>
+
+            {/* Manual "check for update" */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCheckUpdate}
+              disabled={checkingUpdate}
+              aria-label="Vérifier les mises à jour"
+              title="Vérifier les mises à jour"
+              className="h-9 w-9"
+            >
+              <RefreshCw className={cn("h-4 w-4", checkingUpdate && "animate-spin")} />
+            </Button>
+
+
 
             {/* Messages button with unread badge */}
             <Button
@@ -168,6 +240,9 @@ export function MainLayout() {
 
       {/* What's New Modal */}
       <WhatsNewModal />
+
+      {/* First-login language chooser (deferred; shown only when profiles.language is null) */}
+      {deferredReady && <LanguageModal />}
     </div>
   );
 }

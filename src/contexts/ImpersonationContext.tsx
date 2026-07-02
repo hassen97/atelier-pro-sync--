@@ -2,12 +2,14 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDemoMode } from "@/hooks/useDemoMode";
 import { toast } from "sonner";
 
 interface ImpersonationContextType {
   impersonatedUserId: string | null;
   isImpersonating: boolean;
   isReadOnly: boolean;
+  isDemo: boolean;
   isVerifying: boolean;
   impersonatedShopName: string | null;
   exitImpersonation: () => void;
@@ -17,6 +19,7 @@ const ImpersonationContext = createContext<ImpersonationContextType>({
   impersonatedUserId: null,
   isImpersonating: false,
   isReadOnly: false,
+  isDemo: false,
   isVerifying: false,
   impersonatedShopName: null,
   exitImpersonation: () => {},
@@ -85,8 +88,11 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     navigate("/admin", { replace: true });
   }, [navigate]);
 
+  const { isDemo } = useDemoMode();
+
   const isImpersonating = verified && !!impersonatedUserId;
-  const isReadOnly = isImpersonating && modeParam === "readonly";
+  // The shared public demo account is always strictly read-only.
+  const isReadOnly = (isImpersonating && modeParam === "readonly") || isDemo;
 
   return (
     <ImpersonationContext.Provider
@@ -94,6 +100,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
         impersonatedUserId: isImpersonating ? impersonatedUserId : null,
         isImpersonating,
         isReadOnly,
+        isDemo,
         isVerifying,
         impersonatedShopName: shopName,
         exitImpersonation,

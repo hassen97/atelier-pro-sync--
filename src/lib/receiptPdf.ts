@@ -438,18 +438,19 @@ ${data.repairedBy ? `<p class="field"><span class="bold">Tech:</span> ${escHtml(
   printThermalHtml(html, "width=350,height=400");
 }
 
-// ── Customer Credential Slip (single account from the vault) ───────────
+// ── Vault Credential (client saved account: iCloud / Google / Samsung) ──
 
-interface CredentialSlipData {
-  accountType: string;
+export interface VaultCredentialData {
+  customer: string;
+  phone?: string;
+  accountType: string; // already-localized label, e.g. "iCloud"
   emailId: string;
   password: string;
-  customer: string;
-  date?: string;
+  createdAt: string; // formatted date
 }
 
-export async function generateCredentialSlip(
-  data: CredentialSlipData,
+export function printVaultCredential(
+  data: VaultCredentialData,
   shopName: string,
   printerWidth: "80mm" | "58mm" = "80mm"
 ) {
@@ -459,31 +460,539 @@ export async function generateCredentialSlip(
 <html>
 <head>
 <meta charset="utf-8">
-<title>Identifiant</title>
+<title>Identifiants client</title>
 <style>
   ${getThermalPrintCss(pageW, "12px")}
-  .cred-label { font-size: 11px; font-weight: bold; margin: 3px 0 0; }
-  .cred-value { font-size: 14px; font-weight: bold; margin: 0 0 2px; word-break: break-all; }
+  .shop { font-size: 14px; font-weight: bold; text-align: center; }
+  .title { font-size: 11px; font-weight: bold; text-align: center; letter-spacing: 1px; margin: 2px 0 4px; }
+  .field { font-size: 12px; margin: 2px 0; word-break: break-all; }
+  .pass { font-size: 13px; margin: 3px 0; word-break: break-all; }
+  .footer { font-size: 9px; text-align: center; margin-top: 6px; }
 </style>
 </head>
 <body class="thermal-print-root"><main class="thermal-print-container">
 
-<p class="shop-name">${escHtml(shopName)}</p>
-<p class="title">IDENTIFIANT</p>
-<div class="sep-bold"></div>
-<p class="field"><span class="bold">Client:</span> ${escHtml(data.customer)}</p>
-${data.date ? `<p class="field"><span class="bold">Date:</span> ${escHtml(data.date)}</p>` : ""}
+<p class="shop">${escHtml(shopName)}</p>
+<p class="title">IDENTIFIANTS DU COMPTE</p>
 <div class="sep"></div>
-<p class="cred-label">Type de compte</p>
-<p class="cred-value">${escHtml(data.accountType)}</p>
-<p class="cred-label">Email / Identifiant</p>
-<p class="cred-value">${escHtml(data.emailId)}</p>
-<p class="cred-label">Mot de passe</p>
-<p class="cred-value">${escHtml(data.password)}</p>
+<p class="field"><span class="bold">Client:</span> ${escHtml(data.customer)}</p>
+${data.phone ? `<p class="field"><span class="bold">Tél:</span> ${escHtml(data.phone)}</p>` : ""}
+<p class="field"><span class="bold">Type:</span> ${escHtml(data.accountType)}</p>
+<div class="sep"></div>
+<p class="field"><span class="bold">Email / ID:</span> ${escHtml(data.emailId)}</p>
+<p class="pass"><span class="bold">Mot de passe:</span> ${escHtml(data.password)}</p>
+<div class="sep"></div>
+<p class="field"><span class="bold">Créé le:</span> ${escHtml(data.createdAt)}</p>
+<p class="footer">Conservez ces informations en lieu sûr.</p>
+
+</main></body>
+</html>`;
+
+  printThermalHtml(html, "width=350,height=450");
+}
+
+// ── Register Z-Report (Clôture de caisse / end-of-day closing) ──
+
+export interface ClosingBreakdownRow {
+  label: string;
+  value: string; // pre-formatted currency
+  meta?: string; // optional extra (e.g. item count)
+}
+
+export interface RegisterZReportData {
+  shopName: string;
+  dateTime: string; // formatted date & time
+  sales: string; // pre-formatted currency strings
+  repairs: string;
+  expenses: string;
+  net: string;
+  isReprint?: boolean; // when true, prints a duplicate marker
+  closedBy?: string | null;
+  returns?: string | null; // pre-formatted refund total
+  itemsSold?: number;
+  byCategory?: ClosingBreakdownRow[];
+  byProduct?: ClosingBreakdownRow[];
+  byPaymentMethod?: ClosingBreakdownRow[];
+  repairsRows?: ClosingBreakdownRow[];
+}
+
+export function printRegisterZReport(
+  data: RegisterZReportData,
+  printerWidth: "80mm" | "58mm" = "80mm"
+) {
+  const pageW = printerWidth === "80mm" ? "72mm" : "48mm";
+
+  const title = data.isReprint
+    ? "RAPPORT DE CLÔTURE (DUPLICATA)"
+    : "RAPPORT DE CLÔTURE";
+
+  const catRows = (data.byCategory || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}${
+          r.meta ? ` (${escHtml(r.meta)})` : ""
+        }</span><span class="val">${escHtml(r.value)}</span></div>`
+    )
+    .join("");
+
+  const prodRows = (data.byProduct || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}${
+          r.meta ? ` (${escHtml(r.meta)})` : ""
+        }</span><span class="val">${escHtml(r.value)}</span></div>`
+    )
+    .join("");
+
+  const payRows = (data.byPaymentMethod || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}</span><span class="val">${escHtml(
+          r.value
+        )}</span></div>`
+    )
+    .join("");
+
+  const repairRows = (data.repairsRows || [])
+    .map(
+      (r) =>
+        `<div class="z-row"><span>${escHtml(r.label)}${
+          r.meta ? ` - ${escHtml(r.meta)}` : ""
+        }</span><span class="val">${escHtml(r.value)}</span></div>`
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Rapport de clôture</title>
+<style>
+  ${getThermalPrintCss(pageW, "12px")}
+  .z-shop { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 2px; }
+  .z-title { font-size: 15px; font-weight: bold; text-align: center; letter-spacing: 1px; margin: 2px 0; }
+  .z-meta { font-size: 11px; text-align: center; margin: 1px 0; }
+  .z-section { font-size: 11px; font-weight: bold; text-align: left; margin: 3px 0 1px; text-transform: uppercase; }
+  .z-row { display: flex; justify-content: space-between; font-size: 13px; margin: 2px 0; gap: 3mm; }
+  .z-row .val { text-align: right; white-space: nowrap; }
+  .z-total { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; margin: 3px 0; gap: 3mm; }
+  .z-status { font-size: 13px; font-weight: bold; text-align: center; margin: 3px 0; }
+  .z-sign { font-size: 12px; margin-top: 8mm; }
+  .z-sign-line { border-top: 1px solid #000; margin-top: 10mm; padding-top: 1mm; }
+</style>
+</head>
+<body class="thermal-print-root"><main class="thermal-print-container">
+
+<div class="sep-bold"></div>
+<p class="z-title">${escHtml(title)}</p>
+<div class="sep-bold"></div>
+<p class="z-shop">${escHtml(data.shopName)}</p>
+<p class="z-meta">${escHtml(data.dateTime)}</p>
+<div class="sep"></div>
+${
+  catRows
+    ? `<p class="z-section">Ventes par catégorie</p>${catRows}<div class="sep"></div>`
+    : ""
+}
+${
+  prodRows
+    ? `<p class="z-section">Ventes par produit</p>${prodRows}<div class="sep"></div>`
+    : ""
+}
+${
+  payRows
+    ? `<p class="z-section">Modes de paiement</p>${payRows}<div class="sep"></div>`
+    : ""
+}
+${
+  repairRows
+    ? `<p class="z-section">Réparations payées</p>${repairRows}<div class="sep"></div>`
+    : ""
+}
+<div class="z-row"><span>VENTES:</span><span class="val">${escHtml(data.sales)}</span></div>
+<div class="z-row"><span>RÉPARATIONS:</span><span class="val">${escHtml(data.repairs)}</span></div>
+${
+  data.returns
+    ? `<div class="z-row"><span>RETOURS:</span><span class="val">-${escHtml(data.returns)}</span></div>`
+    : ""
+}
+<div class="z-row"><span>DÉPENSES:</span><span class="val">-${escHtml(data.expenses)}</span></div>
+${
+  typeof data.itemsSold === "number"
+    ? `<div class="z-row"><span>ARTICLES VENDUS:</span><span class="val">${data.itemsSold}</span></div>`
+    : ""
+}
+<div class="sep"></div>
+<div class="z-total"><span>TOTAL EN CAISSE:</span><span class="val">${escHtml(data.net)}</span></div>
+<div class="sep-bold"></div>
+<p class="z-status">Statut: Clôturé</p>
+<div class="sep"></div>
+${data.closedBy ? `<p class="z-meta">Clôturé par: ${escHtml(data.closedBy)}</p>` : ""}
+<div class="z-sign">
+  <span>Signature de l'employé:</span>
+  <div class="z-sign-line"></div>
+</div>
 <div class="sep-bold"></div>
 
 </main></body>
 </html>`;
 
-  printThermalHtml(html, "width=350,height=400");
+  printThermalHtml(html, "width=380,height=720");
+}
+
+// ── A4 PDF closing report (jsPDF) ──
+
+export interface ClosingPdfData {
+  shopName: string;
+  address?: string | null;
+  phone?: string | null;
+  logoUrl?: string | null;
+  dateTime: string;
+  closedBy?: string | null;
+  isDuplicate?: boolean;
+  byCategory: { category: string; revenue: number; items: number }[];
+  byProduct?: { product_name: string; quantity: number; revenue: number }[];
+  byPaymentMethod: { method: string; revenue: number }[];
+  repairsRows?: { label: string; customer: string | null; amount: number }[];
+  returns: { product_name: string; quantity: number; refund_amount: number }[];
+  expenses: { category: string; amount: number }[];
+  totals: {
+    sales: number;
+    repairs: number;
+    returns: number;
+    expenses: number;
+    net: number;
+    itemsSold: number;
+  };
+}
+
+async function loadImageDataUrl(
+  url: string
+): Promise<{ dataUrl: string; w: number; h: number } | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve({ w: 0, h: 0 });
+      img.src = dataUrl;
+    });
+    return { dataUrl, w: dims.w, h: dims.h };
+  } catch {
+    return null;
+  }
+}
+
+export async function generateClosingReportPdf(
+  data: ClosingPdfData,
+  format: (n: number) => string
+) {
+  const { default: jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pageW = 210;
+  const margin = 16;
+  const contentW = pageW - margin * 2;
+  let y = margin;
+
+  const black = (): [number, number, number] => [17, 17, 17];
+  const grey = (): [number, number, number] => [110, 110, 110];
+
+  // ---- Header: logo + shop details ----
+  if (data.logoUrl) {
+    const img = await loadImageDataUrl(data.logoUrl);
+    if (img && img.w && img.h) {
+      const maxH = 18;
+      const ratio = img.w / img.h;
+      const h = maxH;
+      const w = Math.min(h * ratio, 40);
+      try {
+        doc.addImage(img.dataUrl, "PNG", margin, y, w, h);
+      } catch {
+        /* ignore unsupported image */
+      }
+    }
+  }
+
+  doc.setTextColor(...black());
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text(data.shopName, pageW - margin, y + 6, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...grey());
+  let infoY = y + 11;
+  if (data.address) {
+    doc.text(data.address, pageW - margin, infoY, { align: "right" });
+    infoY += 4;
+  }
+  if (data.phone) {
+    doc.text(`Tél: ${data.phone}`, pageW - margin, infoY, { align: "right" });
+    infoY += 4;
+  }
+
+  y = Math.max(y + 20, infoY + 2);
+
+  // ---- Title ----
+  doc.setDrawColor(17, 17, 17);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, pageW - margin, y);
+  y += 8;
+  doc.setTextColor(...black());
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(
+    data.isDuplicate ? "RAPPORT DE CLÔTURE (DUPLICATA)" : "RAPPORT DE CLÔTURE",
+    margin,
+    y
+  );
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...grey());
+  doc.text(`Date de clôture: ${data.dateTime}`, margin, y);
+  y += 8;
+
+  // ---- Summary box ----
+  const summary: [string, string][] = [
+    ["Total Ventes", format(data.totals.sales)],
+    ["Total Réparations", format(data.totals.repairs)],
+    ["Total Retours", `- ${format(data.totals.returns)}`],
+    ["Total Dépenses", `- ${format(data.totals.expenses)}`],
+    ["Articles vendus", String(data.totals.itemsSold)],
+  ];
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.2);
+  const boxTop = y;
+  const rowH = 7;
+  summary.forEach(([label, value], i) => {
+    const ry = boxTop + i * rowH;
+    doc.setTextColor(...black());
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(label, margin + 2, ry + 5);
+    doc.setFont("helvetica", "bold");
+    doc.text(value, pageW - margin - 2, ry + 5, { align: "right" });
+    doc.line(margin, ry + rowH, pageW - margin, ry + rowH);
+  });
+  y = boxTop + summary.length * rowH + 4;
+
+  // Net highlight
+  doc.setFillColor(17, 17, 17);
+  doc.rect(margin, y, contentW, 10, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("NET EN CAISSE", margin + 3, y + 6.7);
+  doc.text(format(data.totals.net), pageW - margin - 3, y + 6.7, { align: "right" });
+  y += 16;
+
+  // ---- Generic table renderer ----
+  const drawTable = (
+    titleText: string,
+    headers: string[],
+    rows: string[][],
+    aligns: ("left" | "right")[]
+  ) => {
+    if (!rows.length) return;
+    if (y > 250) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setTextColor(...black());
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(titleText, margin, y);
+    y += 5;
+
+    const colW = contentW / headers.length;
+    doc.setFontSize(9);
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, y, contentW, 6, "F");
+    headers.forEach((h, i) => {
+      const align = aligns[i];
+      const x = align === "right" ? margin + colW * (i + 1) - 2 : margin + colW * i + 2;
+      doc.text(h, x, y + 4, { align });
+    });
+    y += 6;
+
+    doc.setFont("helvetica", "normal");
+    rows.forEach((r) => {
+      if (y > 280) {
+        doc.addPage();
+        y = margin;
+      }
+      r.forEach((cell, i) => {
+        const align = aligns[i];
+        const x = align === "right" ? margin + colW * (i + 1) - 2 : margin + colW * i + 2;
+        doc.text(cell, x, y + 4, { align });
+      });
+      doc.setDrawColor(230, 230, 230);
+      doc.line(margin, y + 5.5, pageW - margin, y + 5.5);
+      y += 6;
+    });
+    y += 6;
+  };
+
+  drawTable(
+    "Ventes par catégorie",
+    ["Catégorie", "Articles", "Total"],
+    data.byCategory.map((c) => [c.category, String(c.items), format(c.revenue)]),
+    ["left", "right", "right"]
+  );
+
+  if (data.byProduct && data.byProduct.length) {
+    drawTable(
+      "Ventes par produit",
+      ["Produit", "Qté", "Total"],
+      data.byProduct.map((p) => [p.product_name, String(p.quantity), format(p.revenue)]),
+      ["left", "right", "right"]
+    );
+  }
+
+  if (data.repairsRows && data.repairsRows.length) {
+    drawTable(
+      "Réparations payées",
+      ["Réparation", "Client", "Montant"],
+      data.repairsRows.map((r) => [r.label, r.customer || "—", format(r.amount)]),
+      ["left", "left", "right"]
+    );
+  }
+
+
+  drawTable(
+    "Modes de paiement",
+    ["Mode", "Total"],
+    data.byPaymentMethod.map((p) => [p.method, format(p.revenue)]),
+    ["left", "right"]
+  );
+
+  drawTable(
+    "Retours / Remboursements",
+    ["Article", "Qté", "Remboursé"],
+    data.returns.map((r) => [r.product_name, String(r.quantity), format(r.refund_amount)]),
+    ["left", "right", "right"]
+  );
+
+  drawTable(
+    "Dépenses",
+    ["Catégorie", "Montant"],
+    data.expenses.map((e) => [e.category, format(e.amount)]),
+    ["left", "right"]
+  );
+
+  // ---- Signature footer ----
+  if (y > 250) {
+    doc.addPage();
+    y = margin;
+  }
+  y = Math.max(y, 255);
+  doc.setDrawColor(17, 17, 17);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y, pageW - margin, y);
+  y += 7;
+  doc.setTextColor(...black());
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Clôturé par: ${data.closedBy || "—"}`, margin, y);
+  y += 14;
+  doc.setDrawColor(120, 120, 120);
+  doc.line(margin, y, margin + 70, y);
+  doc.setFontSize(9);
+  doc.setTextColor(...grey());
+  doc.text("Signature de l'employé", margin, y + 4);
+
+  const fileDate = data.dateTime.replace(/[^0-9]/g, "").slice(0, 8) || "rapport";
+  doc.save(`cloture-${fileDate}.pdf`);
+}
+
+export interface OrderReceiptItem {
+  name: string;
+  sku?: string | null;
+  quantity: number;
+  orderQty: number;
+}
+
+export interface OrderReceiptData {
+  shopName: string;
+  address?: string;
+  phone?: string;
+  dateTime: string;
+  items: OrderReceiptItem[];
+}
+
+/**
+ * 80mm thermal "Bon de commande" for out-of-stock / critical items.
+ * Reuses the same layout as the inventory shortage print flow so a shop
+ * owner can hand the ticket to a supplier.
+ */
+export function printOrderReceipt(data: OrderReceiptData) {
+  const rows = data.items
+    .map(
+      (p) => `
+        <tr>
+          <td class="name">${escHtml(p.name)}${p.sku ? `<br/><span class="sku">${escHtml(p.sku)}</span>` : ""}</td>
+          <td class="center">${p.quantity}</td>
+          <td class="center qty">${p.orderQty}</td>
+        </tr>`
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bon de commande — ${escHtml(data.shopName)}</title>
+<style>
+  @page { size: 80mm auto; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 80mm; }
+  body {
+    padding: 4mm 3mm;
+    font-family: 'Courier New', Courier, monospace;
+    color: #000; background: #fff; font-size: 12px; line-height: 1.4;
+    -webkit-font-smoothing: none; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .shop { text-align: center; font-weight: bold; font-size: 15px; }
+  .meta { text-align: center; font-size: 10.5px; margin-bottom: 1mm; word-break: break-word; }
+  .title { text-align: center; font-weight: bold; font-size: 12.5px; margin: 2mm 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 1.5mm 0; }
+  .date { text-align: center; font-size: 10.5px; margin-bottom: 2mm; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { font-size: 11px; text-align: left; border-bottom: 1px solid #000; padding: 1mm 0.5mm; }
+  th.center, td.center { text-align: center; width: 21%; }
+  td { font-size: 11px; padding: 1.4mm 0.5mm; border-bottom: 1px dotted #999; vertical-align: top; overflow-wrap: break-word; word-break: break-word; }
+  td.name { width: 58%; }
+  .sku { font-size: 9.5px; color: #333; }
+  td.qty { font-weight: bold; }
+  .total { margin-top: 2mm; font-size: 12px; font-weight: bold; text-align: right; }
+  .sign { margin-top: 8mm; font-size: 10.5px; }
+  .sign-line { margin-top: 6mm; border-top: 1px solid #000; width: 50mm; max-width: 100%; padding-top: 1mm; }
+  .footer { text-align: center; font-size: 9.5px; margin-top: 4mm; word-break: break-word; }
+</style>
+</head>
+<body>
+  <div class="shop">${escHtml(data.shopName)}</div>
+  ${data.address ? `<div class="meta">${escHtml(data.address)}</div>` : ""}
+  ${data.phone ? `<div class="meta">Tél: ${escHtml(data.phone)}</div>` : ""}
+  <div class="title">BON DE COMMANDE / RUPTURE</div>
+  <div class="date">${escHtml(data.dateTime)}</div>
+  <table>
+    <thead><tr><th>Produit</th><th class="center">Stock</th><th class="center">À cmd</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="total">Total articles : ${data.items.length}</div>
+  <div class="sign"><div class="sign-line">Signature / Cachet</div></div>
+  <div class="footer">Généré par ${escHtml(data.shopName)}</div>
+</body>
+</html>`;
+
+  printThermalHtml(html, "width=400,height=600");
 }

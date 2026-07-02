@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Store, Megaphone, MessageSquare, LogOut, KeyRound,
   Settings, Users, CreditCard, Tags, ClipboardList, Shield,
-  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox,
+  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox, HeartPulse, Rocket,
 } from "lucide-react";
 import { usePendingServiceRequestCount } from "@/hooks/useAdminServiceRequests";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +12,7 @@ type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
   | "settings" | "employees" | "plans" | "gateways" | "feature_flags"
   | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
-  | "services_catalog" | "services_requests";
+  | "services_catalog" | "services_requests" | "system_health" | "growth_engine";
 
 interface AdminSidebarProps {
   active: AdminView;
@@ -43,9 +43,10 @@ const navSections: { label: string; items: NavItem[] }[] = [
   {
     label: "Commercial",
     items: [
-      { id: "plans",    label: "Tarifs & Plans", icon: Tags },
-      { id: "orders",   label: "Commandes",      icon: ClipboardList },
-      { id: "gateways", label: "Paiements",      icon: CreditCard },
+      { id: "plans",         label: "Tarifs & Plans", icon: Tags },
+      { id: "orders",        label: "Commandes",      icon: ClipboardList },
+      { id: "gateways",      label: "Paiements",      icon: CreditCard },
+      { id: "growth_engine", label: "Growth Engine",  icon: Rocket, badge: "Nouveau" },
     ],
   },
   {
@@ -68,6 +69,7 @@ const navSections: { label: string; items: NavItem[] }[] = [
   {
     label: "Système",
     items: [
+      { id: "system_health",   label: "Santé Système",  icon: HeartPulse, badge: "Nouveau" },
       { id: "signup_attempts", label: "Tentatives",     icon: Shield },
       { id: "feature_flags",   label: "Feature Flags",  icon: Flag },
       { id: "settings",        label: "Paramètres",     icon: Settings },

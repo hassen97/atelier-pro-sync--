@@ -1,45 +1,37 @@
-# Reset GitHub Integration to Match Current Project
+## Findings
 
-## Goal
-Force the GitHub repository to exactly match the current Lovable project state and start with a clean commit history.
+- `GOODS2026` can authenticate successfully, but their account is currently in a broken role state: it has both `super_admin` and `employee` roles.
+- Their team membership under GOODS PRO is marked `removed`, so the app treats them like a shop owner after login instead of an active employee.
+- This is not isolated: the database currently has 19 mixed owner+employee accounts, including 10 active employees and 9 removed-only employee records.
+- The team role trigger now exists, but there are duplicate triggers on `team_members`; this can cause fragile role syncing and should be consolidated.
 
-## Approach
-Because the sandbox only has credentials for Lovable's internal git mirror and not for the user's GitHub account, the safest and most reliable reset is to break the existing GitHub connection, recreate the GitHub repository, and reconnect it. This gives the equivalent of a force-push with clean history without needing GitHub credentials in the sandbox.
+## Plan
 
-## Steps
+1. **Repair current data safely**
+  - Remove stray `super_admin` roles from every account that has a team role (`employee`, `manager`, or `admin`) and is not a platform admin.
+  - Keep each employee’s real team role intact.
+  - For removed employees like `GOODS2026`, preserve their removed status unless the shop owner reactivates them; the login will then correctly show “employee account removed/not active” instead of entering an empty owner dashboard.
+2. **Fix login classification**
+  - Update the login role check so active team membership takes priority over `user_roles`.
+  - If someone logs in from the Employee tab and has an active team row, allow login even if a stray owner role exists.
+  - If someone has only removed team rows, block login with a clear message: the employee account is no longer active and the owner must reactivate it.
+  - Prevent removed employees from being treated as owners.
+3. **Harden protected routing**
+  - Update onboarding/route guards to consider active team membership before owner checks.
+  - This prevents employees from flashing the dashboard then disappearing or being redirected into the wrong owner/onboarding/subscription flow.
+4. **Consolidate backend role sync**
+  - Remove the duplicate team role trigger and keep one canonical trigger.
+  - Update `sync_team_member_role()` so:
+    - active team members never keep `super_admin`
+    - active team members always get their correct role
+    - removed team members do not regain owner behavior accidentally
+5. **Verify with the test account**
+  - Test the `GOODS2026` login flow.
+  - Confirm whether the expected result is active access or a clean “account removed” block.
+  - Re-check that mixed role accounts are reduced to zero and active employees no longer appear as shop owners.
 
-1. **Snapshot the current project state**
-   - Confirm the latest code is in Lovable and ready to push.
+## Important note
 
-2. **Disconnect GitHub in Lovable**
-   - Open the project in Lovable.
-   - Go to the Plus menu in the chat input → GitHub → Disconnect project.
-   - Wait for the disconnection to complete.
+`GOODS2026` is currently marked as a removed employee in the team table. If you want this exact account to login again, I will also reactivate their team membership under GOODS PRO during the fix.
 
-3. **Reset the GitHub repository**
-   - Go to the GitHub repository settings.
-   - Choose one of the following:
-     - **Delete the repository** (clean history, same URL can be reused later).
-     - **Rename it to archive** (keeps old history under a new name) and create a new empty repo with the original name.
-   - Ensure the target repository is empty before reconnecting.
-
-4. **Reconnect GitHub in Lovable**
-   - In Lovable: Plus menu → GitHub → Connect project.
-   - Authorize the Lovable GitHub App again if needed.
-   - Select the target account and the empty repository.
-   - Make sure the GitHub App has "Repository access" set to "All repositories".
-
-5. **Trigger Lovable sync**
-   - Lovable will push the current project state to the empty repository as the initial commit.
-   - If it does not sync immediately, make a tiny non-destructive edit (for example, add a blank line to README.md) and save it to force a push.
-
-6. **Verify the reset**
-   - Check that the GitHub repository contains the same files as the current Lovable project.
-   - Confirm the commit history shows only the new initial commit.
-
-## Technical Notes
-
-- This gives a clean history because the repository is created from scratch.
-- If you want to preserve the old history for reference, rename the old repo instead of deleting it.
-- Lovable's two-way sync will resume from the fresh repository state; no further manual pushes are needed.
-- This does not change the Lovable project itself or its data, only the GitHub repository.
+Check all other employees  from other shop owners

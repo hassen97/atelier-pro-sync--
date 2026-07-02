@@ -13,6 +13,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { SEO } from "@/components/seo/SEO";
+import { BlueprintLoader, preloadBlueprint } from "@/components/auth/BlueprintLoader";
+import repairProLogo from "@/assets/repairpro-logo.png";
+import { saveReferralCode, getSavedReferralCode, clearReferralCode, computeFingerprint } from "@/lib/fingerprint";
 
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY || "";
 const REMEMBER_ME_KEY = "repairpro_remember_me";
@@ -42,10 +45,20 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // 3D "Digital Blueprint" login transition
+  const [showLoader, setShowLoader] = useState(false);
+  const [loaderLogo, setLoaderLogo] = useState<string | null>(null);
   const [adminWhatsapp, setAdminWhatsapp] = useState("");
   const [signupCooldown, setSignupCooldown] = useState(0);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captchaRef = useRef<HCaptcha>(null);
+
+  // Warm the 3D "Digital Blueprint" bundle as soon as the login page mounts so
+  // the holographic animation is ready on the FIRST owner login (not just the
+  // second). Best-effort, never blocks the form.
+  useEffect(() => {
+    preloadBlueprint();
+  }, []);
 
   // Restore remembered username
   useEffect(() => {
@@ -93,17 +106,29 @@ export default function Auth() {
     }
     if (email) setRegisterEmail(email);
     if (username) setRegisterUsername(username);
+    // Capture referral code from ?ref= and persist it for signup
+    const ref = params.get("ref");
+    if (ref) {
+      saveReferralCode(ref);
+      setAuthTab("register");
+      setLoginRole("owner");
+    }
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (user) {
+  // Redirect already-authenticated users — but NOT while the blueprint loader
+  // is playing, so the owner login animation can finish before we navigate.
+  // Done in an effect (not during render) to avoid the
+  // "Cannot update a component while rendering" warning.
+  useEffect(() => {
+    if (!user || showLoader) return;
     const searchParams = new URLSearchParams(location.search);
     const redirect = searchParams.get("redirect");
     const from = redirect || (location.state as { from?: Location })?.from?.pathname || "/dashboard";
     navigate(from, { replace: true });
-    return null;
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, showLoader]);
 
   const validateUsername = (username: string): string | null => {
     if (username.length < 3) return "Le nom d'utilisateur doit contenir au moins 3 caractères";
@@ -117,18 +142,21 @@ export default function Auth() {
     setError(null);
     setLoading(true);
 
-    const { error } = await signIn(loginUsername, loginPassword);
+    try {
+      const { error } = await signIn(loginUsername, loginPassword);
 
-    if (error) {
-      const msg = error.message || "";
-      if (msg === "Invalid login credentials") {
-        setError("Nom d'utilisateur ou mot de passe incorrect");
-      } else if (msg.includes("banned") || msg.includes("User is banned")) {
-        setError("Votre compte est en attente de validation par l'administrateur.");
-      } else {
-        setError(msg);
+      if (error) {
+        const msg = error.message || "";
+        if (msg === "Invalid login credentials") {
+          setError("Nom d'utilisateur ou mot de passe incorrect");
+        } else if (msg.includes("banned") || msg.includes("User is banned")) {
+          setError("Votre compte est en attente de validation par l'administrateur.");
+        } else {
+          setError(msg);
+        }
+        return;
       }
-    } else {
+
       // Remember me
       if (rememberMe) {
         localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({ username: loginUsername }));
@@ -136,31 +164,70 @@ export default function Auth() {
         localStorage.removeItem(REMEMBER_ME_KEY);
       }
 
+      // Owner tab → paint the premium blueprint loader instantly (before any
+      // network round-trips) so it appears the moment the button is pressed.
+      const ownerLoaderStart = Date.now();
+      if (loginRole === "owner") {
+        setLoaderLogo(repairProLogo);
+        setShowLoader(true);
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
+      let isOwnerLogin = false;
+      let userIdForLogo: string | null = null;
       if (sessionData.session?.user) {
         const userId = sessionData.session.user.id;
 
-        // Role matching: check user role vs selected tab
-        const { data: roleData } = await supabase
+        // Role matching: a user can have multiple rows in user_roles
+        // (e.g. platform_admin + super_admin), so fetch the full set rather
+        // than assuming a single row (which breaks with .single()).
+        const { data: roles } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", userId)
-          .single();
+          .eq("user_id", userId);
 
-        const userRole = roleData?.role;
+        const roleSet = new Set((roles ?? []).map((r) => r.role));
+        const isPlatformAdmin = roleSet.has("platform_admin");
 
-        if (loginRole === "employee" && (userRole === "super_admin" || userRole === "admin")) {
-          await supabase.auth.signOut();
-          setError("Ce compte est un compte propriétaire. Veuillez utiliser l'onglet « Propriétaire ».");
-          setLoading(false);
-          return;
-        }
+        // Team membership is the source of truth for employee accounts. Some
+        // legacy employees may still carry stale role rows, so resolve the team
+        // row before deciding whether this is an owner or employee login.
+        const { data: teamRows, error: teamError } = await supabase
+          .from("team_members")
+          .select("id, status, role")
+          .eq("member_user_id", userId)
+          .order("created_at", { ascending: false });
 
-        if (loginRole === "owner" && (userRole === "employee" || userRole === "manager")) {
-          await supabase.auth.signOut();
-          setError("Ce compte est un compte employé. Veuillez utiliser l'onglet « Employé ».");
-          setLoading(false);
-          return;
+        if (teamError) throw teamError;
+
+        const activeTeamRow = (teamRows ?? []).find((row) => row.status === "active");
+        const hasTeamHistory = (teamRows ?? []).length > 0;
+        const hasTeamRole = roleSet.has("employee") || roleSet.has("manager") || roleSet.has("admin");
+        const isEmployee = !!activeTeamRow;
+        const isOwner = roleSet.has("super_admin") && !hasTeamRole && !hasTeamHistory;
+
+        // Platform admins bypass the owner/employee tab guards entirely.
+        if (!isPlatformAdmin) {
+          if (!activeTeamRow && (hasTeamRole || hasTeamHistory)) {
+            await supabase.auth.signOut();
+            setShowLoader(false);
+            setError("Ce compte employé n'est plus actif. Demandez au propriétaire de la boutique de le réactiver.");
+            return;
+          }
+
+          if (loginRole === "employee" && isOwner) {
+            await supabase.auth.signOut();
+            setShowLoader(false);
+            setError("Ce compte est un compte propriétaire. Veuillez utiliser l'onglet « Propriétaire ».");
+            return;
+          }
+
+          if (loginRole === "owner" && isEmployee) {
+            await supabase.auth.signOut();
+            setShowLoader(false);
+            setError("Ce compte est un compte employé. Veuillez utiliser l'onglet « Employé ».");
+            return;
+          }
         }
 
         const { data: profile } = await supabase
@@ -172,20 +239,70 @@ export default function Auth() {
         if (profile?.is_locked) {
           // Admin kill-switch: account explicitly locked by an admin
           await supabase.auth.signOut();
+          setShowLoader(false);
           setError("Votre compte est verrouillé par l'administrateur. Veuillez le contacter.");
-          setLoading(false);
           return;
         }
+
+        // Owner login → show the 3D "Digital Blueprint" transition.
+        isOwnerLogin = !isEmployee;
+        userIdForLogo = userId;
       }
+
       // Invalidate onboarding cache to force fresh fetch
       queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
       const searchParams = new URLSearchParams(location.search);
       const redirect = searchParams.get("redirect");
       const from = redirect || (location.state as { from?: Location })?.from?.pathname || "/dashboard";
-      navigate(from, { replace: true });
-    }
 
-    setLoading(false);
+      // Premium 3D loader for shop owners going to the dashboard.
+      // The overlay is already visible (set optimistically above); here we just
+      // refine the logo and hold a minimum display before navigating.
+      if (isOwnerLogin && from === "/dashboard") {
+        if (!showLoader) {
+          setLoaderLogo(repairProLogo);
+          setShowLoader(true);
+        }
+
+        // Fetch the shop logo (best-effort) so it appears in the blueprint.
+        if (userIdForLogo) {
+          try {
+            const { data: shop } = await supabase
+              .from("shop_settings")
+              .select("logo_url")
+              .eq("user_id", userIdForLogo)
+              .maybeSingle();
+            if (shop?.logo_url) setLoaderLogo(shop.logo_url);
+          } catch {
+            /* keep default logo */
+          }
+        }
+
+        // Minimum display so the 3D animation has time to load and play out
+        // before we navigate to the dashboard.
+        const elapsed = Date.now() - ownerLoaderStart;
+        const minDisplay = 3200;
+        if (elapsed < minDisplay) {
+          await new Promise((r) => setTimeout(r, minDisplay - elapsed));
+        }
+        setShowLoader(false);
+        navigate(from, { replace: true });
+        return;
+      }
+
+      // Non-owner / non-dashboard destinations: make sure the optimistic
+      // loader is cleared before navigating.
+      setShowLoader(false);
+      navigate(from, { replace: true });
+    } catch (err) {
+      setShowLoader(false);
+      setError(
+        (err as Error)?.message ||
+          "Connexion au serveur impossible. Vérifiez votre connexion et réessayez.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -269,6 +386,42 @@ export default function Auth() {
       }
     } else {
       setSuccess("Votre compte a été créé avec succès ! Vous pouvez maintenant vous connecter.");
+
+      // Referral capture + device fingerprint (best-effort, never blocks signup).
+      // Runs while the just-created session is still active (before signOut).
+      try {
+        const fingerprint = await computeFingerprint();
+        const { data: { user: newUser } } = await supabase.auth.getUser();
+        if (newUser) {
+          // Store the new user's signup fingerprint for the anti-fraud radar
+          await supabase
+            .from("profiles")
+            .update({ signup_fingerprint: fingerprint })
+            .eq("user_id", newUser.id);
+
+          const refCode = getSavedReferralCode();
+          if (refCode) {
+            const { data: referrer } = await supabase
+              .from("profiles")
+              .select("user_id")
+              .eq("referral_code", refCode)
+              .maybeSingle();
+            if (referrer && (referrer as any).user_id && (referrer as any).user_id !== newUser.id) {
+              await supabase.from("referrals").insert({
+                referrer_id: (referrer as any).user_id,
+                referred_id: newUser.id,
+                referred_email: registerEmail.trim() || null,
+                ip_fingerprint: fingerprint,
+                status: "pending",
+              });
+            }
+            clearReferralCode();
+          }
+        }
+      } catch (refErr) {
+        console.error("[Auth] referral capture error:", refErr);
+      }
+
       // Notify the platform admin (best-effort, never blocks)
       try {
         await supabase.functions.invoke("notify-admin-signup", {
@@ -300,6 +453,7 @@ export default function Auth() {
 
   return (
     <main className="min-h-screen flex items-center justify-center relative overflow-hidden bg-zinc-950 p-4">
+      <BlueprintLoader visible={showLoader} logoUrl={loaderLogo} />
       <SEO
         title="Connexion / Inscription — RepairPro"
         description="Connectez-vous à RepairPro ou créez votre compte d'atelier de réparation mobile."
@@ -314,8 +468,8 @@ export default function Auth() {
       <div className="relative z-10 w-full max-w-md animate-fade-in">
         {/* Brand */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-primary p-3.5 mb-3 auth-glow">
-            <Wrench className="h-8 w-8 text-white" />
+          <div className="inline-flex items-center justify-center mb-3 auth-glow">
+            <img src={repairProLogo} alt="RepairPro" className="w-16 h-16 rounded-2xl" width={64} height={64} />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Connexion à votre atelier RepairPro</h1>
           <p className="text-zinc-500 mt-1 text-sm">Gestion d'atelier moderne</p>

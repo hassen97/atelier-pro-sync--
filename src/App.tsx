@@ -7,12 +7,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ShopSettingsProvider } from "@/contexts/ShopSettingsContext";
-import { I18nProvider } from "@/contexts/I18nContext";
+
 import { BrandThemeProvider } from "@/contexts/BrandThemeContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { SpeedInsights } from "@vercel/speed-insights/react";
 
 function lazyWithRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
   return lazy(() =>
@@ -53,6 +52,9 @@ const MessagesPage = lazyWithRetry(() => import("./pages/Messages"));
 const OnboardingSetup = lazyWithRetry(() => import("./pages/OnboardingSetup"));
 const Team = lazyWithRetry(() => import("./pages/Team"));
 const Services = lazyWithRetry(() => import("./pages/Services"));
+const Vault = lazyWithRetry(() => import("./pages/Vault"));
+const PanicAnalyzer = lazyWithRetry(() => import("./pages/PanicAnalyzer"));
+const Referrals = lazyWithRetry(() => import("./pages/Referrals"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,7 +82,6 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <SpeedInsights />
         <BrowserRouter>
           <ImpersonationProvider>
             <Suspense fallback={<PageLoader />}>
@@ -113,11 +114,9 @@ const App = () => (
                   <ProtectedRoute>
                     <ShopSettingsProvider>
                       <BrandThemeProvider>
-                        <I18nProvider>
-                          <NotificationsProvider>
-                            <MainLayout />
-                          </NotificationsProvider>
-                        </I18nProvider>
+                        <NotificationsProvider>
+                          <MainLayout />
+                        </NotificationsProvider>
                       </BrandThemeProvider>
                     </ShopSettingsProvider>
                   </ProtectedRoute>
@@ -139,6 +138,9 @@ const App = () => (
                   <Route path="/communaute" element={<Communaute />} />
                   <Route path="/messages" element={<MessagesPage />} />
                   <Route path="/services" element={<Services />} />
+                  <Route path="/vault" element={<Vault />} />
+                  <Route path="/panic-analyzer" element={<PanicAnalyzer />} />
+                  <Route path="/referrals" element={<Referrals />} />
                 </Route>
                 
                 <Route path="*" element={<NotFound />} />
