@@ -1,37 +1,48 @@
-## Findings
+# Migrating your data to Live — the realistic plan
 
-- `GOODS2026` can authenticate successfully, but their account is currently in a broken role state: it has both `super_admin` and `employee` roles.
-- Their team membership under GOODS PRO is marked `removed`, so the app treats them like a shop owner after login instead of an active employee.
-- This is not isolated: the database currently has 19 mixed owner+employee accounts, including 10 active employees and 9 removed-only employee records.
-- The team role trigger now exists, but there are duplicate triggers on `team_members`; this can cause fragile role syncing and should be consolidated.
+## The blocker (please read first)
 
-## Plan
+You asked to move **everything** from Test into Live, and your own account **only exists in Test**. A CSV import cannot do this, for three hard reasons:
 
-1. **Repair current data safely**
-  - Remove stray `super_admin` roles from every account that has a team role (`employee`, `manager`, or `admin`) and is not a platform admin.
-  - Keep each employee’s real team role intact.
-  - For removed employees like `GOODS2026`, preserve their removed status unless the shop owner reactivates them; the login will then correctly show “employee account removed/not active” instead of entering an empty owner dashboard.
-2. **Fix login classification**
-  - Update the login role check so active team membership takes priority over `user_roles`.
-  - If someone logs in from the Employee tab and has an active team row, allow login even if a stray owner role exists.
-  - If someone has only removed team rows, block login with a clear message: the employee account is no longer active and the owner must reactivate it.
-  - Prevent removed employees from being treated as owners.
-3. **Harden protected routing**
-  - Update onboarding/route guards to consider active team membership before owner checks.
-  - This prevents employees from flashing the dashboard then disappearing or being redirected into the wrong owner/onboarding/subscription flow.
-4. **Consolidate backend role sync**
-  - Remove the duplicate team role trigger and keep one canonical trigger.
-  - Update `sync_team_member_role()` so:
-    - active team members never keep `super_admin`
-    - active team members always get their correct role
-    - removed team members do not regain owner behavior accidentally
-5. **Verify with the test account**
-  - Test the `GOODS2026` login flow.
-  - Confirm whether the expected result is active access or a clean “account removed” block.
-  - Re-check that mixed role accounts are reduced to zero and active employees no longer appear as shop owners.
+1. **Logins live in a separate, protected auth system.** Every row (customers, repairs, products, sales) is tied to a `user_id` that points to a login account. Those 370 Test accounts do **not** exist in Live, and I cannot recreate login accounts (with passwords/identities) by importing CSVs. If I loaded the data anyway, **nobody — including you — could log into Live**, and every record would point to a non-existent account.
 
-## Important note
+2. **Live is not empty — it holds different real data.** Live already has **337 shops, 431 customers, 587 repairs, 3,728 products, 128 sales**, and none of them match the Test accounts. Bulk-loading 370 more shops on top would collide on unique IDs and risk **corrupting or duplicating real production data**.
 
-`GOODS2026` is currently marked as a removed employee in the team table. If you want this exact account to login again, I will also reactivate their team membership under GOODS PRO during the fix.
+3. **This is a platform/environment problem, not a code or data problem.** The mismatch (your real working data sitting in "Test", a different dataset in "Live", your account missing from Live) is a side effect of the **Test/Live split created during the workspace/ownership transfer**. Fixing which environment is the "real" one is a platform operation — it can't be patched by importing rows.
 
-Check all other employees  from other shop owners
+Bottom line: there is **no safe SQL/CSV route** to make Test's data (and logins) become Live. Forcing it would break authentication and endanger the 337 real shops already in Live.
+
+## What I recommend instead
+
+```text
+1. Protect everything (I can do this now)
+   - Test backup ...... already saved (test-db-backup.zip)
+   - Live backup ...... export all Live tables to CSV too, so BOTH
+                        environments are preserved before anything changes
+2. Get the split fixed the right way (support)
+   - The environment that holds YOUR real data + YOUR login is Test.
+   - Ask Lovable support to promote/restore Test as the single/Live
+     environment (or remove the Test/Live split) WITHOUT data loss.
+   - This is the only path that keeps logins working.
+3. Only after that: enable transactional email
+   - Once there's a single correct environment, the app-email
+     "Get started" button unblocks.
+```
+
+## What I can safely do for you right now
+
+- **Export a full backup of the Live database** the same way I did for Test (all tables → CSV → zip), so you hold both environments before any change.
+- **Prepare a clear support summary** you can paste to Lovable support: the exact counts in each environment, the fact that your account/data is in Test, and the request to fix the split without losing data.
+
+## What I will NOT do
+
+- Insert Test's 370 shops/users into Live (breaks logins, collides with 337 real shops).
+- Delete the Test database (that's where your real data currently lives) until support confirms Live/single-env is correct.
+
+## Technical notes
+
+- Auth schema (`auth.users`) is managed and off-limits to migrations/imports, which is precisely why logins can't be transferred via CSV.
+- Data never syncs between Test and Live on publish — by design — so there's no built-in "push Test to Live" for data.
+- Verified counts: Live = 337 shops / 587 repairs / 3,728 products; Test backup = 370 shops / ~1,800 repairs / ~4,900 products; **zero** overlapping account IDs between them.
+
+If you approve, I'll generate the Live backup and the support summary. The environment fix itself has to be done by Lovable support.

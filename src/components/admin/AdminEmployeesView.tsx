@@ -293,9 +293,9 @@ export function AdminEmployeesView() {
   });
 
   const deleteEmployee = useMutation({
-    mutationFn: async ({ employeeUserId }: { memberId: string; employeeUserId: string }) => {
-      const { data, error } = await supabase.functions.invoke("wipe-employee", {
-        body: { employeeUserId },
+    mutationFn: async ({ memberId, employeeUserId }: { memberId: string; employeeUserId: string }) => {
+      const { data, error } = await supabase.functions.invoke("admin-manage-users", {
+        body: { action: "delete-employee", memberId, employeeUserId },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -303,7 +303,7 @@ export function AdminEmployeesView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-employees"] });
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
-      toast.success("Employé complètement effacé — aucune trace restante");
+      toast.success("Employé supprimé avec succès");
       setDeleteTarget(null);
       setDetailTarget(null);
     },
@@ -433,7 +433,7 @@ export function AdminEmployeesView() {
         className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
         onClick={() => setDeleteTarget(emp)}
       >
-        <Trash2 className="h-4 w-4 mr-2" /> Wipe employé (suppression totale)
+        <Trash2 className="h-4 w-4 mr-2" /> Supprimer l'employé
       </DropdownMenuItem>
     </>
   );
@@ -818,12 +818,11 @@ export function AdminEmployeesView() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Wipe total de cet employé ?</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer cet employé ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action <strong>efface complètement</strong> le compte de{" "}
-              <strong>{deleteTarget?.full_name || deleteTarget?.username}</strong> : identifiants de connexion,
-              rôles, appartenances d'équipe, transactions, préférences et notifications. Aucune trace ne subsistera.
-              Il perdra tout accès à la boutique <strong>{deleteTarget?.shop_name}</strong>. Irréversible.
+              Cette action supprimera définitivement le compte de{" "}
+              <strong>{deleteTarget?.full_name || deleteTarget?.username}</strong> et retirera
+              son accès à la boutique <strong>{deleteTarget?.shop_name}</strong>. Irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -839,7 +838,7 @@ export function AdminEmployeesView() {
                 }
               }}
             >
-              {deleteEmployee.isPending ? "Effacement..." : "Wipe total"}
+              {deleteEmployee.isPending ? "Suppression..." : "Supprimer"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

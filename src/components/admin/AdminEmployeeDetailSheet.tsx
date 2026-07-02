@@ -192,7 +192,7 @@ export function AdminEmployeeDetailSheet({
                   className="w-full justify-start gap-2 border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-400"
                   onClick={() => onDelete(emp)}
                 >
-                  <Trash2 className="h-4 w-4" /> Wipe employé (suppression totale)
+                  <Trash2 className="h-4 w-4" /> Supprimer l'employé
                 </Button>
               </div>
             </div>
