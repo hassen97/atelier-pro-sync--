@@ -1,37 +1,29 @@
-## Findings
+## Plan to switch GitHub sync back to the old repo
 
-- `GOODS2026` can authenticate successfully, but their account is currently in a broken role state: it has both `super_admin` and `employee` roles.
-- Their team membership under GOODS PRO is marked `removed`, so the app treats them like a shop owner after login instead of an active employee.
-- This is not isolated: the database currently has 19 mixed owner+employee accounts, including 10 active employees and 9 removed-only employee records.
-- The team role trigger now exists, but there are duplicate triggers on `team_members`; this can cause fragile role syncing and should be consolidated.
+1. **Confirm current limitation**
+   - Lovable’s GitHub sync normally creates/connects a repository through the GitHub integration flow.
+   - Directly “pointing” an existing Lovable project to an already-existing old repo is usually not available as a one-click in-chat action.
 
-## Plan
+2. **Use the safest supported path**
+   - In this new workspace, open the **Plus (+) menu in the chat input → GitHub → Connect project**.
+   - Authorize the same GitHub account.
+   - If Lovable offers the old repo as a selectable target, choose it.
+   - If it only offers **Create Repository**, create a new repo from this workspace.
 
-1. **Repair current data safely**
-  - Remove stray `super_admin` roles from every account that has a team role (`employee`, `manager`, or `admin`) and is not a platform admin.
-  - Keep each employee’s real team role intact.
-  - For removed employees like `GOODS2026`, preserve their removed status unless the shop owner reactivates them; the login will then correctly show “employee account removed/not active” instead of entering an empty owner dashboard.
-2. **Fix login classification**
-  - Update the login role check so active team membership takes priority over `user_roles`.
-  - If someone logs in from the Employee tab and has an active team row, allow login even if a stray owner role exists.
-  - If someone has only removed team rows, block login with a clear message: the employee account is no longer active and the owner must reactivate it.
-  - Prevent removed employees from being treated as owners.
-3. **Harden protected routing**
-  - Update onboarding/route guards to consider active team membership before owner checks.
-  - This prevents employees from flashing the dashboard then disappearing or being redirected into the wrong owner/onboarding/subscription flow.
-4. **Consolidate backend role sync**
-  - Remove the duplicate team role trigger and keep one canonical trigger.
-  - Update `sync_team_member_role()` so:
-    - active team members never keep `super_admin`
-    - active team members always get their correct role
-    - removed team members do not regain owner behavior accidentally
-5. **Verify with the test account**
-  - Test the `GOODS2026` login flow.
-  - Confirm whether the expected result is active access or a clean “account removed” block.
-  - Re-check that mixed role accounts are reduced to zero and active employees no longer appear as shop owners.
+3. **If the old repo must stay the canonical repo**
+   - Create the new Lovable-linked repo first.
+   - Then move code from the new repo into your old repo using GitHub/local Git outside Lovable, or rename/archive repos as needed.
+   - Avoid manually forcing git remotes inside the Lovable project, because Lovable manages sync state internally.
 
-## Important note
+4. **Protect your current project state**
+   - Before changing GitHub sync, use **Download codebase** or make sure the current project version is saved.
+   - Do not delete/archive the old repo until the new workspace has successfully synced.
 
-`GOODS2026` is currently marked as a removed employee in the team table. If you want this exact account to login again, I will also reactivate their team membership under GOODS PRO during the fix.
+5. **Validation after reconnecting**
+   - Make a small harmless edit in Lovable.
+   - Confirm it appears in GitHub.
+   - Make a small harmless commit in GitHub.
+   - Confirm it syncs back into Lovable.
 
-Check all other employees  from other shop owners
+## Recommended answer for your case
+Because you own the old repo and it is the same GitHub account, first try the GitHub connection flow in this new workspace. If Lovable does not allow selecting the existing old repo, use a newly created repo as the Lovable sync target, then migrate/merge it into the old repo outside Lovable.
