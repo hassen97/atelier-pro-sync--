@@ -72,4 +72,4 @@ To connect a domain, navigate to Project > Settings > Domains and click Connect 
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
 
-<!-- sync test: 2026-07-02 — verifying GitHub sync to the new repo -->
+<!-- sync test: 2026-07-02 — ready for GitHub reset -->
