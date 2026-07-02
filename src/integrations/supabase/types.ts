@@ -512,6 +512,7 @@ export type Database = {
           description: string | null
           expense_date: string
           id: string
+          session_id: string | null
           supplier_id: string | null
           user_id: string
         }
@@ -522,6 +523,7 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          session_id?: string | null
           supplier_id?: string | null
           user_id: string
         }
@@ -532,10 +534,18 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          session_id?: string | null
           supplier_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "register_sessions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_supplier_id_fkey"
             columns: ["supplier_id"]
@@ -1010,6 +1020,7 @@ export type Database = {
           quantity: number
           sell_price: number
           sku: string | null
+          subcategory_id: string | null
           updated_at: string
           user_id: string
         }
@@ -1025,6 +1036,7 @@ export type Database = {
           quantity?: number
           sell_price?: number
           sku?: string | null
+          subcategory_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1040,6 +1052,7 @@ export type Database = {
           quantity?: number
           sell_price?: number
           sku?: string | null
+          subcategory_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1049,6 +1062,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
         ]
@@ -1062,11 +1082,15 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_demo: boolean
           is_locked: boolean
+          language: string | null
           last_online_at: string | null
           last_verification_reminder_sent_at: string | null
           phone: string | null
+          referral_code: string | null
           registration_ip: string | null
+          signup_fingerprint: string | null
           updated_at: string
           user_id: string
           username: string | null
@@ -1086,11 +1110,15 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_demo?: boolean
           is_locked?: boolean
+          language?: string | null
           last_online_at?: string | null
           last_verification_reminder_sent_at?: string | null
           phone?: string | null
+          referral_code?: string | null
           registration_ip?: string | null
+          signup_fingerprint?: string | null
           updated_at?: string
           user_id: string
           username?: string | null
@@ -1110,11 +1138,15 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_demo?: boolean
           is_locked?: boolean
+          language?: string | null
           last_online_at?: string | null
           last_verification_reminder_sent_at?: string | null
           phone?: string | null
+          referral_code?: string | null
           registration_ip?: string | null
+          signup_fingerprint?: string | null
           updated_at?: string
           user_id?: string
           username?: string | null
@@ -1158,6 +1190,90 @@ export type Database = {
           updated_at?: string
           user_agent?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          id: string
+          ip_fingerprint: string | null
+          referred_email: string | null
+          referred_id: string | null
+          referrer_id: string
+          reward_granted_at: string | null
+          rewarded_by: string | null
+          status: Database["public"]["Enums"]["referral_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_fingerprint?: string | null
+          referred_email?: string | null
+          referred_id?: string | null
+          referrer_id: string
+          reward_granted_at?: string | null
+          rewarded_by?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_fingerprint?: string | null
+          referred_email?: string | null
+          referred_id?: string | null
+          referrer_id?: string
+          reward_granted_at?: string | null
+          rewarded_by?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      register_sessions: {
+        Row: {
+          closed_at: string | null
+          closed_by_name: string | null
+          created_at: string
+          id: string
+          opened_at: string
+          report_data: Json | null
+          shop_id: string
+          snapshot_depenses: number
+          snapshot_net: number
+          snapshot_reparations: number
+          snapshot_ventes: number
+          status: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by_name?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          report_data?: Json | null
+          shop_id: string
+          snapshot_depenses?: number
+          snapshot_net?: number
+          snapshot_reparations?: number
+          snapshot_ventes?: number
+          status?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by_name?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          report_data?: Json | null
+          shop_id?: string
+          snapshot_depenses?: number
+          snapshot_net?: number
+          snapshot_reparations?: number
+          snapshot_ventes?: number
+          status?: string
         }
         Relationships: []
       }
@@ -1213,6 +1329,7 @@ export type Database = {
           payment_type: string
           recorded_by: string | null
           repair_id: string
+          session_id: string | null
           user_id: string
         }
         Insert: {
@@ -1224,6 +1341,7 @@ export type Database = {
           payment_type?: string
           recorded_by?: string | null
           repair_id: string
+          session_id?: string | null
           user_id: string
         }
         Update: {
@@ -1235,9 +1353,18 @@ export type Database = {
           payment_type?: string
           recorded_by?: string | null
           repair_id?: string
+          session_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "repair_payments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "register_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       repair_status_history: {
         Row: {
@@ -1439,6 +1566,7 @@ export type Database = {
           id: string
           notes: string | null
           payment_method: string
+          session_id: string | null
           total_amount: number
           user_id: string
         }
@@ -1449,6 +1577,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: string
+          session_id?: string | null
           total_amount?: number
           user_id: string
         }
@@ -1459,6 +1588,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: string
+          session_id?: string | null
           total_amount?: number
           user_id?: string
         }
@@ -1468,6 +1598,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "register_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -1696,6 +1833,7 @@ export type Database = {
           set_by_admin: string | null
           started_at: string
           status: string
+          trial_ends_at: string | null
           updated_at: string
           user_id: string
         }
@@ -1707,6 +1845,7 @@ export type Database = {
           set_by_admin?: string | null
           started_at?: string
           status?: string
+          trial_ends_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1718,6 +1857,7 @@ export type Database = {
           set_by_admin?: string | null
           started_at?: string
           status?: string
+          trial_ends_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1748,6 +1888,38 @@ export type Database = {
           ip_address?: string
         }
         Relationships: []
+      }
+      subcategories: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscription_orders: {
         Row: {
@@ -2093,6 +2265,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_category_preferences: {
+        Row: {
+          bg_color: string | null
+          category_id: string
+          category_kind: string
+          display_order: number | null
+          id: string
+          text_size: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bg_color?: string | null
+          category_id: string
+          category_kind?: string
+          display_order?: number | null
+          id?: string
+          text_size?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bg_color?: string | null
+          category_id?: string
+          category_kind?: string
+          display_order?: number | null
+          id?: string
+          text_size?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2208,15 +2413,59 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      close_register_session: {
+        Args: { _closed_by_name?: string; _report?: Json; _shop_id: string }
+        Returns: string
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
+      }
+      detect_health_issues: {
+        Args: {
+          bloat_ratio?: number
+          min_size_mb?: number
+          slow_threshold_s?: number
+        }
+        Returns: Json
       }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      generate_referral_code: { Args: never; Returns: string }
+      get_active_connections: {
+        Args: never
+        Returns: {
+          active: number
+          idle: number
+          total: number
+        }[]
+      }
+      get_db_table_sizes: {
+        Args: never
+        Returns: {
+          dead_ratio: number
+          dead_tuples: number
+          live_tuples: number
+          table_name: string
+          total_size_mb: number
+        }[]
+      }
+      get_or_create_open_session: {
+        Args: { _shop_id: string }
+        Returns: string
+      }
       get_repair_by_token: { Args: { p_token: string }; Returns: Json }
+      get_slow_queries: {
+        Args: never
+        Returns: {
+          duration_seconds: number
+          pid: number
+          query: string
+          state: string
+        }[]
+      }
       get_team_owner_id: { Args: { _member_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -2229,6 +2478,7 @@ export type Database = {
         Args: { _conv_id: string; _user_id: string }
         Returns: boolean
       }
+      is_maintenance_mode: { Args: never; Returns: boolean }
       is_team_member: {
         Args: { _member_id: string; _owner_id: string }
         Returns: boolean
@@ -2258,6 +2508,7 @@ export type Database = {
         | "manager"
         | "employee"
         | "platform_admin"
+      referral_status: "pending" | "joined" | "rewarded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2392,6 +2643,7 @@ export const Constants = {
         "employee",
         "platform_admin",
       ],
+      referral_status: ["pending", "joined", "rewarded"],
     },
   },
 } as const
