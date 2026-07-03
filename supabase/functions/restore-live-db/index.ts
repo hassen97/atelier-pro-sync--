@@ -34,6 +34,7 @@ serve(async (req) => {
     sqlUrl?: string;
     files?: FileEntry[];
     mode?: "all" | "db" | "storage";
+    dryRun?: boolean;
   };
   try {
     body = await req.json();
