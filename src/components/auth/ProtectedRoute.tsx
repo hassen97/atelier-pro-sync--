@@ -180,10 +180,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // Platform admin redirect logic. Admins normally live in /admin, but allow
-  // a small allow-list of admin-only tools (e.g. the temporary DB restore page)
-  // so they aren't force-redirected away from them.
-  const adminAllowedPaths = ["/admin", "/db-restore"];
+  // Platform admin redirect logic. Admins live in /admin.
+  const adminAllowedPaths = ["/admin"];
   if (
     isPlatformAdmin &&
     !adminAllowedPaths.includes(location.pathname) &&
