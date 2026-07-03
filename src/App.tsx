@@ -180,7 +180,8 @@ const App = () => (
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </Suspense>
+              </Suspense>
+            </RouteErrorBoundary>
           </ImpersonationProvider>
         </BrowserRouter>
       </TooltipProvider>
