@@ -110,7 +110,25 @@ Deno.serve(async (req) => {
           password: await decrypt(r.password, key),
         })),
       );
+
+      // Opportunistic migration: encrypt any remaining legacy plaintext rows.
+      const legacy = rows.filter(
+        (r: any) => r.password && !String(r.password).startsWith(ENC_PREFIX),
+      );
+      if (legacy.length > 0) {
+        await Promise.all(
+          legacy.map(async (r: any) => {
+            const enc = await encrypt(String(r.password), key);
+            await userClient
+              .from("customer_vault")
+              .update({ password: enc })
+              .eq("id", r.id);
+          }),
+        );
+      }
+
       return json({ data: decrypted });
+
     }
 
     if (action === "create") {
