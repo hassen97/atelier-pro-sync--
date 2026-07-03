@@ -2452,6 +2452,16 @@ export type Database = {
           total_size_mb: number
         }[]
       }
+      get_enabled_payment_gateways: {
+        Args: never
+        Returns: {
+          config: Json
+          description: string
+          gateway_key: string
+          gateway_name: string
+          id: string
+        }[]
+      }
       get_or_create_open_session: {
         Args: { _shop_id: string }
         Returns: string
