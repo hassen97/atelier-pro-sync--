@@ -97,17 +97,27 @@ serve(async (req) => {
       return json({ error: `Payload load error: ${String((e as Error)?.message ?? e)}` }, 500);
     }
 
-    // Skip statements targeting Supabase-managed schemas. The DB role is NOT the
-    // owner of these (e.g. auth sequences like refresh_tokens_id_seq), so a
+    // Supabase-managed schemas can't be restored via raw SQL: the DB role is
+    // NOT the owner (e.g. auth sequences like refresh_tokens_id_seq), so a
     // TRUNCATE/INSERT against them fails with "must be owner of sequence ...".
-    // These schemas can't be restored via raw SQL; only public data is restored.
+    // Only public data is restored.
     const RESERVED_SCHEMA =
       /\b(?:auth|storage|vault|realtime|supabase_functions|supabase_migrations|extensions|graphql|graphql_public|pgsodium|cron|net|pgbouncer)\./i;
+    const isReservedTable = (t: string) => RESERVED_SCHEMA.test(t.trim());
     const runnable: string[] = [];
     let skipped = 0;
     for (const s of statements) {
-      if (RESERVED_SCHEMA.test(s)) skipped++;
-      else runnable.push(s);
+      const truncate = s.match(/^\s*TRUNCATE\s+(?:TABLE\s+)?([\s\S]*?)(\s+(?:RESTART|CONTINUE|CASCADE|RESTRICT)[\s\S]*)?;?\s*$/i);
+      if (truncate) {
+        // Keep only the public tables in the TRUNCATE list; drop reserved ones
+        // so public tables are still cleared before inserts.
+        const kept = truncate[1].split(",").map((t) => t.trim()).filter((t) => t && !isReservedTable(t));
+        if (kept.length === 0) { skipped++; continue; }
+        runnable.push(`TRUNCATE TABLE ${kept.join(", ")}${truncate[2] ?? " RESTART IDENTITY CASCADE"};`);
+        continue;
+      }
+      if (RESERVED_SCHEMA.test(s)) { skipped++; continue; }
+      runnable.push(s);
     }
     summary.statements_skipped = skipped;
 
