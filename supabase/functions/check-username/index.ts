@@ -66,6 +66,30 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // ── Auth: only signed-in users may probe username/phone availability. ──
+    // This prevents anonymous enumeration of registered accounts.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: authData, error: authErr } = await adminClient.auth.getUser(token);
+    if (authErr || !authData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { username, phone } = await req.json().catch(() => ({}));
 
     if (!username && !phone) {
@@ -74,6 +98,8 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
