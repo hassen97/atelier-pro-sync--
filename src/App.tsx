@@ -12,17 +12,42 @@ import { BrandThemeProvider } from "@/contexts/BrandThemeContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 
 function lazyWithRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
   return lazy(() =>
-    importFn().catch(() => {
-      if (!sessionStorage.getItem("chunk_reload")) {
-        sessionStorage.setItem("chunk_reload", "1");
-        window.location.reload();
-      }
-      sessionStorage.removeItem("chunk_reload");
-      return importFn();
-    })
+    importFn()
+      .then((mod) => {
+        // Successful load — clear any stale reload guard so future failures
+        // are allowed exactly one reload attempt again.
+        try {
+          sessionStorage.removeItem("chunk_reload");
+        } catch {
+          /* ignore */
+        }
+        return mod;
+      })
+      .catch(async (err) => {
+        // First failure in this session → trigger a single hard reload to fetch
+        // fresh chunks. Keep the guard set until a load actually succeeds so we
+        // never loop reloads on a persistently failing chunk.
+        let alreadyReloaded = false;
+        try {
+          alreadyReloaded = sessionStorage.getItem("chunk_reload") === "1";
+          if (!alreadyReloaded) {
+            sessionStorage.setItem("chunk_reload", "1");
+            window.location.reload();
+            // Return a never-resolving promise so nothing renders before reload.
+            return await new Promise<{ default: ComponentType<any> }>(() => {});
+          }
+        } catch {
+          /* sessionStorage unavailable — fall through to a retry */
+        }
+        // We've already reloaded once and it still failed: retry the import.
+        // If it rejects, let it propagate to RouteErrorBoundary (recoverable UI)
+        // instead of leaving an uncaught rejection that blanks the screen.
+        return importFn();
+      })
   );
 }
 
