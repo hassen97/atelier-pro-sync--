@@ -1,56 +1,40 @@
-# Replace Live database with the Test dump
+# Fix the intermittent blank preview (/db-restore)
 
-Goal: make **live/production** an exact copy of the **test** database from your uploaded `pg_dump` — all business data, all auth accounts, and the 21 storage files. This is **destructive and irreversible for live**.
+## What I verified first
+- **Landing (`/`), Auth (`/auth`)** render fully. **TypeScript typecheck passes** (0 errors).
+- **BlueprintCanvas builds and renders** correctly. It only mounts during the login loader and is already guarded by a WebGL-availability check, a `CanvasErrorBoundary`, and a CSS fallback (`BlueprintLoaderFallback`) — it is not the source of the blank window.
+- The blank is on **`/db-restore`** and **intermittent** — this points at the lazy-load path, not the page's own code.
 
-## ⚠️ Before anything: back up live
-Live currently holds real data (337 users, 587 repairs, 431 customers, 3,728 products, 128 sales) that will be **permanently deleted**. First run **Cloud → Advanced settings → Export data** with **Live/Production selected** and keep that zip. We do not proceed until you confirm you have it.
+## Root cause
+Two independent issues combine into a blank screen:
 
-## Why an edge function
-- Lovable tools (migration/insert/SQL editor) write to **test only**; the SQL editor also can't handle a 30k-row `COPY`-format dump.
-- An edge function invoked on the **published** app connects to the **live** database directly, so it's the only reliable way to load this data into live.
+1. **No error boundary around routes.** In `src/App.tsx`, `<Routes>` is wrapped only in `<Suspense>`. When a lazily-imported page chunk fails to load (stale cache / network hiccup — intermittent), the rejected promise from `React.lazy` propagates with nothing to catch it, so React unmounts the whole tree → **blank white screen**.
 
-## Phases
+2. **Broken retry guard in `lazyWithRetry`** (`src/App.tsx`). After calling `window.location.reload()`, it *synchronously* runs `sessionStorage.removeItem("chunk_reload")`, wiping the "already reloaded once" flag before the reload happens. The second `importFn()` retry can also reject (again uncaught), and the guard never persists — so a genuinely failing chunk can blank out or reload-loop instead of recovering gracefully.
 
-### Phase 1 — Schema parity (prerequisite)
-The dump's rows assume live has the **same schema as test**. Because the earlier `ticket_number` publish failed, live schema may be behind. Since we're wiping live anyway, we clear the blocker and publish so live schema == test schema:
-1. On live, empty the conflicting rows (we're deleting them regardless): truncate `repairs` (and any other tables the pending migrations touch).
-2. **Publish** so all pending migrations apply cleanly to live.
-3. Confirm live schema now matches test.
+3. **Secondary (reachability):** `ProtectedRoute` redirects every platform admin to `/admin` (`isPlatformAdmin && pathname !== "/admin"`), so `/db-restore` is currently unreachable for the very admin the page asks you to sign in as — you'd get bounced away rather than see the tool.
 
-### Phase 2 — Build the restore payload (sandbox, one-time)
-A script converts the dump into an executable payload:
-- Parse each `COPY ... FROM stdin` block and convert to batched multi-row `INSERT` statements, correctly decoding pg_dump escapes (`\t \n \r \\ \N`→NULL).
-- Wrap the whole thing in one transaction:
-  - `SET session_replication_role = replica;` (disables triggers + FK checks during load so `handle_new_user`, ordering, etc. don't interfere)
-  - `TRUNCATE` every target table (all 56 `public` + the 16 loaded `auth` tables) `RESTART IDENTITY CASCADE` — we only truncate tables we reload, never `auth.sessions`, `auth.refresh_tokens`, `auth.schema_migrations`, etc.
-  - all `INSERT` batches
-  - `SELECT setval('auth.refresh_tokens_id_seq', 10805, true);`
-  - reset `session_replication_role`, then `COMMIT`
-- Because it's a single transaction, **any failure rolls back and live is left untouched** until a fully successful run.
-- gzip the SQL and upload it as a Lovable asset (stable public URL the function can fetch at runtime).
-- Build a storage manifest: upload the 21 export files as assets and record `{bucket, objectPath, url}` for each.
+## The fix
 
-### Phase 3 — The restore edge function
-`restore-live-db`:
-- Requires a one-time `RESTORE_SECRET` header (added via secret), rejects otherwise.
-- Connects with the internal DB URL (same pattern as the existing `admin-db-maintenance` function).
-- Fetches the gzipped SQL, decompresses, executes the transaction.
-- Then reads the storage manifest and, using the service role, re-uploads each file into the matching live bucket at its original path (`upsert`), so existing `logo_url` / `proof_url` values keep resolving. Buckets already exist in live from schema sync.
-- Returns a JSON summary (rows loaded per table, files restored).
+### 1. Add a route-level error boundary (new file `src/components/RouteErrorBoundary.tsx`)
+A small class component that catches render/chunk-load errors and shows a branded fallback (message + "Reload" button using existing UI tokens) instead of a blank screen. On a detected dynamic-import/chunk error it offers a one-tap reload.
 
-### Phase 4 — Run against live, then clean up
-1. Publish so the function + secret exist in the **live** environment.
-2. Invoke `restore-live-db` once against the **production** URL with the secret.
-3. Verify live counts now equal the dump (369 users, 1695 repairs, 4942 products, 1449 customers, 633 sales) and spot-check a logo/proof image loads.
-4. **Delete** the function, the `RESTORE_SECRET`, and the temporary restore assets so this can't run again.
+### 2. Wrap routes with it in `src/App.tsx`
+Wrap the existing `<Suspense fallback={<PageLoader/>}>…</Suspense>` with `<RouteErrorBoundary>` so any failed page chunk degrades to the fallback UI, never a blank window.
 
-## Risks / notes
-- **Irreversible** for live once it commits successfully — hence the Phase 0 backup.
-- Replacing production **auth** means anyone who signed up on live but isn't in the dump loses their account, and everyone must **log in again** (active sessions are dropped). Passwords from the dump continue to work.
-- `repair-photos` and `supplier-proofs` buckets have **no files** in the export, so those stay empty.
-- The dump was taken 2026-07-03; any activity on test after that isn't included.
-- If the ~30k-row transaction approaches the edge-function time limit, the loader falls back to running per-table in sequence (still wrapped so live isn't left half-populated).
+### 3. Repair `lazyWithRetry` in `src/App.tsx`
+Rework the guard so it:
+- only clears the `chunk_reload` flag **after a successful import**, not synchronously right after triggering a reload;
+- returns a resolved retry and, if the retry still fails, rethrows into the new error boundary (fallback UI) rather than leaving an uncaught rejection.
 
-## Confirmations I need before building
-1. You have (or will take) the **live backup** in Phase 0.
-2. You accept that **all current live data and any live-only accounts are permanently deleted**.
+### 4. Make `/db-restore` reachable for platform admins in `src/components/auth/ProtectedRoute.tsx`
+Add `/db-restore` (and `/admin`) to the admin bypass so a platform admin visiting `/db-restore` is not force-redirected to `/admin`. This keeps the temporary restore tool usable without weakening any other guard.
+
+## Verification
+- Run the TypeScript typecheck (expect 0 errors).
+- Reproduce with Playwright: load `/db-restore` while blocking the page chunk to simulate the intermittent failure, and confirm the **error-boundary fallback with a Reload button** appears instead of a blank screen; confirm a normal load renders the restore UI.
+- Confirm the landing, auth, and a normal protected route still render and that BlueprintCanvas still mounts/renders in the login loader.
+
+## Notes
+- All changes are frontend/presentation and routing-guard only — no backend, no database, no changes to the restore edge function or its logic.
+- These are the temporary restore-tool files; everything here remains safe to delete after the restore is complete.
