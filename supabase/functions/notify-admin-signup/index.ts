@@ -15,12 +15,44 @@ interface SignupPayload {
   test?: boolean;
 }
 
+// Escape user-supplied values before interpolating into HTML email
+const esc = (v: unknown): string =>
+  String(v ?? "—")
+    .slice(0, 200)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Require authentication: signup calls carry the freshly-created user's JWT,
+    // admin test calls carry the admin's JWT, and internal calls use the service key.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    let authed = authHeader === `Bearer ${serviceKey}`;
+    if (!authed && authHeader) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data } = await userClient.auth.getUser();
+      authed = !!data.user;
+    }
+    if (!authed) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const body = (await req.json().catch(() => ({}))) as SignupPayload;
     const isTest = body.test === true;
     const username = isTest ? (body.username ?? "test_user") : body.username;
@@ -29,8 +61,6 @@ Deno.serve(async (req) => {
     const phone = isTest ? (body.phone ?? "+216 00 000 000") : body.phone;
     const country = isTest ? (body.country ?? "TN") : body.country;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(supabaseUrl, serviceKey);
 
     // Try to find the freshly-created user_id by username
