@@ -54,11 +54,22 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Find waitlist entries never notified
-  const { data: entries, error } = await admin
-    .from("waitlist")
-    .select("id, email, notified_at")
-    .is("notified_at", null);
+  // Optional resend mode: re-send to ALL waitlist entries (including already notified)
+  let resend = false;
+  try {
+    const body = await req.json();
+    resend = body?.resend === true;
+  } catch {
+    // no body — default behaviour
+  }
+
+  // Find waitlist entries to notify
+  let query = admin.from("waitlist").select("id, email, notified_at");
+  if (!resend) {
+    // Default: only entries never notified
+    query = query.is("notified_at", null);
+  }
+  const { data: entries, error } = await query;
 
   if (error) {
     console.error("[notify-waitlist] query error:", error);

@@ -21,11 +21,15 @@ import {
   Users2,
   MessageCircle,
   Cloud,
+  KeyRound,
+  Activity,
+  Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FeedbackDialog } from "@/components/feedback/FeedbackDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import repairProLogo from "@/assets/repairpro-logo.png";
 import {
   Tooltip,
   TooltipContent,
@@ -33,7 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { useAllowedPages } from "@/hooks/useTeam";
-import { useI18n } from "@/contexts/I18nContext";
+import { useTranslation } from "react-i18next";
 import { useUnreadMessageCount } from "@/hooks/useCommunity";
 
 const navigation = [
@@ -42,6 +46,8 @@ const navigation = [
   { nameKey: "nav.repairs" as const, href: "/repairs", icon: Wrench },
   { nameKey: "nav.inventory" as const, href: "/inventory", icon: Package },
   { nameKey: "nav.customers" as const, href: "/customers", icon: Users },
+  { nameKey: "nav.customers" as const, href: "/vault", icon: KeyRound, labelOverride: "Coffre-fort" },
+  { nameKey: "nav.customers" as const, href: "/panic-analyzer", icon: Activity, labelOverride: "Analyseur Panic" },
   { nameKey: "nav.suppliers" as const, href: "/suppliers", icon: Truck },
   { nameKey: "nav.expenses" as const, href: "/expenses", icon: Receipt },
   { nameKey: "nav.debts" as const, href: "/customer-debts", icon: CreditCard },
@@ -53,6 +59,7 @@ const navigation = [
   { nameKey: "nav.community" as const, href: "/communaute", icon: Users2 },
   { nameKey: "nav.services" as const, href: "/services", icon: Cloud },
   { nameKey: "nav.messages" as const, href: "/messages", icon: MessageCircle },
+  { nameKey: "nav.customers" as const, href: "/referrals", icon: Gift, labelOverride: "Parrainage" },
 ];
 
 const bottomNav = [
@@ -71,7 +78,7 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
   const { settings } = useShopSettingsContext();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { allowedPages } = useAllowedPages();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const { data: unreadCount = 0 } = useUnreadMessageCount();
 
   // Filter navigation based on allowed pages
@@ -84,10 +91,10 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
     return location.pathname.startsWith(path);
   };
 
-  const NavItem = ({ item }: { item: { nameKey: string; href: string; icon: any } }) => {
+  const NavItem = ({ item }: { item: { nameKey: string; href: string; icon: any; labelOverride?: string } }) => {
     const active = isActive(item.href);
     const Icon = item.icon;
-    const name = t(item.nameKey as any);
+    const name = item.labelOverride ?? t(item.nameKey as any);
     const hasUnread = item.href === "/messages" && unreadCount > 0;
 
     const linkContent = (
@@ -152,9 +159,7 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
                 className="w-9 h-9 rounded-lg object-cover"
               />
             ) : (
-              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-primary">
-                <Smartphone className="h-5 w-5 text-primary-foreground" />
-              </div>
+              <img src={repairProLogo} alt="RepairPro" className="w-9 h-9 rounded-lg" width={36} height={36} />
             )}
             <div className="flex flex-col">
               <span className="font-semibold text-sidebar-foreground text-sm truncate max-w-[140px]">{settings.shop_name}</span>
@@ -169,9 +174,7 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
               className="w-9 h-9 rounded-lg object-cover"
             />
           ) : (
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-primary">
-              <Smartphone className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src={repairProLogo} alt="RepairPro" className="w-9 h-9 rounded-lg" width={36} height={36} />
           )
         )}
         {!isMobile && (

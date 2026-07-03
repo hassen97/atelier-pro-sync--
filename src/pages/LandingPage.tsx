@@ -3,17 +3,20 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { usePublicPlans } from "@/hooks/useSubscriptionPlans";
-import { useJoinWaitlist } from "@/hooks/useWaitlist";
+import { useDemoLogin } from "@/hooks/useDemoLogin";
 import {
   Package, Wrench, Truck, RotateCcw,
   Menu, X, ChevronRight, Check, Smartphone,
   Shield, BarChart3, Users, Zap, ArrowRight,
-  Sparkles, Mail, Loader2
+  Sparkles, PlayCircle, LogIn, UserPlus, Loader2
 } from "lucide-react";
 import { SEO } from "@/components/seo/SEO";
+import { getUpdateStatus, applyUpdateNow } from "@/lib/swUpdate";
+import { UpdateCheckOverlay } from "@/components/landing/UpdateCheckOverlay";
+import repairProLogo from "@/assets/repairpro-logo.png";
+
 
 /* ── animation variants ── */
 const fadeUp = {
@@ -49,13 +52,40 @@ const stats = [
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [updatePhase, setUpdatePhase] = useState<
+    "checking" | "current" | "update" | "done"
+  >("checking");
   const { user } = useAuth();
   const navigate = useNavigate();
   const { scrollYProgress } = useScroll();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
   const { data: plans } = usePublicPlans();
-  const joinWaitlist = useJoinWaitlist();
+  const { startDemo, loading: demoLoading } = useDemoLogin();
+
+
+  // On open: run a status-returning update check, then drive the 3D overlay.
+  //  - "current": play a brief confirmation beat, then reveal the landing page.
+  //  - "update":  show a blocking refresh prompt (mandatory) until the user
+  //               clears the cache and reloads into the latest version.
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    getUpdateStatus(2500)
+      .then((status) => {
+        if (!active) return;
+        if (status === "update") {
+          setUpdatePhase("update");
+        } else {
+          setUpdatePhase("current");
+          timer = setTimeout(() => active && setUpdatePhase("done"), 1500);
+        }
+      })
+      .catch(() => active && setUpdatePhase("done"));
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -73,31 +103,20 @@ export default function LandingPage() {
     }
   };
 
-  const handleWaitlistSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = waitlistEmail.trim();
-    if (!email || !email.includes("@")) return;
 
-    // Derive a candidate username from the local part of the email
-    const localPart = email.split("@")[0] || "";
-    let username = localPart.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/^_+|_+$/g, "");
-    if (username.length < 3) username = (username + "_user").slice(0, 20);
-    if (username.length > 20) username = username.slice(0, 20);
-
-    const goToSignup = () => {
-      setWaitlistEmail("");
-      const params = new URLSearchParams({ tab: "register", email, username });
-      navigate(`/auth?${params.toString()}`);
-    };
-
-    joinWaitlist.mutate(email, {
-      // Redirect on success AND on duplicate (already on the waitlist)
-      onSuccess: goToSignup,
-      onError: goToSignup,
-    });
-  };
 
   const displayPlans = plans || [];
+
+  // 3D update-check overlay while we verify the visitor is on the latest build.
+  if (updatePhase !== "done") {
+    return (
+      <UpdateCheckOverlay
+        state={updatePhase}
+        onRefresh={() => applyUpdateNow()}
+      />
+    );
+  }
+
 
   return (
     <main className="landing-page min-h-screen relative" style={{ scrollBehavior: "smooth" }}>
@@ -112,9 +131,8 @@ export default function LandingPage() {
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "lp-navbar-scrolled" : "bg-transparent"}`}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5 relative z-10">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: "linear-gradient(135deg, hsl(217 91% 60%), hsl(187 72% 50%))" }}>
-              <Smartphone className="h-4.5 w-4.5 text-white" />
-            </div>
+            <img src={repairProLogo} alt="RepairPro" className="h-8 w-8 rounded-lg" width={32} height={32} />
+
             <span className="text-lg font-bold tracking-tight" style={{ color: "hsl(0 0% 98%)" }}>RepairPro</span>
           </Link>
 
@@ -125,14 +143,25 @@ export default function LandingPage() {
             <a href="#pricing" className="text-sm transition-colors" style={{ color: "hsl(240 5% 55%)" }} onMouseEnter={e => (e.currentTarget.style.color = "hsl(0 0% 98%)")} onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 5% 55%)")}>
               Tarifs
             </a>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={startDemo}
+              disabled={demoLoading}
+              className="text-sm"
+              style={{ color: "hsl(217 91% 70%)" }}
+            >
+              {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><PlayCircle className="mr-1.5 h-4 w-4" /> Démo</>}
+            </Button>
             <Link to="/auth">
               <Button variant="ghost" size="sm" className="text-sm" style={{ color: "hsl(240 5% 65%)" }}>Connexion</Button>
             </Link>
-            <a href="#waitlist">
+            <Link to="/auth?tab=register">
               <Button size="sm" className="lp-glow-btn rounded-full px-5 text-sm font-medium" style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 45%))", color: "white" }}>
-                Rejoindre la liste
+                Créer un compte
               </Button>
-            </a>
+            </Link>
+
           </div>
 
           <button className="md:hidden p-2 relative z-10" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu" style={{ color: "hsl(240 5% 65%)" }}>
@@ -145,12 +174,22 @@ export default function LandingPage() {
             <div className="flex flex-col gap-3">
               <a href="#features" onClick={() => setMenuOpen(false)} className="text-sm py-2" style={{ color: "hsl(240 5% 65%)" }}>Fonctionnalités</a>
               <a href="#pricing" onClick={() => setMenuOpen(false)} className="text-sm py-2" style={{ color: "hsl(240 5% 65%)" }}>Tarifs</a>
+              <Button
+                variant="outline"
+                onClick={() => { setMenuOpen(false); startDemo(); }}
+                disabled={demoLoading}
+                className="w-full justify-center rounded-full"
+                style={{ borderColor: "hsla(217, 91%, 60%, 0.4)", color: "hsl(217 91% 70%)" }}
+              >
+                {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><PlayCircle className="mr-1.5 h-4 w-4" /> Essayer la démo</>}
+              </Button>
               <Link to="/auth" onClick={() => setMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start" style={{ color: "hsl(240 5% 65%)" }}>Connexion</Button>
               </Link>
-              <a href="#waitlist" onClick={() => setMenuOpen(false)}>
-                <Button className="w-full rounded-full" style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 45%))", color: "white" }}>Rejoindre la liste</Button>
-              </a>
+              <Link to="/auth?tab=register" onClick={() => setMenuOpen(false)}>
+                <Button className="w-full rounded-full" style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 45%))", color: "white" }}>Créer un compte</Button>
+              </Link>
+
             </div>
           </motion.div>
         )}
@@ -176,34 +215,42 @@ export default function LandingPage() {
             — le tout depuis une seule plateforme pensée pour les ateliers en Tunisie et en France.
           </motion.p>
 
-          {/* Waitlist CTA */}
-          <motion.div variants={fadeUp} id="waitlist" className="mt-10 mx-auto max-w-md">
-            <form onSubmit={handleWaitlistSubmit} className="flex gap-2">
-              <div className="relative flex-1">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "hsl(240 5% 40%)" }} />
-                <Input
-                  type="email"
-                  placeholder="votre@email.com"
-                  value={waitlistEmail}
-                  onChange={e => setWaitlistEmail(e.target.value)}
-                  className="pl-10 h-12 rounded-full text-sm"
-                  style={{ background: "hsla(240, 6%, 10%, 0.8)", border: "1px solid hsla(0, 0%, 100%, 0.1)", color: "hsl(0 0% 98%)" }}
-                  required
-                />
-              </div>
+          {/* CTA: 3 actions — Démo / Créer un compte / Connexion */}
+          <motion.div variants={fadeUp} className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Button
+              size="lg"
+              onClick={startDemo}
+              disabled={demoLoading}
+              className="lp-glow-btn rounded-full px-7 h-12 text-sm font-semibold w-full sm:w-auto"
+              style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+            >
+              {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><PlayCircle className="mr-2 h-5 w-5" /> Essayer la démo</>}
+            </Button>
+            <Link to="/auth?tab=register" className="w-full sm:w-auto">
               <Button
-                type="submit"
-                disabled={joinWaitlist.isPending}
-                className="lp-glow-btn rounded-full px-6 h-12 text-sm font-medium shrink-0"
-                style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+                size="lg"
+                variant="outline"
+                className="rounded-full px-7 h-12 text-sm font-medium w-full"
+                style={{ background: "hsla(240, 6%, 10%, 0.6)", borderColor: "hsla(0, 0%, 100%, 0.12)", color: "hsl(0 0% 98%)" }}
               >
-                {joinWaitlist.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Rejoindre <ArrowRight className="ml-1.5 h-4 w-4" /></>}
+                <UserPlus className="mr-2 h-4 w-4" /> Créer un compte
               </Button>
-            </form>
-            <p className="mt-3 text-xs" style={{ color: "hsl(240 5% 40%)" }}>
-              Rejoignez la liste d'attente — soyez parmi les premiers alertés au lancement.
-            </p>
+            </Link>
+            <Link to="/auth" className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                variant="ghost"
+                className="rounded-full px-7 h-12 text-sm font-medium w-full"
+                style={{ color: "hsl(240 5% 70%)" }}
+              >
+                <LogIn className="mr-2 h-4 w-4" /> Connexion
+              </Button>
+            </Link>
           </motion.div>
+          <motion.p variants={fadeUp} className="mt-3 text-xs" style={{ color: "hsl(240 5% 40%)" }}>
+            Testez gratuitement avec des données d'exemple — aucune inscription requise.
+          </motion.p>
+
 
           {/* Dashboard Mockup */}
           <motion.div variants={fadeUp} className="mt-16 sm:mt-20">
@@ -404,7 +451,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── CTA final (Waitlist) ─── */}
+      {/* ─── CTA final ─── */}
       <section className="relative z-10 py-20 sm:py-28">
         <motion.div className="mx-auto max-w-3xl px-4 text-center sm:px-6" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
           <motion.h2 variants={fadeUp} className="text-3xl font-bold sm:text-4xl lp-gradient-text" style={{ letterSpacing: "-0.02em" }}>
@@ -413,38 +460,47 @@ export default function LandingPage() {
           <motion.p variants={fadeUp} className="mx-auto mt-4 max-w-xl text-sm sm:text-base" style={{ color: "hsl(240 5% 50%)" }}>
             Rejoignez des centaines d'ateliers qui utilisent RepairPro pour gérer leur activité au quotidien.
           </motion.p>
-          <motion.div variants={fadeUp} className="mt-8 mx-auto max-w-md">
-            <form onSubmit={handleWaitlistSubmit} className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="votre@email.com"
-                value={waitlistEmail}
-                onChange={e => setWaitlistEmail(e.target.value)}
-                className="h-12 rounded-full text-sm flex-1"
-                style={{ background: "hsla(240, 6%, 10%, 0.8)", border: "1px solid hsla(0, 0%, 100%, 0.1)", color: "hsl(0 0% 98%)" }}
-                required
-              />
+          <motion.div variants={fadeUp} className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Button
+              size="lg"
+              onClick={startDemo}
+              disabled={demoLoading}
+              className="lp-glow-btn rounded-full px-8 h-12 text-sm font-semibold w-full sm:w-auto"
+              style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+            >
+              {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><PlayCircle className="mr-2 h-5 w-5" /> Essayer la démo</>}
+            </Button>
+            <Link to="/auth?tab=register" className="w-full sm:w-auto">
               <Button
-                type="submit"
-                disabled={joinWaitlist.isPending}
                 size="lg"
-                className="lp-glow-btn rounded-full px-8 text-sm font-medium shrink-0"
-                style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+                variant="outline"
+                className="rounded-full px-8 h-12 text-sm font-medium w-full"
+                style={{ background: "hsla(240, 6%, 10%, 0.6)", borderColor: "hsla(0, 0%, 100%, 0.12)", color: "hsl(0 0% 98%)" }}
               >
-                {joinWaitlist.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Rejoindre la liste d'attente"}
+                <UserPlus className="mr-2 h-4 w-4" /> Créer un compte
               </Button>
-            </form>
+            </Link>
+            <Link to="/auth" className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                variant="ghost"
+                className="rounded-full px-8 h-12 text-sm font-medium w-full"
+                style={{ color: "hsl(240 5% 70%)" }}
+              >
+                <LogIn className="mr-2 h-4 w-4" /> Connexion
+              </Button>
+            </Link>
           </motion.div>
         </motion.div>
       </section>
+
 
       {/* ─── Footer ─── */}
       <footer className="relative z-10 py-8" style={{ borderTop: "1px solid hsla(0, 0%, 100%, 0.05)" }}>
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 text-center sm:flex-row sm:justify-between sm:px-6">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md" style={{ background: "linear-gradient(135deg, hsl(217 91% 60%), hsl(187 72% 50%))" }}>
-              <Smartphone className="h-3.5 w-3.5 text-white" />
-            </div>
+            <img src={repairProLogo} alt="RepairPro" className="h-6 w-6 rounded-md" width={24} height={24} loading="lazy" />
+
             <span className="font-semibold text-sm" style={{ color: "hsl(0 0% 85%)" }}>RepairPro</span>
           </div>
           <p className="text-xs" style={{ color: "hsl(240 5% 35%)" }}>

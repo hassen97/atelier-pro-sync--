@@ -179,6 +179,7 @@ export function useCreateSale() {
       queryClient.invalidateQueries({ queryKey: ["inventory-stats"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["profit"] });
+      queryClient.invalidateQueries({ queryKey: ["session-totals"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customers-all"] });
       queryClient.invalidateQueries({ queryKey: ["loyalty-transactions"] });
