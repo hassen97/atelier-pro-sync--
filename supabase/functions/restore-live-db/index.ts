@@ -96,8 +96,13 @@ serve(async (req) => {
           );
         }
       }
-      await pg.queryArray("COMMIT");
-      summary.db = { ok: true, statements_executed: executed };
+      if (dryRun) {
+        await pg.queryArray("ROLLBACK");
+        summary.db = { ok: true, statements_executed: executed, committed: false, note: "dry run rolled back — DB unchanged" };
+      } else {
+        await pg.queryArray("COMMIT");
+        summary.db = { ok: true, statements_executed: executed, committed: true };
+      }
     } catch (e) {
       await pg.queryArray("ROLLBACK").catch(() => {});
       return json({ error: `Transaction error: ${String((e as Error)?.message ?? e)}` }, 500);
