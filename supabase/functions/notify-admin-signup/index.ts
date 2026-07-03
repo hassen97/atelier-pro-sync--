@@ -15,12 +15,44 @@ interface SignupPayload {
   test?: boolean;
 }
 
+// Escape user-supplied values before interpolating into HTML email
+const esc = (v: unknown): string =>
+  String(v ?? "—")
+    .slice(0, 200)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Require authentication: signup calls carry the freshly-created user's JWT,
+    // admin test calls carry the admin's JWT, and internal calls use the service key.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    let authed = authHeader === `Bearer ${serviceKey}`;
+    if (!authed && authHeader) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data } = await userClient.auth.getUser();
+      authed = !!data.user;
+    }
+    if (!authed) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const body = (await req.json().catch(() => ({}))) as SignupPayload;
     const isTest = body.test === true;
     const username = isTest ? (body.username ?? "test_user") : body.username;
@@ -29,8 +61,6 @@ Deno.serve(async (req) => {
     const phone = isTest ? (body.phone ?? "+216 00 000 000") : body.phone;
     const country = isTest ? (body.country ?? "TN") : body.country;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(supabaseUrl, serviceKey);
 
     // Try to find the freshly-created user_id by username
@@ -78,18 +108,18 @@ Deno.serve(async (req) => {
     if (emailEnabled && adminEmail) {
       const subject = isTest
         ? `🧪 [TEST] Alerte d'inscription RepairPro`
-        : `🔔 Nouvelle inscription : ${username ?? "Nouveau compte"}`;
+        : `🔔 Nouvelle inscription : ${esc(username ?? "Nouveau compte")}`;
       const html = `
         <div style="font-family:Inter,Arial,sans-serif;background:#f5f7fb;padding:24px;">
           <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
             <h2 style="margin:0 0 12px;color:#0f172a;">${isTest ? "🧪 E-mail de test" : "Nouvelle inscription RepairPro"}</h2>
             <p style="color:#475569;margin:0 0 16px;">${isTest ? "Cet e-mail confirme que vos alertes d'inscription sont correctement configurées." : "Un nouveau propriétaire vient de créer un compte."}</p>
             <table style="width:100%;border-collapse:collapse;font-size:14px;color:#0f172a;">
-              <tr><td style="padding:6px 0;color:#64748b;">Nom complet</td><td style="padding:6px 0;text-align:right;">${full_name ?? "—"}</td></tr>
-              <tr><td style="padding:6px 0;color:#64748b;">Username</td><td style="padding:6px 0;text-align:right;">@${username ?? "—"}</td></tr>
-              <tr><td style="padding:6px 0;color:#64748b;">Email</td><td style="padding:6px 0;text-align:right;">${email ?? "—"}</td></tr>
-              <tr><td style="padding:6px 0;color:#64748b;">Téléphone</td><td style="padding:6px 0;text-align:right;">${phone ?? "—"}</td></tr>
-              <tr><td style="padding:6px 0;color:#64748b;">Pays</td><td style="padding:6px 0;text-align:right;">${country ?? "—"}</td></tr>
+              <tr><td style="padding:6px 0;color:#64748b;">Nom complet</td><td style="padding:6px 0;text-align:right;">${esc(full_name)}</td></tr>
+              <tr><td style="padding:6px 0;color:#64748b;">Username</td><td style="padding:6px 0;text-align:right;">@${esc(username)}</td></tr>
+              <tr><td style="padding:6px 0;color:#64748b;">Email</td><td style="padding:6px 0;text-align:right;">${esc(email)}</td></tr>
+              <tr><td style="padding:6px 0;color:#64748b;">Téléphone</td><td style="padding:6px 0;text-align:right;">${esc(phone)}</td></tr>
+              <tr><td style="padding:6px 0;color:#64748b;">Pays</td><td style="padding:6px 0;text-align:right;">${esc(country)}</td></tr>
             </table>
           </div>
         </div>
