@@ -48,7 +48,8 @@ serve(async (req) => {
   }
 
   const mode = body.mode ?? "all";
-  const summary: Record<string, unknown> = { mode };
+  const dryRun = body.dryRun === true;
+  const summary: Record<string, unknown> = { mode, dryRun };
 
   // ---- Phase A: database restore ----
   if (mode === "all" || mode === "db") {
