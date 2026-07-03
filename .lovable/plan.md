@@ -1,49 +1,51 @@
-## Problem
+## Part 1 — Permanently remove the DB restore tool
 
-The full restore now succeeds for the database (`committed: true`, 189 statements executed), but the storage phase fails for all 21 files with:
+Remove every entry point so the page and function can never be reached again.
 
+**Frontend**
+- Delete `src/pages/DbRestore.tsx`.
+- In `src/App.tsx`: remove the lazy import `const DbRestore = lazyWithRetry(() => import("./pages/DbRestore"));` (line 83) and the entire `/db-restore` `<Route>` block plus its "TEMPORARY one-time DB restore tool" comment (lines ~139–144).
+- In `src/components/auth/ProtectedRoute.tsx`: change `const adminAllowedPaths = ["/admin", "/db-restore"];` back to `["/admin"]` and update the nearby comment.
+
+**Backend / edge function**
+- Delete the folder `supabase/functions/restore-live-db/` (its `index.ts`).
+- In `supabase/config.toml`: remove the `[functions.restore-live-db]` block (`verify_jwt = false`).
+- Undeploy the live function via the delete-edge-functions tool for `restore-live-db`, so the endpoint stops serving even though it was public (`verify_jwt = false`).
+
+After this, `/db-restore` 404s inside the app and the function URL returns not-found.
+
+## Part 2 — Database & storage analysis (findings)
+
+The database is **not** large: **80 MB total**, and storage buckets hold only **~12.7 MB**. There is no bloat and dead-row counts are ~0, so no urgent cleanup is needed. Summary of the biggest consumers:
+
+```text
+Table                  Total     Rows     Notes
+activity_log           3.4 MB    13,478   append-only audit log (biggest table)
+products               1.6 MB     4,942   live data — keep
+repairs                1.0 MB     1,695   live data — keep
+repair_status_history  536 kB     3,080   live data — keep
+
+Bucket           Files  Size
+shop-logos       11     7.5 MB
+payment-proofs   10     5.2 MB
 ```
-403 Unauthorized — "Invalid Compact JWS"
-```
 
-## Root cause
+## Part 3 — Safe, low-risk cleanup (optional, opt-in)
 
-In `supabase/functions/restore-live-db/index.ts` (Phase B), each file is uploaded with a raw `fetch`:
+Only two things are genuinely safe to remove. Both are reversible in impact (no live feature depends on them):
 
-```
-POST {SUPABASE_URL}/storage/v1/object/{bucket}/{path}
-Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}
-```
+1. **Delete 3 orphaned logo files** — not referenced by any `shop_settings.logo_url` (leftover originals replaced by optimized versions). Frees ~1.6 MB:
+   - `shop-logos/c8a47d37-ecc5-44ee-8b1e-3447925f554b/logo.PNG`
+   - `shop-logos/26c3f824-a3a7-44f4-8664-9c7d15116e9a/logo.png`
+   - `shop-logos/8b499584-fc8f-4e25-8e8e-f58fb9d57c69/logo.jpg`
+   Done via a storage delete (`DELETE FROM storage.objects WHERE ...`).
 
-This sends only an `Authorization: Bearer` header and no `apikey` header. On this project the backend uses the new API key format (evidenced by the `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` secrets). The new secret key is **not** a JWT, so the Storage API's JWT parser rejects the bearer token with "Invalid Compact JWS". The database phase is unaffected because it uses a direct Postgres connection, not this token.
+2. **Optionally prune old `activity_log` rows** older than 90 days (~7,000 rows, frees ~1.5 MB). This is audit history only — no business logic reads it — but it is a permanent delete, so it's opt-in. Recent 90 days are kept for accountability.
 
-## Fix
+**What to keep (do NOT touch):** all business tables (products, repairs, customers, sales, payments, etc.), all `payment-proofs` (every file maps to a valid owner — 0 orphans), and all referenced shop logos.
 
-Replace the raw `fetch` upload in Phase B with the `@supabase/supabase-js` storage client, which correctly sends the key in the `apikey` header the current key format expects.
+**Note (not cleanup):** many `shop_settings.logo_url` values still point to the previous project's domain (`uvvpgxjbqrvzhcunkpag.supabase.co`) from the restore, not this project. Those images won't load. That's a data-consistency issue separate from storage cleanup — flagging it, not fixing it here.
 
-### Changes in `supabase/functions/restore-live-db/index.ts` (Phase B only)
+## Confirmation needed before building
 
-1. Create one admin client for storage:
-   ```ts
-   const storageClient = createClient(supabaseUrl, serviceKey, {
-     auth: { persistSession: false, autoRefreshToken: false },
-   });
-   ```
-2. For each file, keep fetching the source bytes from `f.url`, then upload via the client instead of raw fetch:
-   ```ts
-   const { error: upErr } = await storageClient.storage
-     .from(f.bucket)
-     .upload(f.path, bytes, {
-       contentType: f.content_type || "application/octet-stream",
-       upsert: true,
-     });
-   ```
-3. Record success/failure from `upErr` in the existing `results` array (path, ok, error message) so the response `summary.storage` keeps the same shape (`total` / `succeeded` / `failed`).
-4. Keep the existing source-fetch failure handling and try/catch per file.
-
-No other phase, the DB logic, the auth/authorization block, or the response contract changes.
-
-## Verification
-
-- Typecheck the function.
-- Re-run a **storage-only** restore (`mode: "storage"`) to confirm files upload with `succeeded: 21, failed: []`, then a full restore to confirm end to end.
+I'll always do Part 1 (removal) and Part 3 step 1 (delete the 3 orphaned logos). For Part 3 step 2 (prune `activity_log`), please confirm whether you want it — and if so, keep the last 90 days or a different window.
