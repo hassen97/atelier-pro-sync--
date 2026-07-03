@@ -15,7 +15,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, MoreVertical, KeyRound, Lock, Unlock, Trash2, Settings2, Search, ArrowUp, ArrowDown, Phone, MessageCircle, CheckCircle, Megaphone, LogIn, Download, ArrowRightLeft, UserCog, Zap, CreditCard, Clock, Ban, ShieldCheck, AlertTriangle, SearchX, Store, Rocket } from "lucide-react";
+import { Plus, MoreHorizontal, KeyRound, Lock, Unlock, Trash2, Settings2, Search, ArrowUp, ArrowDown, Phone, MessageCircle, CheckCircle, Megaphone, LogIn, Download, ArrowRightLeft, UserCog, Zap, CreditCard, Clock, Ban, ShieldCheck, AlertTriangle } from "lucide-react";
 import { VerifiedBadge } from "@/components/verification/VerifiedBadge";
 import { ShopDetailSheet } from "./ShopDetailSheet";
 import { Input } from "@/components/ui/input";
@@ -120,47 +120,25 @@ const statusDot: Record<string, string> = {
 };
 
 function getUnifiedStatus(owner: any, sub: any): { key: string; label: string; color: string; icon: any } {
-  // 1) Setup takes absolute priority — an owner who hasn't finished onboarding.
-  if (owner.onboarding_completed === false) {
-    return { key: "setup_incomplete", label: "Setup ⚠️", color: "border-amber-500/30 text-amber-400 bg-amber-500/10", icon: AlertTriangle };
-  }
-
+  // Verification gate removed — every owner is treated as verified.
   if (sub) {
-    const now = new Date();
-    const trialEnds = sub.trial_ends_at ? new Date(sub.trial_ends_at) : null;
-    const isExpired = sub.expires_at ? new Date(sub.expires_at) < now : false;
-    const inTrial = sub.status === "trialing" || (trialEnds ? now < trialEnds : false);
-
-    // 2) Trial: explicit trialing status OR still inside the trial window.
-    if (!isExpired && inTrial) {
+    const isExpired = sub.expires_at && new Date(sub.expires_at) < new Date();
+    if (!isExpired && sub.status === "trialing") {
       return { key: "trialing", label: "Essai", color: "border-violet-500/30 text-violet-400 bg-violet-500/10", icon: Clock };
     }
-    // 3) Pro: active AND past the trial period.
     if (!isExpired && sub.status === "active") {
       return { key: "pro", label: "Pro", color: "border-amber-400/30 text-amber-300 bg-amber-400/10", icon: CreditCard };
     }
   }
-
-  // 4) Fallback.
   return { key: "verified", label: "Vérifié", color: "border-emerald-500/30 text-emerald-400 bg-emerald-500/10", icon: CheckCircle };
 }
 
 function getDisplayName(owner: any): { name: string; isIncomplete: boolean } {
-  const isIncomplete = owner.onboarding_completed === false;
   const shopName = owner.shop_name;
   if (!shopName || shopName === "Mon Atelier") {
-    return { name: `⚠️ Setup Incomplet (@${owner.username || "?"})`, isIncomplete };
+    return { name: `⚠️ Setup Incomplet (@${owner.username || "?"})`, isIncomplete: true };
   }
-  return { name: shopName, isIncomplete };
-}
-
-const SETUP_RESCUE_MESSAGE =
-  "Salut, j'ai remarqué que vous n'avez pas terminé la configuration de votre boutique sur GoodsPro. Avez-vous besoin d'aide pour finaliser ?";
-
-function getWhatsAppRescueLink(owner: any): string | null {
-  const raw = (owner.whatsapp_phone || owner.phone || "").replace(/[^0-9]/g, "");
-  if (!raw) return null;
-  return `https://wa.me/${raw}?text=${encodeURIComponent(SETUP_RESCUE_MESSAGE)}`;
+  return { name: shopName, isIncomplete: false };
 }
 
 function useBulkAction() {
@@ -236,7 +214,7 @@ export function AdminShopsView() {
     // Filter
     if (filter !== "all") {
       if (filter === "setup_incomplete") {
-        result = result.filter((o: any) => o._status.key === "setup_incomplete");
+        result = result.filter((o: any) => o._display.isIncomplete);
       } else if (filter === "online") {
         result = result.filter((o: any) => isOwnerOnline(o.last_online_at));
       } else {
@@ -288,17 +266,17 @@ export function AdminShopsView() {
       verified: all.filter((o: any) => o._status.key === "verified").length,
       trialing: all.filter((o: any) => o._status.key === "trialing").length,
       pro: all.filter((o: any) => o._status.key === "pro").length,
-      setup_incomplete: all.filter((o: any) => o._status.key === "setup_incomplete").length,
+      setup_incomplete: all.filter((o: any) => o._display.isIncomplete).length,
     };
   }, [owners, subMap]);
 
-  const filters: { key: FilterType; label: string; color?: string; count: number }[] = [
-    { key: "all", label: `Tous (${counts.all})`, count: counts.all },
-    { key: "online", label: `En ligne (${counts.online})`, color: "text-emerald-400", count: counts.online },
-    { key: "verified", label: `Vérifiés (${counts.verified})`, color: "text-emerald-400", count: counts.verified },
-    { key: "trialing", label: `Essai (${counts.trialing})`, color: "text-violet-400", count: counts.trialing },
-    { key: "pro", label: `Pro (${counts.pro})`, color: "text-amber-300", count: counts.pro },
-    { key: "setup_incomplete", label: `Setup ⚠️ (${counts.setup_incomplete})`, count: counts.setup_incomplete },
+  const filters: { key: FilterType; label: string; color?: string }[] = [
+    { key: "all", label: `Tous (${counts.all})` },
+    { key: "online", label: `En ligne (${counts.online})`, color: "text-emerald-400" },
+    { key: "verified", label: `Vérifiés (${counts.verified})`, color: "text-emerald-400" },
+    { key: "trialing", label: `Essai (${counts.trialing})`, color: "text-violet-400" },
+    { key: "pro", label: `Pro (${counts.pro})`, color: "text-amber-300" },
+    { key: "setup_incomplete", label: `Setup ⚠️ (${counts.setup_incomplete})` },
   ];
 
   // Selection
@@ -334,75 +312,6 @@ export function AdminShopsView() {
     "bulk-revert-to-pending": { title: "Remettre en attente", desc: `Remettre ${selectedIds.size} propriétaire(s) en attente ?`, btn: "Remettre en attente" },
   };
 
-  // Shared dropdown items so desktop table + mobile cards stay in sync.
-  const renderActionItems = (owner: any, display: { name: string; isIncomplete: boolean }) => {
-    const isSetup = owner._status?.key === "setup_incomplete";
-    const rescueLink = getWhatsAppRescueLink(owner);
-    return (
-      <DropdownMenuContent align="end" className="bg-slate-900 border-white/10 text-white">
-        {isSetup && (
-          <>
-            <DropdownMenuItem
-              className="text-emerald-400 focus:text-emerald-300"
-              disabled={!rescueLink}
-              onClick={() => {
-                if (rescueLink) window.open(rescueLink, "_blank", "noopener,noreferrer");
-                else toast.error("Aucun numéro de téléphone pour cette boutique");
-              }}
-            >
-              <Rocket className="h-4 w-4 mr-2" /> Relancer via WhatsApp
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        )}
-        <DropdownMenuItem className="text-[#00D4FF]" onClick={() => setGodModeTarget({ userId: owner.user_id, shopName: display.name })}>
-          <Zap className="h-4 w-4 mr-2" /> God Mode — Abonnement
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setEditTarget({ userId: owner.user_id, name: owner.full_name || owner.username || "", country: owner.country || "TN", currency: owner.currency || "TND" })}>
-          <Settings2 className="h-4 w-4 mr-2" /> Modifier pays/devise
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setResetTarget({ userId: owner.user_id, name: owner.full_name || owner.username || "" })}>
-          <KeyRound className="h-4 w-4 mr-2" /> Réinitialiser mot de passe
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setAnnouncementTarget({ userId: owner.user_id, shopName: owner.shop_name })}>
-          <Megaphone className="h-4 w-4 mr-2" /> Envoyer une annonce
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={async () => {
-          const newRole = prompt("Nouveau rôle (super_admin ou employee) :", "employee");
-          if (!newRole || !["super_admin", "employee"].includes(newRole)) return;
-          const { error } = await supabase.functions.invoke("admin-manage-users", { body: { action: "change-role", userId: owner.user_id, newRole } });
-          if (error) toast.error("Erreur"); else toast.success("Rôle modifié");
-        }}>
-          <UserCog className="h-4 w-4 mr-2" /> Changer le rôle
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTransferSource(owner.user_id)}>
-          <ArrowRightLeft className="h-4 w-4 mr-2" /> Transférer les données
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={async () => {
-          toast.info("Export en cours...");
-          const { data, error } = await supabase.functions.invoke("admin-manage-users", { body: { action: "export-shop-data", userId: owner.user_id } });
-          if (error) { toast.error("Erreur d'export"); return; }
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a"); a.href = url; a.download = `backup-${owner.shop_name}-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url);
-          toast.success("Export téléchargé");
-        }}>
-          <Download className="h-4 w-4 mr-2" /> Sauvegarder (JSON)
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { window.location.href = `/?impersonate=${owner.user_id}&mode=readonly`; }}>
-          <LogIn className="h-4 w-4 mr-2" /> Accéder à la boutique
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-red-400" onClick={() => { if (confirm(`Supprimer ${owner.full_name || owner.username} ?`)) deleteOwner.mutate(owner.user_id); }}>
-          <Trash2 className="h-4 w-4 mr-2" /> Supprimer
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    );
-  };
-
-
-
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -415,37 +324,31 @@ export function AdminShopsView() {
         </Button>
       </div>
 
-      {/* Status Filters — horizontally scrollable on mobile */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 py-0.5">
-        {filters.map((f) => {
-          const isEmpty = f.key !== "all" && f.count === 0;
-          const isActive = filter === f.key;
-          return (
-            <Button
-              key={f.key}
-              variant={isActive ? "default" : "outline"}
-              size="sm"
-              disabled={isEmpty}
-              className={cn(
-                "text-xs whitespace-nowrap shrink-0",
-                isActive
-                  ? "bg-[#00D4FF]/20 text-[#00D4FF] border-[#00D4FF]/30"
-                  : "border-white/10 text-slate-400 hover:text-white hover:bg-white/5",
-                isEmpty && "opacity-40 pointer-events-none"
-              )}
-              onClick={() => { setFilter(f.key); setSelectedIds(new Set()); }}
-            >
-              {f.label}
-            </Button>
-          );
-        })}
+      {/* Status Filters */}
+      <div className="flex gap-2 flex-wrap">
+        {filters.map((f) => (
+          <Button
+            key={f.key}
+            variant={filter === f.key ? "default" : "outline"}
+            size="sm"
+            className={cn(
+              "text-xs",
+              filter === f.key
+                ? "bg-[#00D4FF]/20 text-[#00D4FF] border-[#00D4FF]/30"
+                : "border-white/10 text-slate-400 hover:text-white hover:bg-white/5"
+            )}
+            onClick={() => { setFilter(f.key); setSelectedIds(new Set()); }}
+          >
+            {f.label}
+          </Button>
+        ))}
       </div>
 
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
         <Input
-          placeholder="Rechercher une boutique..."
+          placeholder="Rechercher par boutique, nom, username, téléphone, email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus-visible:ring-[#00D4FF]/30"
@@ -465,8 +368,8 @@ export function AdminShopsView() {
         </div>
       )}
 
-      {/* Unified Table — desktop only */}
-      <div className="admin-glass-card rounded-xl overflow-hidden hidden md:block">
+      {/* Unified Table */}
+      <div className="admin-glass-card rounded-xl overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="border-white/5 hover:bg-transparent">
@@ -582,88 +485,65 @@ export function AdminShopsView() {
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      {renderActionItems(owner, display)}
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="text-[#00D4FF]" onClick={() => setGodModeTarget({ userId: owner.user_id, shopName: display.name })}>
+                          <Zap className="h-4 w-4 mr-2" /> God Mode — Abonnement
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setEditTarget({ userId: owner.user_id, name: owner.full_name || owner.username || "", country: owner.country || "TN", currency: owner.currency || "TND" })}>
+                          <Settings2 className="h-4 w-4 mr-2" /> Modifier pays/devise
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setResetTarget({ userId: owner.user_id, name: owner.full_name || owner.username || "" })}>
+                          <KeyRound className="h-4 w-4 mr-2" /> Réinitialiser mot de passe
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAnnouncementTarget({ userId: owner.user_id, shopName: owner.shop_name })}>
+                          <Megaphone className="h-4 w-4 mr-2" /> Envoyer une annonce
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={async () => {
+                          const newRole = prompt("Nouveau rôle (super_admin ou employee) :", "employee");
+                          if (!newRole || !["super_admin", "employee"].includes(newRole)) return;
+                          const { error } = await supabase.functions.invoke("admin-manage-users", { body: { action: "change-role", userId: owner.user_id, newRole } });
+                          if (error) toast.error("Erreur"); else toast.success("Rôle modifié");
+                        }}>
+                          <UserCog className="h-4 w-4 mr-2" /> Changer le rôle
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setTransferSource(owner.user_id)}>
+                          <ArrowRightLeft className="h-4 w-4 mr-2" /> Transférer les données
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={async () => {
+                          toast.info("Export en cours...");
+                          const { data, error } = await supabase.functions.invoke("admin-manage-users", { body: { action: "export-shop-data", userId: owner.user_id } });
+                          if (error) { toast.error("Erreur d'export"); return; }
+                          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a"); a.href = url; a.download = `backup-${owner.shop_name}-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url);
+                          toast.success("Export téléchargé");
+                        }}>
+                          <Download className="h-4 w-4 mr-2" /> Sauvegarder (JSON)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { window.location.href = `/?impersonate=${owner.user_id}&mode=readonly`; }}>
+                          <LogIn className="h-4 w-4 mr-2" /> Accéder à la boutique
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-red-400" onClick={() => { if (confirm(`Supprimer ${owner.full_name || owner.username} ?`)) deleteOwner.mutate(owner.user_id); }}>
+                          <Trash2 className="h-4 w-4 mr-2" /> Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               );
             })}
+            {filteredOwners.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-slate-500 py-8">
+                  Aucune boutique trouvée
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
-
-      {/* Mobile card grid — < md */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:hidden">
-        {filteredOwners.map((owner: any) => {
-          const status = getOnlineStatus(owner.last_online_at);
-          const unified = owner._status;
-          const display = owner._display;
-          const StatusIcon = unified.icon;
-          const isSelected = selectedIds.has(owner.user_id);
-          const initials = (display.name || "?").trim().slice(0, 2).toUpperCase();
-          return (
-            <div
-              key={owner.user_id}
-              className={cn(
-                "admin-glass-card rounded-xl p-4 relative cursor-pointer transition-colors hover:bg-white/5",
-                owner.is_locked && "opacity-60",
-                isSelected && "ring-1 ring-[#00D4FF]/40"
-              )}
-              onClick={() => setSelectedShopId(owner.user_id)}
-            >
-              {/* Actions dropdown top-right */}
-              <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-white">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  {renderActionItems(owner, display)}
-                </DropdownMenu>
-              </div>
-
-              <div className="flex items-start gap-3 pr-9">
-                {/* Avatar */}
-                {owner.logo_url ? (
-                  <img src={owner.logo_url} alt={display.name} className="h-11 w-11 rounded-lg object-cover border border-white/10 shrink-0" />
-                ) : (
-                  <div className="h-11 w-11 rounded-lg bg-[#00D4FF]/15 text-[#00D4FF] flex items-center justify-center text-sm font-semibold shrink-0">
-                    {initials}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn("text-sm font-medium truncate", display.isIncomplete ? "text-amber-400" : "text-white")}>
-                      {display.name}
-                    </span>
-                    {owner.verification_status === "verified" && !display.isIncomplete && <VerifiedBadge />}
-                  </div>
-                  <p className="text-xs text-slate-500 truncate">@{owner.username}</p>
-                  <div className="mt-2 flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", unified.color)}>
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {unified.label}
-                    </Badge>
-                    <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                      <span className={cn("w-2 h-2 rounded-full", statusDot[status])} />
-                      {owner.repair_count} rép.
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Shared empty state */}
-      {filteredOwners.length === 0 && (
-        <div className="admin-glass-card rounded-xl flex flex-col items-center justify-center py-14 text-center">
-          <SearchX className="h-10 w-10 text-slate-600 mb-3" />
-          <p className="text-sm text-slate-400">Aucun résultat pour ce filtre.</p>
-        </div>
-      )}
 
       {/* Bulk confirm dialog */}
       {confirmAction && confirmLabels[confirmAction] && (

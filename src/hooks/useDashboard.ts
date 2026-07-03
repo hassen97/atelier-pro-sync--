@@ -4,9 +4,6 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export interface DashboardStats {
   salesTotal: number;
-  salesThisMonth: number;
-  salesLastMonth: number;
-  salesTrendPct: number | null;
   repairsInProgress: number;
   repairsCompleted: number;
   repairsPending: number;
@@ -26,9 +23,6 @@ export function useDashboardStats() {
       if (!user) {
         return {
           salesTotal: 0,
-          salesThisMonth: 0,
-          salesLastMonth: 0,
-          salesTrendPct: null,
           repairsInProgress: 0,
           repairsCompleted: 0,
           repairsPending: 0,
@@ -67,7 +61,7 @@ export function useDashboardStats() {
           .eq("user_id", user.id),
         supabase
           .from("sales")
-          .select("id, total_amount, created_at")
+          .select("id, total_amount")
           .eq("user_id", user.id),
         supabase
           .from("product_returns")
@@ -102,30 +96,8 @@ export function useDashboardStats() {
 
       const salesTotal = sales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0) - totalRefunds;
 
-      // Month-over-month sales comparison
-      const now = new Date();
-      const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-      const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-      let salesThisMonth = 0;
-      let salesLastMonth = 0;
-      for (const s of sales) {
-        const ts = s.created_at ? new Date(s.created_at).getTime() : 0;
-        const amount = Number(s.total_amount) || 0;
-        if (ts >= startThisMonth) salesThisMonth += amount;
-        else if (ts >= startLastMonth) salesLastMonth += amount;
-      }
-      const salesTrendPct =
-        salesLastMonth > 0
-          ? ((salesThisMonth - salesLastMonth) / salesLastMonth) * 100
-          : salesThisMonth > 0
-          ? 100
-          : null;
-
       return {
         salesTotal,
-        salesThisMonth,
-        salesLastMonth,
-        salesTrendPct,
         repairsInProgress,
         repairsCompleted,
         repairsPending,
@@ -180,7 +152,7 @@ export function useLowStockAlerts(limit = 5) {
 
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, quantity, min_quantity")
+        .select("id, name, quantity, min_quantity")
         .eq("user_id", user.id)
         .order("quantity", { ascending: true })
         .limit(20);

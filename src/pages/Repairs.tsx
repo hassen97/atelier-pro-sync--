@@ -1,15 +1,11 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, Filter, ChevronLeft, ChevronRight, CheckSquare, X, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import { Search, Plus, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { RepairCard } from "@/components/repairs/RepairCard";
 import { type RepairStatus } from "@/components/repairs/RepairStatusSelect";
 import { CancelRepairDialog } from "@/components/repairs/CancelRepairDialog";
@@ -25,8 +21,6 @@ import {
   useUpdateRepair,
   useUpdateRepairStatus,
   useDeleteRepair,
-  useBulkUpdateRepairStatus,
-  useBulkDeleteRepair,
   REPAIRS_PAGE_SIZE,
 } from "@/hooks/useRepairs";
 import { useAllCustomers, useUpdateCustomer } from "@/hooks/useCustomers";
@@ -124,11 +118,6 @@ export default function Repairs() {
   const [assignRepair, setAssignRepair] = useState<ReturnType<typeof transformRepair> | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // Multi-selection state
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkConfirm, setBulkConfirm] = useState<null | "delete" | "rejected">(null);
-
   const queryClient = useQueryClient();
   const { data: repairsResult = { data: [], count: 0 }, isLoading } = useRepairs(page);
   const rawRepairs = repairsResult.data;
@@ -141,8 +130,6 @@ export default function Repairs() {
   const updateRepair = useUpdateRepair();
   const updateStatus = useUpdateRepairStatus();
   const deleteRepair = useDeleteRepair();
-  const bulkUpdateStatus = useBulkUpdateRepairStatus();
-  const bulkDelete = useBulkDeleteRepair();
   const updateCustomer = useUpdateCustomer();
 
   // Enable realtime updates for repairs
@@ -195,49 +182,10 @@ export default function Repairs() {
     pending: repairs.filter((r) => r.status === "pending").length,
     in_progress: repairs.filter((r) => r.status === "in_progress").length,
     completed: repairs.filter((r) => r.status === "completed").length,
-    rejected: repairs.filter((r) => r.status === "rejected").length,
     warranty: repairs.filter((r) => r.is_warranty).length,
   });
 
   const counts = getStatusCounts();
-
-  // ----- Multi-selection helpers -----
-  const selectedCount = selectedIds.size;
-  const allFilteredSelected = filteredRepairs.length > 0 && filteredRepairs.every((r) => selectedIds.has(r.id));
-
-  const handleSelectChange = (repair: ReturnType<typeof transformRepair>, checked: boolean) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(repair.id);
-      else next.delete(repair.id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    setSelectedIds((prev) => {
-      if (allFilteredSelected) return new Set();
-      return new Set(filteredRepairs.map((r) => r.id));
-    });
-  };
-
-  const exitSelection = () => {
-    setSelectionMode(false);
-    setSelectedIds(new Set());
-  };
-
-  const handleBulkStatus = (status: RepairStatus) => {
-    if (selectedCount === 0) return;
-    bulkUpdateStatus.mutate(
-      { ids: Array.from(selectedIds), status },
-      { onSuccess: () => exitSelection() }
-    );
-  };
-
-  const handleBulkDelete = () => {
-    if (selectedCount === 0) return;
-    bulkDelete.mutate(Array.from(selectedIds), { onSuccess: () => exitSelection() });
-  };
 
   const handleNewRepair = () => {
     setEditingRepair(null);
@@ -303,7 +251,6 @@ export default function Repairs() {
               in_progress: "En cours",
               completed: "Terminé",
               delivered: "Livré",
-              rejected: "Rejeté",
             };
             toast.success(`Statut mis à jour`, {
               description: `→ ${statusLabels[newStatus]}`,
@@ -404,7 +351,6 @@ export default function Repairs() {
         in_progress: "En cours",
         completed: "Terminé",
         delivered: "Livré",
-        rejected: "Rejeté",
       };
 
       toast.success(`Réparation ${statusLabels[pendingStatus].toLowerCase()}`, {
@@ -412,11 +358,6 @@ export default function Repairs() {
           ? "Paiement complet enregistré" 
           : `Paiement de ${data.paymentAmount.toFixed(3)} DT enregistré`,
       });
-
-      queryClient.invalidateQueries({ queryKey: ["session-totals"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-
-
 
       // Reset state
       setPaymentConfirmOpen(false);
@@ -575,55 +516,7 @@ export default function Repairs() {
           <Filter className="h-4 w-4 mr-2" />
           Filtres
         </Button>
-        <Button
-          variant={selectionMode ? "default" : "outline"}
-          onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
-        >
-          {selectionMode ? <X className="h-4 w-4 mr-2" /> : <CheckSquare className="h-4 w-4 mr-2" />}
-          {selectionMode ? "Annuler" : "Sélectionner"}
-        </Button>
       </div>
-
-      {/* Bulk action bar */}
-      {selectionMode && (
-        <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card/95 backdrop-blur p-3 shadow-soft">
-          <span className="text-sm font-medium mr-1">
-            {selectedCount} sélectionnée{selectedCount > 1 ? "s" : ""}
-          </span>
-          <Button variant="outline" size="sm" onClick={toggleSelectAll} disabled={filteredRepairs.length === 0}>
-            {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
-          </Button>
-          <div className="flex-1" />
-          <Button
-            size="sm"
-            className="bg-success text-success-foreground hover:bg-success/90"
-            disabled={selectedCount === 0 || bulkUpdateStatus.isPending}
-            onClick={() => handleBulkStatus("completed")}
-          >
-            <CheckCircle2 className="h-4 w-4 mr-2" />
-            Marquer terminé
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-destructive border-destructive/30 hover:bg-destructive/10"
-            disabled={selectedCount === 0 || bulkUpdateStatus.isPending}
-            onClick={() => setBulkConfirm("rejected")}
-          >
-            <XCircle className="h-4 w-4 mr-2" />
-            Marquer rejeté
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={selectedCount === 0 || bulkDelete.isPending}
-            onClick={() => setBulkConfirm("delete")}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Supprimer
-          </Button>
-        </div>
-      )}
 
       {/* Status Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -632,11 +525,6 @@ export default function Repairs() {
           <TabsTrigger value="pending">En attente ({counts.pending})</TabsTrigger>
           <TabsTrigger value="in_progress">En cours ({counts.in_progress})</TabsTrigger>
           <TabsTrigger value="completed">Terminées ({counts.completed})</TabsTrigger>
-          {counts.rejected > 0 && (
-            <TabsTrigger value="rejected" className="text-destructive">
-              Rejetées ({counts.rejected})
-            </TabsTrigger>
-          )}
           {counts.warranty > 0 && (
             <TabsTrigger value="warranty" className="text-orange-500">
               Garantie ({counts.warranty})
@@ -655,9 +543,6 @@ export default function Repairs() {
                 onPrint={handlePrint}
                 onCancel={handleCancel}
                 onStatusChange={handleStatusChange}
-                selectable={selectionMode}
-                selected={selectedIds.has(repair.id)}
-                onSelectChange={handleSelectChange}
               />
             ))}
           </div>
@@ -737,34 +622,6 @@ export default function Repairs() {
         onConfirm={handleAssignConfirm}
         isLoading={updateRepair.isPending}
       />
-
-      <AlertDialog open={bulkConfirm !== null} onOpenChange={(o) => !o && setBulkConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {bulkConfirm === "delete" ? "Supprimer les réparations ?" : "Marquer comme rejetées ?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {bulkConfirm === "delete"
-                ? `Cette action supprimera définitivement ${selectedCount} réparation(s). Cette action est irréversible.`
-                : `${selectedCount} réparation(s) seront marquées comme « Rejeté ».`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className={bulkConfirm === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
-              onClick={() => {
-                if (bulkConfirm === "delete") handleBulkDelete();
-                else handleBulkStatus("rejected");
-                setBulkConfirm(null);
-              }}
-            >
-              Confirmer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -128,32 +128,35 @@ Deno.serve(async (req) => {
 
     const roles = new Set((callerRoleRows ?? []).map((r: any) => r.role as string));
     const isPlatformAdmin = roles.has("platform_admin");
+    const isShopOwner = roles.has("super_admin") || roles.has("admin");
 
-    // Team membership takes precedence over role rows. Team admins/managers may
-    // create employees for their owner; they must not create an isolated shop
-    // under their own user id just because they have an `admin` role row.
-    const { data: activeMembership, error: activeMembershipError } = await adminClient
-      .from("team_members")
-      .select("owner_id, role, status")
-      .eq("member_user_id", callerId)
-      .eq("status", "active")
-      .maybeSingle();
+    if (isPlatformAdmin || isShopOwner) {
+      // Tenant isolation: shop owners (super_admin / admin) always create
+      // employees under their OWN account. Any client-supplied owner/shop id
+      // is intentionally ignored.
+      ownerId = callerId;
+    } else {
+      // Delegated path: an active team manager/admin may create employees on
+      // behalf of their shop owner. The owner_id is resolved server-side.
+      const { data: managerMembership, error: managerError } = await adminClient
+        .from("team_members")
+        .select("owner_id, role, status")
+        .eq("member_user_id", callerId)
+        .eq("status", "active")
+        .in("role", ["manager", "admin"])
+        .maybeSingle();
 
-    if (activeMembershipError) {
-      console.error("Active membership lookup error:", activeMembershipError);
-      return new Response(
-        JSON.stringify({ error: "Erreur lors de la vérification de l'équipe" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+      if (managerError) {
+        console.error("Manager membership lookup error:", managerError);
+      }
 
-    if (activeMembership) {
-      if (!["manager", "admin"].includes(activeMembership.role as string)) {
+      if (!managerMembership) {
+        console.error("Permission denied for user:", callerId);
         return new Response(
-          JSON.stringify({ error: "Erreur : Seuls les gérants (admin) et super admins peuvent créer des comptes employés." }),
+          JSON.stringify({
+            error:
+              "Erreur : Seuls les gérants (admin) et super admins peuvent créer des comptes employés.",
+          }),
           {
             status: 403,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -161,24 +164,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      ownerId = activeMembership.owner_id as string;
-    } else if (isPlatformAdmin || roles.has("super_admin")) {
-      // Tenant isolation: shop owners (super_admin / admin) always create
-      // employees under their OWN account. Any client-supplied owner/shop id
-      // is intentionally ignored.
-      ownerId = callerId;
-    } else {
-      console.error("Permission denied for user:", callerId);
-      return new Response(
-        JSON.stringify({
-          error:
-            "Erreur : Seuls les gérants (admin) et super admins peuvent créer des comptes employés.",
-        }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      ownerId = managerMembership.owner_id as string;
     }
 
     const rawBody = await req.json();

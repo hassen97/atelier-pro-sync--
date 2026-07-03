@@ -357,65 +357,7 @@
   box-shadow: 0 0 0 2px hsla(217, 91%, 60%, 0.15) !important;
 }
 
-/* Blueprint Loader (CSS fallback) */
-.blueprint-logo-pulse {
-  animation: blueprint-pulse 2s ease-in-out infinite;
-}
-
-@keyframes blueprint-pulse {
-  0%, 100% {
-    filter: drop-shadow(0 0 8px hsla(217, 91%, 60%, 0.4));
-    transform: scale(1);
-  }
-  50% {
-    filter: drop-shadow(0 0 24px hsla(217, 91%, 60%, 0.85));
-    transform: scale(1.05);
-  }
-}
-
-.blueprint-ring {
-  animation: blueprint-ring 2.4s ease-out infinite;
-}
-
-.blueprint-ring-delay {
-  animation-delay: 1.2s;
-}
-
-@keyframes blueprint-ring {
-  0% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  100% {
-    transform: scale(1.7);
-    opacity: 0;
-  }
-}
-
-.blueprint-dot {
-  animation: blueprint-dot 1.2s ease-in-out infinite;
-}
-
-.blueprint-dot-2 {
-  animation-delay: 0.2s;
-}
-
-.blueprint-dot-3 {
-  animation-delay: 0.4s;
-}
-
-@keyframes blueprint-dot {
-  0%, 100% {
-    opacity: 0.25;
-    transform: translateY(0);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(-3px);
-  }
-}
-
-
+/* Landing Page - Premium Dark SaaS */
 .landing-page {
   --lp-bg: 240 10% 4%;
   --lp-card: 240 6% 10%;
@@ -556,36 +498,6 @@
     0 0 0 1px hsla(0, 0%, 100%, 0.05),
     inset 0 1px 0 hsla(0, 0%, 100%, 0.05);
 }
-
-/* Landing UI polish: interactive CTAs, focus rings, balanced headings */
-.landing-page .lp-glow-btn {
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease;
-  will-change: transform;
-}
-.landing-page .lp-glow-btn:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.06);
-}
-.landing-page .lp-glow-btn:active {
-  transform: scale(0.98);
-}
-.landing-page a:focus-visible,
-.landing-page button:focus-visible,
-.landing-page input:focus-visible {
-  outline: 2px solid hsl(217 91% 65%);
-  outline-offset: 2px;
-}
-.landing-page h1,
-.landing-page h2,
-.landing-page h3 {
-  text-wrap: balance;
-}
-.landing-page p {
-  text-wrap: pretty;
-}
-
-
-
 
 @media print {
   @page { margin: 0; }

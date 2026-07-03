@@ -42,7 +42,6 @@ export const ALL_PAGES = [
   { href: "/repairs", label: "Réparations" },
   { href: "/inventory", label: "Stock" },
   { href: "/customers", label: "Clients" },
-  { href: "/vault", label: "Coffre-fort comptes" },
   { href: "/suppliers", label: "Fournisseurs" },
   { href: "/expenses", label: "Dépenses" },
   { href: "/customer-debts", label: "Dettes Clients" },
@@ -53,24 +52,19 @@ export const ALL_PAGES = [
   { href: "/settings", label: "Paramètres" },
   { href: "/communaute", label: "Entraide" },
   { href: "/messages", label: "Messages" },
-  { href: "/referrals", label: "Parrainage" },
 ] as const;
 
 // Check if current user is a super_admin (owner)
-export function useIsOwner(options: { enabled?: boolean } = {}) {
+export function useIsOwner() {
   const { user } = useAuth();
-  const enabled = options.enabled ?? true;
   return useQuery({
     queryKey: ["user-role", user?.id],
     queryFn: async () => {
       if (!user) return false;
-      // A platform admin may also have a shop-owner role row. Filter by the
-      // exact role so multi-role accounts never trigger a "multiple rows" error.
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .eq("role", "super_admin")
         .maybeSingle();
       if (error) {
         console.error("useIsOwner error:", error);
@@ -78,16 +72,13 @@ export function useIsOwner(options: { enabled?: boolean } = {}) {
       }
       return data?.role === "super_admin";
     },
-    enabled: enabled && !!user,
-    staleTime: 60_000,
-    retry: 1,
+    enabled: !!user,
   });
 }
 
 // Get team membership info for the current user (as employee)
-export function useMyTeamInfo(options: { enabled?: boolean } = {}) {
+export function useMyTeamInfo() {
   const { user } = useAuth();
-  const enabled = options.enabled ?? true;
   return useQuery({
     queryKey: ["my-team-info", user?.id],
     queryFn: async () => {
@@ -104,8 +95,7 @@ export function useMyTeamInfo(options: { enabled?: boolean } = {}) {
       }
       return data as TeamMember | null;
     },
-    enabled: enabled && !!user,
-    staleTime: 60_000,
+    enabled: !!user,
     retry: 1,
   });
 }
@@ -114,15 +104,14 @@ export function useMyTeamInfo(options: { enabled?: boolean } = {}) {
 export function useEffectiveUserId() {
   const { user } = useAuth();
   const { data: teamInfo } = useMyTeamInfo();
+  const { data: isOwner } = useIsOwner();
   const { impersonatedUserId } = useImpersonation();
 
   if (!user) return null;
   // If platform_admin is impersonating, use the impersonated user's ID
   if (impersonatedUserId) return impersonatedUserId;
-  // If user is an active team member, always use the owner's user_id — even if
-  // the member also carries a stray `super_admin` role. Team membership takes
-  // precedence so employees never get scoped to their own (empty) shop.
-  if (teamInfo?.owner_id) return teamInfo.owner_id;
+  // If user is a team member, use the owner's user_id
+  if (teamInfo?.owner_id && !isOwner) return teamInfo.owner_id;
   // Otherwise use own user_id
   return user.id;
 }
@@ -261,24 +250,22 @@ export function useAddTeamMember() {
   });
 }
 
-// Remove team member — fully wipes the employee account (no leftovers).
-// This prevents orphaned auth/profile/role rows that previously caused
-// "removed" employees to break login for the whole shop.
+// Remove team member
 export function useRemoveTeamMember() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (member: { memberId: string; memberUserId: string }) => {
-      const { data, error } = await supabase.functions.invoke("wipe-employee", {
-        body: { employeeUserId: member.memberUserId },
-      });
+    mutationFn: async (memberId: string) => {
+      const { error } = await supabase
+        .from("team_members")
+        .update({ status: "removed" })
+        .eq("id", memberId);
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
-      toast.success("Employé supprimé définitivement");
+      toast.success("Membre retiré de l'équipe");
     },
-    onError: (err: any) => toast.error(err.message || "Erreur lors de la suppression du membre"),
+    onError: () => toast.error("Erreur lors du retrait du membre"),
   });
 }
 
@@ -423,27 +410,23 @@ export function useDeleteTask() {
 }
 
 // Hook for allowed pages (used in sidebar filtering)
-export function useAllowedPages(options: { enabled?: boolean } = {}) {
-  const enabled = options.enabled ?? true;
-  const { data: isOwner, isLoading: ownerLoading } = useIsOwner({ enabled });
-  const { data: teamInfo, isLoading: teamLoading } = useMyTeamInfo({ enabled });
-
-  if (!enabled) return { allowedPages: null, isLoading: false, isTeamMember: false };
+export function useAllowedPages() {
+  const { data: isOwner, isLoading: ownerLoading } = useIsOwner();
+  const { data: teamInfo, isLoading: teamLoading } = useMyTeamInfo();
 
   const isLoading = ownerLoading || teamLoading;
 
   if (isLoading) return { allowedPages: null, isLoading: true, isTeamMember: false };
 
-  // Active team membership takes precedence over a (possibly stray) owner role:
-  // an employee with a leftover super_admin role must still get filtered pages.
-  if (teamInfo) {
-    // Map legacy "/" entries to "/dashboard" for compatibility
-    const pages = (teamInfo.allowed_pages || []).map((p: string) => p === "/" ? "/dashboard" : p);
-    // Always include dashboard access
-    const allPages = pages.includes("/dashboard") ? pages : ["/dashboard", ...pages];
-    return { allowedPages: allPages, isLoading: false, isTeamMember: true };
+  // Owner or standalone user: all pages
+  if (isOwner || !teamInfo) {
+    return { allowedPages: null, isLoading: false, isTeamMember: false };
   }
 
-  // Owner or standalone user: all pages
-  return { allowedPages: null, isLoading: false, isTeamMember: false };
+  // Team member: filtered pages
+  // Map legacy "/" entries to "/dashboard" for compatibility
+  const pages = (teamInfo.allowed_pages || []).map((p: string) => p === "/" ? "/dashboard" : p);
+  // Always include dashboard access
+  const allPages = pages.includes("/dashboard") ? pages : ["/dashboard", ...pages];
+  return { allowedPages: allPages, isLoading: false, isTeamMember: true };
 }

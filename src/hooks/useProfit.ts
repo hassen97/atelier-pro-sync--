@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { startOfMonth, endOfMonth, subMonths, subDays, startOfDay, endOfDay, format as formatDate } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
 export type ProfitPeriod = string | { from: Date; to: Date };
 
@@ -24,37 +24,33 @@ export function useProfit(period: ProfitPeriod = "month") {
 
       if (isCustom) {
         const { from, to } = period as { from: Date; to: Date };
-        startDate = startOfDay(from);
-        endDate = endOfDay(to);
+        startDate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+        endDate = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999);
         const lengthMs = endDate.getTime() - startDate.getTime();
         prevEndDate = new Date(startDate.getTime() - 1);
         prevStartDate = new Date(prevEndDate.getTime() - lengthMs);
       } else {
         switch (period) {
           case "today":
-            // Strict local-day boundaries: 00:00:00.000 -> 23:59:59.999 local time
-            startDate = startOfDay(now);
-            endDate = endOfDay(now);
-            prevStartDate = startOfDay(subDays(now, 1));
-            prevEndDate = endOfDay(subDays(now, 1));
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+            prevStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            prevEndDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             break;
           case "week":
-            startDate = startOfDay(subDays(now, 6));
-            endDate = endOfDay(now);
-            prevStartDate = startOfDay(subDays(now, 13));
-            prevEndDate = endOfDay(subDays(now, 7));
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            prevStartDate = new Date(startDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+            prevEndDate = new Date(startDate.getTime() - 1);
             break;
           case "quarter":
-            startDate = startOfDay(subMonths(now, 3));
-            endDate = endOfDay(now);
-            prevStartDate = startOfDay(subMonths(startDate, 3));
+            startDate = subMonths(now, 3);
+            prevStartDate = subMonths(startDate, 3);
             prevEndDate = new Date(startDate.getTime() - 1);
             break;
           case "year":
-            startDate = startOfDay(new Date(now.getFullYear(), 0, 1));
-            endDate = endOfDay(now);
-            prevStartDate = startOfDay(new Date(now.getFullYear() - 1, 0, 1));
-            prevEndDate = endOfDay(new Date(now.getFullYear() - 1, 11, 31));
+            startDate = new Date(now.getFullYear(), 0, 1);
+            prevStartDate = new Date(now.getFullYear() - 1, 0, 1);
+            prevEndDate = new Date(now.getFullYear() - 1, 11, 31);
             break;
           default: // month
             startDate = startOfMonth(now);
@@ -123,8 +119,8 @@ export function useProfit(period: ProfitPeriod = "month") {
         .from("expenses")
         .select("id, amount, category")
         .eq("user_id", user.id)
-        .gte("expense_date", formatDate(startDate, "yyyy-MM-dd"))
-        .lte("expense_date", formatDate(endDate, "yyyy-MM-dd"));
+        .gte("expense_date", startDate.toISOString().split("T")[0])
+        .lte("expense_date", endDate.toISOString().split("T")[0]);
 
       if (expensesError) throw expensesError;
 

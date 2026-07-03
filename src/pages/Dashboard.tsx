@@ -5,43 +5,29 @@ import {
   Package,
   AlertTriangle,
   CreditCard,
+  ArrowUpRight,
+  ArrowDownRight,
   Clock,
   CheckCircle2,
   XCircle,
   Loader2,
   Download,
   Shield,
-  Plus,
-  PackagePlus,
-  Receipt,
-  TrendingUp,
-  TrendingDown,
-  Printer,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { SelectedPart } from "@/components/repairs/RepairDialog";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useDashboardStats, useRecentRepairs, useLowStockAlerts } from "@/hooks/useDashboard";
-import { CurrentRegisterPanel } from "@/components/dashboard/CurrentRegisterPanel";
 import { useCreateRepair } from "@/hooks/useRepairs";
 import { useDashboardRealtime } from "@/hooks/useRealtimeSubscription";
 import { useCurrency } from "@/hooks/useCurrency";
-import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
-import { printOrderReceipt, type OrderReceiptItem } from "@/lib/receiptPdf";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { RepairDialog } from "@/components/repairs/RepairDialog";
@@ -53,8 +39,6 @@ import { OnboardingReminderBanner } from "@/components/onboarding/OnboardingRemi
 import { WaitlistTrialBanner } from "@/components/dashboard/WaitlistTrialBanner";
 import { OnboardingReminderModal } from "@/components/onboarding/OnboardingReminderModal";
 import { useOnboardingReminder } from "@/hooks/useOnboardingReminder";
-import { format as formatDate } from "date-fns";
-import { fr } from "date-fns/locale";
 
 const statusConfig = {
   pending: { label: "En attente", icon: Clock, className: "bg-warning/10 text-warning border-warning/20" },
@@ -66,16 +50,15 @@ const statusConfig = {
 
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: recentRepairs = [], isLoading: repairsLoading } = useRecentRepairs(6);
-  const { data: stockAlerts = [], isLoading: alertsLoading } = useLowStockAlerts(10);
+  const { data: recentRepairs = [], isLoading: repairsLoading } = useRecentRepairs(5);
+  const { data: stockAlerts = [], isLoading: alertsLoading } = useLowStockAlerts(5);
   const createRepair = useCreateRepair();
   const { format } = useCurrency();
-  const { settings } = useShopSettingsContext();
   const queryClient = useQueryClient();
-
+  
   // Enable realtime updates for dashboard data
   useDashboardRealtime();
-
+  
   const { data: teamInfo } = useMyTeamInfo();
   const [repairDialogOpen, setRepairDialogOpen] = useState(false);
   const navigate = useNavigate();
@@ -87,17 +70,20 @@ export default function Dashboard() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Tableau de bord" description="Vue d'ensemble de votre activité" />
-        <Skeleton className="h-12 w-full" />
-        <div className="grid gap-4 md:grid-cols-3">
-          <Skeleton className="md:col-span-2 h-48" />
-          <Skeleton className="h-48" />
-        </div>
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[...Array(2)].map((_, i) => (
             <Skeleton key={i} className="h-20" />
           ))}
         </div>
-        <Skeleton className="h-72" />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Skeleton className="lg:col-span-2 h-80" />
+          <Skeleton className="h-80" />
+        </div>
       </div>
     );
   }
@@ -126,37 +112,10 @@ export default function Dashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
+    
     toast.success("Rapport exporté avec succès");
   };
 
-  // Top 3 most critical stock items (prefer 0-stock, then lowest)
-  const criticalItems = [...stockAlerts]
-    .sort((a: any, b: any) => (a.quantity ?? 0) - (b.quantity ?? 0))
-    .slice(0, 3);
-
-  const printOrder = (items: any[]) => {
-    if (!items.length) {
-      toast.error("Aucun produit à commander");
-      return;
-    }
-    const orderItems: OrderReceiptItem[] = items.map((p) => ({
-      name: p.name,
-      sku: p.sku,
-      quantity: p.quantity ?? 0,
-      orderQty: Math.max((p.min_quantity || 5) - (p.quantity ?? 0), 1),
-    }));
-    printOrderReceipt({
-      shopName: settings.shop_name || "RepairPro",
-      address: settings.address || undefined,
-      phone: settings.phone || undefined,
-      dateTime: formatDate(new Date(), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr }),
-      items: orderItems,
-    });
-  };
-
-  const trendPct = stats?.salesTrendPct;
-  const trendUp = (trendPct ?? 0) >= 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -169,220 +128,189 @@ export default function Dashboard() {
       )}
       <PageHeader
         title="Tableau de bord"
-        description={`Vue d'ensemble · ${formatDate(new Date(), "EEEE d MMMM yyyy", { locale: fr })}`}
+        description="Vue d'ensemble de votre activité"
       >
         <SubscriptionBadge />
-        <Button
-          variant="outline"
-          size="sm"
-          className="border-orange-500/30 text-orange-500 hover:bg-orange-500/10"
-          onClick={() => navigate("/warranty")}
-        >
-          <Shield className="h-4 w-4 mr-2" />
-          Garantie / Retour
-        </Button>
-      </PageHeader>
-
-      {/* Quick Action Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Button
-          className="bg-gradient-primary hover:opacity-90 justify-start h-11"
-          onClick={() => setRepairDialogOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nouvelle Réparation
-        </Button>
-        <Button variant="secondary" className="justify-start h-11" onClick={() => navigate("/pos")}>
-          <ShoppingCart className="h-4 w-4 mr-2" />
-          Nouvelle Vente
-        </Button>
-        <Button variant="secondary" className="justify-start h-11" onClick={() => navigate("/inventory")}>
-          <PackagePlus className="h-4 w-4 mr-2" />
-          Entrée Stock
-        </Button>
-        <Button variant="secondary" className="justify-start h-11" onClick={handleExport}>
+        <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="h-4 w-4 mr-2" />
           Exporter
         </Button>
-      </div>
+        <Button variant="outline" size="sm" className="border-orange-500/30 text-orange-500 hover:bg-orange-500/10" onClick={() => navigate("/warranty")}>
+          <Shield className="h-4 w-4 mr-2" />
+          Garantie / Retour
+        </Button>
+        <Button size="sm" className="bg-gradient-primary hover:opacity-90" onClick={() => setRepairDialogOpen(true)}>
+          + Nouvelle réparation
+        </Button>
+      </PageHeader>
 
-      {/* Main Bento Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Caisse en cours (wide) */}
-        <div className="md:col-span-2">
-          <CurrentRegisterPanel />
-        </div>
-
-        {/* Right column: Ventes du mois + Alertes stock */}
-        <div className="grid grid-cols-1 gap-5">
-          {/* Ventes du mois */}
-          <div className="rounded-xl bg-muted/40 p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Ventes du mois
-              </p>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-success/10 text-success">
-                <ShoppingCart className="h-4 w-4" />
-              </div>
-            </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight font-mono-numbers">
-              {format(stats?.salesTotal || 0)}
-            </p>
-            {trendPct !== null && trendPct !== undefined ? (
-              <div
-                className={cn(
-                  "mt-2 inline-flex items-center gap-1 text-sm font-semibold",
-                  trendUp ? "text-success" : "text-destructive",
-                )}
-              >
-                {trendUp ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                {trendUp ? "+" : ""}
-                {Math.round(trendPct)}%
-                <span className="font-normal text-muted-foreground">vs mois dernier</span>
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-muted-foreground">Pas d'historique le mois dernier</p>
-            )}
-          </div>
-
-          {/* Alertes Stock */}
-          <div className="rounded-xl bg-muted/40 p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Alertes stock
-              </p>
-              {(stats?.stockAlerts || 0) > 0 && (
-                <Badge variant="destructive">{stats?.stockAlerts}</Badge>
-              )}
-            </div>
-            {criticalItems.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">Aucune alerte de stock</p>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {criticalItems.map((item: any) => (
-                  <div key={item.id} className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(item.quantity ?? 0) <= 0
-                          ? "Rupture"
-                          : `${item.quantity} restant${item.quantity > 1 ? "s" : ""}`}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 shrink-0 px-2 text-xs"
-                      onClick={() => printOrder([item])}
-                    >
-                      <Printer className="h-3.5 w-3.5 mr-1" />
-                      Commander
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="mt-3 flex items-center gap-2">
-              {criticalItems.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 flex-1 text-xs"
-                  onClick={() => printOrder(criticalItems)}
-                >
-                  Tout commander
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" className="h-7 flex-1 text-xs text-primary" asChild>
-                <Link to="/inventory">Inventaire →</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Secondary Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <SecondaryStat
-          label="Réparations en cours"
+      {/* KPI Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Ventes du mois"
+          value={format(stats?.salesTotal || 0)}
+          icon={ShoppingCart}
+          variant="success"
+        />
+        <StatCard
+          title="Réparations en cours"
           value={stats?.repairsInProgress || 0}
-          hint={`${stats?.repairsCompleted || 0} terminées`}
+          subtitle={`${stats?.repairsCompleted || 0} terminées`}
           icon={Wrench}
+          variant="accent"
         />
-        <SecondaryStat
-          label="Total produits"
+        <StatCard
+          title="Alertes stock"
+          value={stats?.stockAlerts || 0}
+          subtitle="Produits en rupture imminente"
+          icon={AlertTriangle}
+          variant="warning"
+        />
+        <StatCard
+          title="Total produits"
           value={stats?.totalProducts || 0}
-          hint={`${stats?.totalCustomers || 0} clients`}
+          subtitle={`${stats?.totalCustomers || 0} clients`}
           icon={Package}
+          variant="default"
         />
-        <SecondaryStat
-          label="Dettes clients"
-          value={format(stats?.customerDebts || 0)}
-          icon={CreditCard}
-          valueClassName="text-warning"
-        />
-        <SecondaryStat
-          label="Dettes fournisseurs"
-          value={format(stats?.supplierDebts || 0)}
-          icon={Receipt}
-          valueClassName="text-destructive"
-        />
+      </div>
+
+      {/* Debts Overview */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="border-warning/30 bg-warning/5">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Dettes clients</p>
+                <p className="mt-1 text-xl font-bold font-mono-numbers text-warning">
+                  {format(stats?.customerDebts || 0)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-warning" />
+                <ArrowUpRight className="h-4 w-4 text-warning" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Dettes fournisseurs</p>
+                <p className="mt-1 text-xl font-bold font-mono-numbers text-destructive">
+                  {format(stats?.supplierDebts || 0)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-destructive" />
+                <ArrowDownRight className="h-4 w-4 text-destructive" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* My Tasks (for team members) */}
       {teamInfo && <MyTasks />}
 
-      {/* Réparations récentes — compact table */}
-      <div className="rounded-xl bg-muted/40 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div>
-            <h2 className="text-sm font-semibold">Réparations récentes</h2>
-            <p className="text-xs text-muted-foreground">Dernières fiches de réparation</p>
-          </div>
-          <Button variant="ghost" size="sm" className="text-primary" asChild>
-            <Link to="/repairs">Voir tout →</Link>
-          </Button>
+      {/* Main Content Grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Recent Repairs */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Réparations récentes</CardTitle>
+                <CardDescription>Dernières fiches de réparation</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" className="text-primary" asChild>
+                <Link to="/repairs">Voir tout →</Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border">
+              {recentRepairs.length === 0 ? (
+                <div className="px-6 py-8 text-center text-muted-foreground">
+                  Aucune réparation récente
+                </div>
+              ) : (
+                recentRepairs.map((repair: any) => {
+                  const status = statusConfig[repair.status as keyof typeof statusConfig] || statusConfig.pending;
+                  const StatusIcon = status.icon;
+                  return (
+                    <div
+                      key={repair.id}
+                      className="flex items-center justify-between px-6 py-3 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={cn("flex items-center justify-center w-8 h-8 rounded-lg", status.className)}>
+                          <StatusIcon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {repair.customer?.name || "Client anonyme"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {repair.device_model} • {repair.problem_description}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Badge variant="secondary" className={status.className}>
+                          {status.label}
+                        </Badge>
+                        <span className="text-sm font-medium font-mono-numbers">
+                          {format(Number(repair.total_cost) || 0)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stock Alerts */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-warning" />
+                <CardTitle className="text-base">Alertes stock</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {stockAlerts.length === 0 ? (
+                <div className="py-4 text-center text-muted-foreground text-sm">
+                  Aucune alerte de stock
+                </div>
+              ) : (
+                stockAlerts.map((item: any) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-warning/5 border border-warning/20"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Seuil: {item.min_quantity} unités
+                      </p>
+                    </div>
+                    <Badge variant="destructive" className="shrink-0">
+                      {item.quantity} restant{item.quantity > 1 ? "s" : ""}
+                    </Badge>
+                  </div>
+                ))
+              )}
+              <Button variant="outline" size="sm" className="w-full mt-2" asChild>
+                <Link to="/inventory">Voir l'inventaire</Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
-        {recentRepairs.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Aucune réparation récente
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Client</TableHead>
-                <TableHead>Appareil</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Prix</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentRepairs.map((repair: any) => {
-                const status =
-                  statusConfig[repair.status as keyof typeof statusConfig] || statusConfig.pending;
-                return (
-                  <TableRow key={repair.id}>
-                    <TableCell className="font-medium">
-                      {repair.customer?.name || "Client anonyme"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      <span className="block truncate max-w-[180px]">{repair.device_model}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={status.className}>
-                        {status.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono-numbers font-medium">
-                      {format(Number(repair.total_cost) || 0)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
       </div>
 
       {/* Repair Dialog */}
@@ -435,33 +363,6 @@ export default function Dashboard() {
         }}
         isLoading={createRepair.isPending}
       />
-    </div>
-  );
-}
-
-function SecondaryStat({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  valueClassName,
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="rounded-xl bg-muted/30 p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground truncate">{label}</p>
-        <Icon className="h-4 w-4 text-muted-foreground/70 shrink-0" />
-      </div>
-      <p className={cn("mt-1.5 text-xl font-bold tracking-tight font-mono-numbers", valueClassName)}>
-        {value}
-      </p>
-      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }

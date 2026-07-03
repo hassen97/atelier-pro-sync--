@@ -20,7 +20,6 @@ export interface ShopOwner {
   whatsapp_phone: string | null;
   email: string | null;
   verification_status?: string;
-  onboarding_completed?: boolean;
 }
 
 export interface AdminStats {
@@ -71,20 +70,14 @@ export function useIsPlatformAdmin() {
     queryKey: ["is-platform-admin", user?.id],
     queryFn: async () => {
       if (!user) return false;
-      // A user can have multiple rows in user_roles (e.g. platform_admin +
-      // super_admin). Filtering by role returns at most one row, so this is
-      // safe with .maybeSingle() and never fails on multi-role accounts.
       const { data } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .eq("role", "platform_admin")
-        .maybeSingle();
-      return !!data;
+        .single();
+      return data?.role === "platform_admin";
     },
     enabled: !!user,
-    staleTime: 60_000,
-    retry: 1,
   });
 }
 
@@ -102,7 +95,6 @@ export function useAdminData() {
     enabled: !!user,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
-    retry: 1,
   });
 }
 
@@ -120,7 +112,6 @@ export function useAdminRevenue() {
     enabled: !!user,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
-    retry: 1,
   });
 }
 
@@ -138,7 +129,6 @@ export function useAdminActivity() {
     enabled: !!user,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
-    retry: 1,
   });
 }
 

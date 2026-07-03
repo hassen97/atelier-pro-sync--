@@ -226,10 +226,10 @@ export function useAdminShopSubscriptions() {
       const { data, error } = await supabase
         .from("shop_subscriptions")
         .select(`
-          user_id, status, expires_at, started_at, trial_ends_at,
+          user_id, status, expires_at, started_at,
           plan:subscription_plans(id, name, price, currency)
         `)
-        .in("status", ["active", "trialing"]);
+        .eq("status", "active");
       if (error) throw error;
       return (data || []) as any[];
     },

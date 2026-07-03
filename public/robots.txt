@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://www.getheavencoin.com/sitemap.xml
+Sitemap: https://getheavencoin.com/sitemap.xml

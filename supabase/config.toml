@@ -9,7 +9,5 @@ project_id = "rgikflkocotkljbajzrb"
     verify_jwt = false
   [functions.send-web-push]
     verify_jwt = false
-  [functions.demo-login]
-    verify_jwt = false
-  [functions.demo-provision]
+  [functions.migrate-helper]
     verify_jwt = false
