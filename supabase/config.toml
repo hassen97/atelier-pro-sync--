@@ -13,3 +13,5 @@ project_id = "rgikflkocotkljbajzrb"
     verify_jwt = false
   [functions.demo-provision]
     verify_jwt = false
+  [functions.restore-live-db]
+    verify_jwt = false
