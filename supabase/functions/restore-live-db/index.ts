@@ -169,6 +169,10 @@ serve(async (req) => {
       return json({ error: "Storage credentials missing" }, 500);
     }
 
+    const storageClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
     const results: { path: string; ok: boolean; status?: number; error?: string }[] = [];
     for (const f of body.files) {
       try {
@@ -178,24 +182,16 @@ serve(async (req) => {
           continue;
         }
         const bytes = new Uint8Array(await src.arrayBuffer());
-        const up = await fetch(
-          `${supabaseUrl}/storage/v1/object/${f.bucket}/${f.path}`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${serviceKey}`,
-              "Content-Type": f.content_type || "application/octet-stream",
-              "x-upsert": "true",
-            },
-            body: bytes,
-          },
-        );
-        const okUp = up.ok;
+        const { error: upErr } = await storageClient.storage
+          .from(f.bucket)
+          .upload(f.path, bytes, {
+            contentType: f.content_type || "application/octet-stream",
+            upsert: true,
+          });
         results.push({
           path: `${f.bucket}/${f.path}`,
-          ok: okUp,
-          status: up.status,
-          error: okUp ? undefined : (await up.text()).slice(0, 200),
+          ok: !upErr,
+          error: upErr ? String(upErr.message).slice(0, 200) : undefined,
         });
       } catch (e) {
         results.push({ path: `${f.bucket}/${f.path}`, ok: false, error: String((e as Error)?.message ?? e) });
