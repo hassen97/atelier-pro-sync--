@@ -14,12 +14,10 @@ export function useEnabledGateways() {
   return useQuery({
     queryKey: ["enabled-payment-gateways"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payment_gateways" as any)
-        .select("id, gateway_key, gateway_name, description, config")
-        .eq("is_enabled", true);
+      const { data, error } = await supabase.rpc("get_enabled_payment_gateways" as any);
       if (error) throw error;
       return (data || []) as unknown as EnabledGateway[];
+
     },
   });
 }
