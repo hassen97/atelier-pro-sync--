@@ -32,42 +32,47 @@ Deno.serve(async (req) => {
   }
   const mode = body.mode === "auto" ? "auto" : "manual";
 
-  // Auth check for manual mode (must be platform_admin)
-  if (mode === "manual") {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    const token = authHeader.replace("Bearer ", "");
-    // Allow service role calls (cron) to use manual too
-    if (token !== serviceKey) {
-      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      const { data: { user } } = await userClient.auth.getUser();
-      if (!user) {
-        return new Response(
-          JSON.stringify({ error: "Unauthorized" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+  // ── Authorization (required for BOTH modes) ──
+  // Accept any of: a matching cron secret header, the service-role key,
+  // or a platform-admin JWT. Previously `auto` mode bypassed all checks,
+  // which let anyone trigger a mass email blast.
+  const cronSecret =
+    Deno.env.get("CRON_SECRET") || Deno.env.get("HEALTH_CRON_SECRET");
+  const providedSecret = req.headers.get("x-cron-secret");
+  const authHeader = req.headers.get("Authorization");
+  const bearer = authHeader?.startsWith("Bearer ")
+    ? authHeader.replace("Bearer ", "")
+    : null;
+
+  let authorized = false;
+
+  if (providedSecret && cronSecret && providedSecret === cronSecret) {
+    authorized = true; // cron context
+  } else if (bearer && bearer === serviceKey) {
+    authorized = true; // service-role (internal) call
+  } else if (bearer) {
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: `Bearer ${bearer}` } },
+    });
+    const { data: { user } } = await userClient.auth.getUser();
+    if (user) {
       const { data: roleRow } = await admin
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .eq("role", "platform_admin")
         .maybeSingle();
-      if (!roleRow) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden — platform admin required" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      if (roleRow) authorized = true;
     }
   }
+
+  if (!authorized) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
 
   // Find eligible owners: super_admin + onboarding_completed=false + has email + reminders < max
   const { data: owners, error: ownersErr } = await admin
