@@ -100,13 +100,8 @@ Deno.serve(async (req) => {
     }
 
 
-
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     let exists = false;
+
 
     if (username) {
       const normalizedUsername = normalizeUsername(username);
