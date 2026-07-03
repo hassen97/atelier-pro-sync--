@@ -43,8 +43,33 @@ serve(async (req) => {
     return json({ error: "Invalid JSON body" }, 400);
   }
 
+  // Authorization: allow either a valid RESTORE_SECRET, or a platform_admin JWT.
+  const supabaseUrlEnv = Deno.env.get("SUPABASE_URL");
+  const serviceKeyEnv = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const expected = Deno.env.get("RESTORE_SECRET");
-  if (!expected || body.secret !== expected) {
+
+  let authorized = false;
+  if (expected && body.secret && body.secret === expected) {
+    authorized = true;
+  } else {
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ") && supabaseUrlEnv && serviceKeyEnv) {
+      const token = authHeader.replace("Bearer ", "");
+      const admin = createClient(supabaseUrlEnv, serviceKeyEnv);
+      const { data: userData } = await admin.auth.getUser(token);
+      const callerId = userData?.user?.id;
+      if (callerId) {
+        const { data: roleRow } = await admin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", callerId)
+          .eq("role", "platform_admin")
+          .maybeSingle();
+        if (roleRow) authorized = true;
+      }
+    }
+  }
+  if (!authorized) {
     return json({ error: "Unauthorized" }, 401);
   }
 
