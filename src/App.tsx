@@ -136,12 +136,7 @@ const App = () => (
                   </ProtectedRoute>
                 } />
 
-                {/* TEMPORARY one-time DB restore tool — remove after use */}
-                <Route path="/db-restore" element={
-                  <ProtectedRoute>
-                    <DbRestore />
-                  </ProtectedRoute>
-                } />
+
 
                 
                 {/* Protected routes */}
