@@ -97,6 +97,20 @@ serve(async (req) => {
       return json({ error: `Payload load error: ${String((e as Error)?.message ?? e)}` }, 500);
     }
 
+    // Skip statements targeting Supabase-managed schemas. The DB role is NOT the
+    // owner of these (e.g. auth sequences like refresh_tokens_id_seq), so a
+    // TRUNCATE/INSERT against them fails with "must be owner of sequence ...".
+    // These schemas can't be restored via raw SQL; only public data is restored.
+    const RESERVED_SCHEMA =
+      /\b(?:auth|storage|vault|realtime|supabase_functions|supabase_migrations|extensions|graphql|graphql_public|pgsodium|cron|net|pgbouncer)\./i;
+    const runnable: string[] = [];
+    let skipped = 0;
+    for (const s of statements) {
+      if (RESERVED_SCHEMA.test(s)) skipped++;
+      else runnable.push(s);
+    }
+    summary.statements_skipped = skipped;
+
     const dbUrl = Deno.env.get("SUPABASE_DB_URL");
     if (!dbUrl) return json({ error: "SUPABASE_DB_URL missing" }, 500);
 
@@ -105,9 +119,9 @@ serve(async (req) => {
     let executed = 0;
     try {
       await pg.queryArray("BEGIN");
-      for (let i = 0; i < statements.length; i++) {
+      for (let i = 0; i < runnable.length; i++) {
         try {
-          await pg.queryArray(statements[i]);
+          await pg.queryArray(runnable[i]);
           executed++;
         } catch (e) {
           await pg.queryArray("ROLLBACK").catch(() => {});
@@ -115,7 +129,7 @@ serve(async (req) => {
             {
               error: "SQL execution failed — transaction rolled back, live DB unchanged",
               failed_statement_index: i,
-              statement_preview: statements[i].slice(0, 300),
+              statement_preview: runnable[i].slice(0, 300),
               detail: String((e as Error)?.message ?? e),
             },
             500,
