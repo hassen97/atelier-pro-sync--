@@ -35,15 +35,11 @@ export function useVaultEntries() {
     queryKey: ["customer-vault", effectiveUserId],
     queryFn: async () => {
       if (!effectiveUserId) return [] as VaultEntry[];
-      const { data, error } = await supabase
-        .from("customer_vault" as any)
-        .select(
-          "id, user_id, customer_id, account_type, email_id, password, created_at, updated_at, customers:customer_id(id, name, phone)"
-        )
-        .eq("user_id", effectiveUserId)
-        .order("created_at", { ascending: false });
+      const { data, error } = await supabase.functions.invoke("customer-vault", {
+        body: { action: "list" },
+      });
       if (error) throw error;
-      return (data ?? []) as unknown as VaultEntry[];
+      return ((data as any)?.data ?? []) as VaultEntry[];
     },
     enabled: !!effectiveUserId,
   });
@@ -56,13 +52,11 @@ export function useCreateVaultEntry() {
   return useMutation({
     mutationFn: async (input: VaultEntryInput) => {
       if (!effectiveUserId) throw new Error("Non authentifié");
-      const { data, error } = await supabase
-        .from("customer_vault" as any)
-        .insert({ ...input, user_id: effectiveUserId })
-        .select()
-        .single();
+      const { data, error } = await supabase.functions.invoke("customer-vault", {
+        body: { action: "create", ...input },
+      });
       if (error) throw error;
-      return data;
+      return (data as any)?.data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-vault"] });
@@ -79,14 +73,11 @@ export function useUpdateVaultEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<VaultEntryInput> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("customer_vault" as any)
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const { data, error } = await supabase.functions.invoke("customer-vault", {
+        body: { action: "update", id, ...updates },
+      });
       if (error) throw error;
-      return data;
+      return (data as any)?.data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-vault"] });
@@ -100,7 +91,9 @@ export function useDeleteVaultEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("customer_vault" as any).delete().eq("id", id);
+      const { error } = await supabase.functions.invoke("customer-vault", {
+        body: { action: "delete", id },
+      });
       if (error) throw error;
       return id;
     },
@@ -111,6 +104,7 @@ export function useDeleteVaultEntry() {
     onError: () => toast.error("Erreur lors de la suppression"),
   });
 }
+
 
 /** Generate a strong password like "Apple2026!xyz". */
 export function generateStrongPassword(): string {
