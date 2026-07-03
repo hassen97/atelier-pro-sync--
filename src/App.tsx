@@ -110,8 +110,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <ImpersonationProvider>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
+            <RouteErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/auth" element={<Auth />} />
