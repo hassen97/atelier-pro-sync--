@@ -91,13 +91,31 @@ Deno.serve(async (req) => {
     // Identify caller (used for test mode and admin-only fan-out)
     let callerId: string | null = null;
     const authHeader = req.headers.get("Authorization");
-    if (authHeader) {
+    // Trusted server-to-server calls (e.g. notify-admin-signup fan-out) pass the service-role key
+    const isServiceRole = !!authHeader && authHeader === `Bearer ${serviceKey}`;
+    if (authHeader && !isServiceRole) {
       const userClient = createClient(supabaseUrl, anonKey, {
         global: { headers: { Authorization: authHeader } },
       });
       const { data } = await userClient.auth.getUser();
       callerId = data.user?.id ?? null;
     }
+
+    const isPlatformAdmin = async (uid: string): Promise<boolean> => {
+      const { data } = await admin
+        .from("user_roles")
+        .select("user_id")
+        .eq("user_id", uid)
+        .eq("role", "platform_admin")
+        .maybeSingle();
+      return !!data;
+    };
+
+    const forbidden = () =>
+      new Response(
+        JSON.stringify({ error: "Not authorized" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
 
     // Resolve target user_ids
     let targetUserIds: string[] = [];
@@ -111,12 +129,20 @@ Deno.serve(async (req) => {
       }
       targetUserIds = [callerId];
     } else if (body.to_all_admins) {
+      // Only the service role or an authenticated platform admin may broadcast to all admins
+      if (!isServiceRole && !(callerId && (await isPlatformAdmin(callerId)))) {
+        return forbidden();
+      }
       const { data: admins } = await admin
         .from("user_roles")
         .select("user_id")
         .eq("role", "platform_admin");
       targetUserIds = (admins ?? []).map((r: any) => r.user_id);
     } else if (body.user_ids?.length) {
+      // Only the service role or an authenticated platform admin may target arbitrary users
+      if (!isServiceRole && !(callerId && (await isPlatformAdmin(callerId)))) {
+        return forbidden();
+      }
       targetUserIds = body.user_ids;
     }
 
