@@ -6,6 +6,10 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  define: {
+    // Build stamp used to label the "new version available" toast.
+    __APP_VERSION__: JSON.stringify(new Date().toISOString()),
+  },
   server: {
     host: "::",
     port: 8080,
@@ -80,6 +84,14 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
+          // 3D login loader libs — heavy, only loaded lazily on owner login.
+          if (
+            id.includes("/three/") ||
+            id.includes("/three-stdlib/") ||
+            id.includes("@react-three/")
+          ) {
+            return "vendor-three";
+          }
           if (
             id.includes("node_modules/react-dom") ||
             id.match(/node_modules\/react\//) ||

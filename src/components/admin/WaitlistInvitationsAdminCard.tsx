@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Gift, Users, Send, CheckCircle2, MailCheck } from "lucide-react";
+import { Loader2, Gift, Users, Send, CheckCircle2, MailCheck, Repeat } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -32,6 +32,7 @@ export function WaitlistInvitationsAdminCard() {
     signedUp: 0,
   });
   const [sending, setSending] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const loadStats = async (showToast = false) => {
     setLoading(true);
@@ -83,6 +84,27 @@ export function WaitlistInvitationsAdminCard() {
       toast.error(e?.message ?? "Erreur lors de l'envoi");
     } finally {
       setSending(false);
+    }
+  };
+
+  const resendInvitations = async () => {
+    setResending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("notify-waitlist", {
+        body: { resend: true },
+      });
+      if (error) throw error;
+      const queued = (data as any)?.queued ?? 0;
+      const skipped = (data as any)?.skipped ?? 0;
+      toast.success(
+        `${queued} email${queued > 1 ? "s" : ""} renvoyé${queued > 1 ? "s" : ""} en file d'attente${skipped > 0 ? ` · ${skipped} ignoré${skipped > 1 ? "s" : ""}` : ""}`
+      );
+      await loadStats();
+    } catch (e: any) {
+      console.error("[WaitlistInvitations] resend:", e);
+      toast.error(e?.message ?? "Erreur lors du renvoi");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -174,6 +196,40 @@ export function WaitlistInvitationsAdminCard() {
                 <AlertDialogCancel>Annuler</AlertDialogCancel>
                 <AlertDialogAction onClick={sendInvitations}>
                   Envoyer maintenant
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={resending || stats.total === 0}
+                className="border-violet-400/30 text-violet-200 hover:bg-violet-500/10"
+              >
+                {resending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Repeat className="h-4 w-4 mr-2" />
+                )}
+                Renvoyer à tous ({stats.total})
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Renvoyer l'email à tous ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Les <b>{stats.total}</b> inscrit{stats.total > 1 ? "s" : ""} de la liste d'attente
+                  recevront à nouveau l'email d'invitation, <b>y compris ceux déjà notifiés</b>.
+                  Utilisez cette option pour relancer toute la liste.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction onClick={resendInvitations}>
+                  Renvoyer maintenant
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

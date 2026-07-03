@@ -25,13 +25,15 @@ import {
 import {
   MoreHorizontal, KeyRound, Trash2, Users, Search, Lock, Unlock,
   ShieldCheck, Copy, Check, RefreshCw, Store, UserCog, ChevronLeft, ChevronRight,
-  Wifi, WifiOff, Clock, Calendar,
+  Wifi, WifiOff, Clock, Calendar, UserX, UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import { EmployeeRecord } from "@/hooks/useAdmin";
+import { AdminEmployeeDetailSheet } from "./AdminEmployeeDetailSheet";
+
 
 const PAGE_SIZE = 50;
 
@@ -239,16 +241,24 @@ function ReassignShopModal({ open, onOpenChange, employee, shops, onSuccess }: R
 }
 
 // ── Main Component ──
+type FilterType = "all" | "active" | "online" | "suspended" | "removed";
+
+function isOnline(lastOnline: string | null, now: number) {
+  return !!lastOnline && new Date(lastOnline).getTime() > now - 10 * 60 * 1000;
+}
+
 export function AdminEmployeesView() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [now, setNow] = useState(() => Date.now());
+  const [filter, setFilter] = useState<FilterType>("all");
   const [credentialsTarget, setCredentialsTarget] = useState<EmployeeRecord | null>(null);
   const [reassignTarget, setReassignTarget] = useState<EmployeeRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EmployeeRecord | null>(null);
   const [roleToggleTarget, setRoleToggleTarget] = useState<EmployeeRecord | null>(null);
+  const [detailTarget, setDetailTarget] = useState<EmployeeRecord | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-employees"],
@@ -260,7 +270,6 @@ export function AdminEmployeesView() {
       return data as { employees: EmployeeRecord[] };
     },
     enabled: !!user,
-    // Auto-refresh every 60 seconds
     refetchInterval: 60_000,
   });
 
@@ -284,9 +293,9 @@ export function AdminEmployeesView() {
   });
 
   const deleteEmployee = useMutation({
-    mutationFn: async ({ memberId, employeeUserId }: { memberId: string; employeeUserId: string }) => {
-      const { data, error } = await supabase.functions.invoke("admin-manage-users", {
-        body: { action: "delete-employee", memberId, employeeUserId },
+    mutationFn: async ({ employeeUserId }: { memberId: string; employeeUserId: string }) => {
+      const { data, error } = await supabase.functions.invoke("wipe-employee", {
+        body: { employeeUserId },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -294,8 +303,9 @@ export function AdminEmployeesView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-employees"] });
       queryClient.invalidateQueries({ queryKey: ["admin-data"] });
-      toast.success("Employé supprimé avec succès");
+      toast.success("Employé complètement effacé — aucune trace restante");
       setDeleteTarget(null);
+      setDetailTarget(null);
     },
     onError: (err: any) => toast.error(err.message || "Erreur lors de la suppression"),
   });
@@ -334,65 +344,170 @@ export function AdminEmployeesView() {
   const employees = data?.employees || [];
   const shops = shopsData || [];
 
+  // ── Stats ──
+  const stats = useMemo(() => {
+    const removed = employees.filter((e) => e.status === "removed");
+    const activeMembers = employees.filter((e) => e.status !== "removed");
+    return {
+      total: employees.length,
+      active: activeMembers.filter((e) => !e.is_locked).length,
+      online: activeMembers.filter((e) => isOnline(e.last_online_at, now)).length,
+      suspended: activeMembers.filter((e) => e.is_locked).length,
+      removed: removed.length,
+    };
+  }, [employees, now]);
+
+  const filters: { key: FilterType; label: string; count: number }[] = [
+    { key: "all", label: "Tous", count: stats.total },
+    { key: "active", label: "Actifs", count: stats.active },
+    { key: "online", label: "En ligne", count: stats.online },
+    { key: "suspended", label: "Suspendus", count: stats.suspended },
+    { key: "removed", label: "Retirés", count: stats.removed },
+  ];
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return employees;
-    const q = search.toLowerCase();
-    return employees.filter((e) =>
-      (e.username || "").toLowerCase().includes(q) ||
-      (e.full_name || "").toLowerCase().includes(q) ||
-      (e.shop_name || "").toLowerCase().includes(q) ||
-      (e.owner_username || "").toLowerCase().includes(q) ||
-      (e.phone || "").includes(q)
-    );
-  }, [employees, search]);
+    let result = employees;
+    if (filter === "active") result = result.filter((e) => e.status !== "removed" && !e.is_locked);
+    else if (filter === "online") result = result.filter((e) => e.status !== "removed" && isOnline(e.last_online_at, now));
+    else if (filter === "suspended") result = result.filter((e) => e.status !== "removed" && e.is_locked);
+    else if (filter === "removed") result = result.filter((e) => e.status === "removed");
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((e) =>
+        (e.username || "").toLowerCase().includes(q) ||
+        (e.full_name || "").toLowerCase().includes(q) ||
+        (e.shop_name || "").toLowerCase().includes(q) ||
+        (e.owner_username || "").toLowerCase().includes(q) ||
+        (e.phone || "").includes(q)
+      );
+    }
+    return result;
+  }, [employees, search, filter, now]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Reset to page 1 when search changes
   const handleSearch = (v: string) => {
     setSearch(v);
     setPage(1);
   };
 
+  const handleFilter = (f: FilterType) => {
+    setFilter(f);
+    setPage(1);
+  };
+
+  // ── Shared action menu items ──
+  const renderActionItems = (emp: EmployeeRecord) => (
+    <>
+      <DropdownMenuItem onClick={() => setDetailTarget(emp)}>
+        <UserCheck className="h-4 w-4 mr-2 text-slate-300" />
+        Voir le profil
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={() => setCredentialsTarget(emp)}>
+        <KeyRound className="h-4 w-4 mr-2 text-[#00D4FF]" />
+        Générer nouveau mot de passe
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setReassignTarget(emp)}>
+        <Store className="h-4 w-4 mr-2 text-violet-400" />
+        Réassigner à une boutique
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setRoleToggleTarget(emp)}>
+        <UserCog className="h-4 w-4 mr-2 text-amber-400" />
+        {emp.role === "employee" ? "Promouvoir → Propriétaire" : "Rétrograder → Employé"}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      {emp.is_locked ? (
+        <DropdownMenuItem onClick={() => lockUnlockEmployee.mutate({ userId: emp.member_user_id, lock: false })}>
+          <Unlock className="h-4 w-4 mr-2 text-emerald-500" /> Activer le compte
+        </DropdownMenuItem>
+      ) : (
+        <DropdownMenuItem onClick={() => lockUnlockEmployee.mutate({ userId: emp.member_user_id, lock: true })}>
+          <Lock className="h-4 w-4 mr-2 text-orange-500" /> Suspendre le compte
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
+        onClick={() => setDeleteTarget(emp)}
+      >
+        <Trash2 className="h-4 w-4 mr-2" /> Wipe employé (suppression totale)
+      </DropdownMenuItem>
+    </>
+  );
+
+  const statusBadge = (emp: EmployeeRecord) => {
+    if (emp.status === "removed") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+          <UserX className="h-3 w-3" /> Retiré
+        </span>
+      );
+    }
+    if (emp.is_locked) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] text-red-400 font-medium">
+          <WifiOff className="h-3 w-3" /> Suspendu
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+        <Wifi className="h-3 w-3" /> Actif
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-5 animate-fade-in">
       {/* ── Header ── */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-[#00D4FF]/20 flex items-center justify-center border border-violet-500/20">
-            <Users className="h-5 w-5 text-violet-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              Global Employee Hub
-              {!isLoading && (
-                <Badge className="bg-violet-500/15 text-violet-300 border-violet-500/25 text-xs font-semibold">
-                  {employees.length} compte{employees.length !== 1 ? "s" : ""}
-                </Badge>
-              )}
-            </h2>
-            <p className="text-xs text-slate-500">Centre de commandement des comptes employés — God Mode</p>
-          </div>
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-[#00D4FF]/20 flex items-center justify-center border border-violet-500/20 shrink-0">
+          <Users className="h-5 w-5 text-violet-400" />
         </div>
+        <div>
+          <h2 className="text-lg font-bold text-white">Global Employee Hub</h2>
+          <p className="text-xs text-slate-500">Centre de commandement des comptes employés — God Mode</p>
+        </div>
+      </div>
 
-        {/* Stats strip */}
-        <div className="flex items-center gap-3">
-          <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/8 text-center">
-            <p className="text-lg font-bold text-white">{employees.filter(e => !e.is_locked).length}</p>
-            <p className="text-[10px] text-emerald-400">Actifs</p>
+      {/* ── Stat cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {[
+          { label: "Total", value: stats.total, color: "text-white", ring: "border-white/8" },
+          { label: "Actifs", value: stats.active, color: "text-emerald-400", ring: "border-emerald-500/20" },
+          { label: "En ligne", value: stats.online, color: "text-[#00D4FF]", ring: "border-[#00D4FF]/20" },
+          { label: "Suspendus", value: stats.suspended, color: "text-red-400", ring: "border-red-500/20" },
+          { label: "Retirés", value: stats.removed, color: "text-slate-400", ring: "border-white/8" },
+        ].map((s) => (
+          <div key={s.label} className={cn("rounded-xl border bg-white/[0.02] px-4 py-3", s.ring)}>
+            <p className={cn("text-2xl font-bold", s.color)}>{isLoading ? "—" : s.value}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{s.label}</p>
           </div>
-          <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/8 text-center">
-            <p className="text-lg font-bold text-white">{employees.filter(e => e.is_locked).length}</p>
-            <p className="text-[10px] text-red-400">Suspendus</p>
-          </div>
-          <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/8 text-center">
-            <p className="text-lg font-bold text-white">
-              {employees.filter(e => e.last_online_at && new Date(e.last_online_at) > new Date(Date.now() - 10 * 60 * 1000)).length}
-            </p>
-            <p className="text-[10px] text-[#00D4FF]">En ligne</p>
-          </div>
-        </div>
+        ))}
+      </div>
+
+      {/* ── Filter tabs (horizontal scroll on mobile) ── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+        {filters.map((f) => {
+          const active = filter === f.key;
+          return (
+            <button
+              key={f.key}
+              onClick={() => handleFilter(f.key)}
+              className={cn(
+                "shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
+                active
+                  ? "bg-white text-[#0F172A]"
+                  : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
+              )}
+            >
+              {f.label} <span className={cn("text-xs", active ? "text-slate-500" : "text-slate-600")}>({f.count})</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Omni-Search ── */}
@@ -414,8 +529,77 @@ export function AdminEmployeesView() {
         )}
       </div>
 
-      {/* ── Table ── */}
-      <div className="rounded-xl overflow-hidden border border-white/8 bg-white/[0.02]">
+      {/* ── Mobile card grid ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:hidden">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-white/8 bg-white/[0.02] p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <div className="space-y-1.5 flex-1"><Skeleton className="h-3.5 w-28" /><Skeleton className="h-2.5 w-20" /></div>
+              </div>
+              <Skeleton className="h-3 w-full" />
+            </div>
+          ))
+        ) : paginated.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-sm text-slate-500">
+            {search || filter !== "all" ? "Aucun employé ne correspond" : "Aucun employé enregistré"}
+          </div>
+        ) : paginated.map((emp) => {
+          const rc = roleConfig[emp.role] || roleConfig.employee;
+          const online = isOnline(emp.last_online_at, now);
+          return (
+            <div
+              key={emp.id}
+              onClick={() => setDetailTarget(emp)}
+              className="rounded-xl border border-white/8 bg-white/[0.02] p-4 space-y-3 active:bg-white/[0.04] transition-colors cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative">
+                    <Avatar name={emp.full_name} username={emp.username} />
+                    <span className={cn(
+                      "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0F172A]",
+                      online ? "bg-emerald-400" : "bg-slate-600"
+                    )} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white text-sm font-medium leading-tight truncate">{emp.full_name || `@${emp.username}`}</p>
+                    {emp.username && <p className="text-xs text-slate-500 truncate">@{emp.username}</p>}
+                  </div>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-white shrink-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
+                    {renderActionItems(emp)}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-300 truncate">{emp.shop_name}</p>
+                  <p className="text-[10px] text-slate-600 truncate">@{emp.owner_username || "—"}</p>
+                </div>
+                <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5 shrink-0", rc.color)}>{rc.label}</Badge>
+              </div>
+              <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                {statusBadge(emp)}
+                <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
+                  <Clock className="h-3 w-3" />
+                  {emp.last_online_at ? formatDistanceToNow(new Date(emp.last_online_at), { addSuffix: true, locale: fr }) : "Jamais"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Desktop table ── */}
+      <div className="rounded-xl overflow-hidden border border-white/8 bg-white/[0.02] hidden md:block">
         <Table>
           <TableHeader>
             <TableRow className="border-white/8 hover:bg-transparent">
@@ -457,19 +641,21 @@ export function AdminEmployeesView() {
                       <Users className="h-5 w-5 text-slate-600" />
                     </div>
                     <p className="text-slate-500 text-sm">
-                      {search ? "Aucun employé ne correspond à la recherche" : "Aucun employé enregistré"}
+                      {search || filter !== "all" ? "Aucun employé ne correspond" : "Aucun employé enregistré"}
                     </p>
                   </div>
                 </TableCell>
               </TableRow>
             ) : paginated.map((emp) => {
-               const rc = roleConfig[emp.role] || roleConfig.employee;
-              const isLocked = emp.is_locked;
-              const isVerified = true;
-              const isOnline = emp.last_online_at && new Date(emp.last_online_at) > new Date(now - 10 * 60 * 1000);
+              const rc = roleConfig[emp.role] || roleConfig.employee;
+              const online = isOnline(emp.last_online_at, now);
 
               return (
-                <TableRow key={emp.id} className="border-white/5 hover:bg-white/[0.025] transition-colors group">
+                <TableRow
+                  key={emp.id}
+                  className="border-white/5 hover:bg-white/[0.025] transition-colors group cursor-pointer"
+                  onClick={() => setDetailTarget(emp)}
+                >
                   {/* User Info */}
                   <TableCell className="py-3">
                     <div className="flex items-center gap-3">
@@ -477,7 +663,7 @@ export function AdminEmployeesView() {
                         <Avatar name={emp.full_name} username={emp.username} />
                         <span className={cn(
                           "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0F172A]",
-                          isOnline ? "bg-emerald-400" : "bg-slate-600"
+                          online ? "bg-emerald-400" : "bg-slate-600"
                         )} />
                       </div>
                       <div>
@@ -511,25 +697,7 @@ export function AdminEmployeesView() {
 
                   {/* Status */}
                   <TableCell className="hidden lg:table-cell py-3">
-                    <div className="flex flex-col gap-1">
-                      {isLocked ? (
-                        <div className="flex items-center gap-1.5">
-                          <WifiOff className="h-3 w-3 text-red-400" />
-                          <span className="text-xs text-red-400 font-medium">Suspendu</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <Wifi className="h-3 w-3 text-emerald-400" />
-                          <span className="text-xs text-emerald-400 font-medium">Actif</span>
-                        </div>
-                      )}
-                      {isVerified && (
-                        <div className="flex items-center gap-1">
-                          <ShieldCheck className="h-3 w-3 text-[#00D4FF]" />
-                          <span className="text-[10px] text-[#00D4FF]">Vérifié</span>
-                        </div>
-                      )}
-                    </div>
+                    {statusBadge(emp)}
                   </TableCell>
 
                   {/* Last seen */}
@@ -551,7 +719,7 @@ export function AdminEmployeesView() {
                   </TableCell>
 
                   {/* Actions */}
-                  <TableCell className="text-right py-3">
+                  <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
@@ -559,35 +727,7 @@ export function AdminEmployeesView() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={() => setCredentialsTarget(emp)}>
-                          <KeyRound className="h-4 w-4 mr-2 text-[#00D4FF]" />
-                          Générer nouveau mot de passe
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setReassignTarget(emp)}>
-                          <Store className="h-4 w-4 mr-2 text-violet-400" />
-                          Réassigner à une boutique
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setRoleToggleTarget(emp)}>
-                          <UserCog className="h-4 w-4 mr-2 text-amber-400" />
-                          {emp.role === "employee" ? "Promouvoir → Propriétaire" : "Rétrograder → Employé"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {isLocked ? (
-                          <DropdownMenuItem onClick={() => lockUnlockEmployee.mutate({ userId: emp.member_user_id, lock: false })}>
-                            <Unlock className="h-4 w-4 mr-2 text-emerald-500" /> Activer le compte
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem onClick={() => lockUnlockEmployee.mutate({ userId: emp.member_user_id, lock: true })}>
-                            <Lock className="h-4 w-4 mr-2 text-orange-500" /> Suspendre le compte
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-red-400 focus:text-red-400 focus:bg-red-500/10"
-                          onClick={() => setDeleteTarget(emp)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" /> Supprimer l'employé
-                        </DropdownMenuItem>
+                        {renderActionItems(emp)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -642,6 +782,17 @@ export function AdminEmployeesView() {
         </div>
       )}
 
+      {/* ── Detail Sheet ── */}
+      <AdminEmployeeDetailSheet
+        employee={detailTarget}
+        onClose={() => setDetailTarget(null)}
+        onCredentials={(e) => setCredentialsTarget(e)}
+        onReassign={(e) => setReassignTarget(e)}
+        onRoleToggle={(e) => setRoleToggleTarget(e)}
+        onLockToggle={(e) => lockUnlockEmployee.mutate({ userId: e.member_user_id, lock: !e.is_locked })}
+        onDelete={(e) => setDeleteTarget(e)}
+      />
+
       {/* ── Modals ── */}
       {credentialsTarget && (
         <GenerateCredentialsModal
@@ -667,11 +818,12 @@ export function AdminEmployeesView() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cet employé ?</AlertDialogTitle>
+            <AlertDialogTitle>Wipe total de cet employé ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action supprimera définitivement le compte de{" "}
-              <strong>{deleteTarget?.full_name || deleteTarget?.username}</strong> et retirera
-              son accès à la boutique <strong>{deleteTarget?.shop_name}</strong>. Irréversible.
+              Cette action <strong>efface complètement</strong> le compte de{" "}
+              <strong>{deleteTarget?.full_name || deleteTarget?.username}</strong> : identifiants de connexion,
+              rôles, appartenances d'équipe, transactions, préférences et notifications. Aucune trace ne subsistera.
+              Il perdra tout accès à la boutique <strong>{deleteTarget?.shop_name}</strong>. Irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -687,7 +839,7 @@ export function AdminEmployeesView() {
                 }
               }}
             >
-              {deleteEmployee.isPending ? "Suppression..." : "Supprimer"}
+              {deleteEmployee.isPending ? "Effacement..." : "Wipe total"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -742,4 +894,3 @@ export function AdminEmployeesView() {
     </div>
   );
 }
-

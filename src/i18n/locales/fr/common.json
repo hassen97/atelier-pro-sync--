@@ -1,0 +1,56 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "pos": "Point de Vente",
+    "repairs": "Réparations",
+    "inventory": "Stock",
+    "customers": "Clients",
+    "suppliers": "Fournisseurs",
+    "expenses": "Dépenses",
+    "debts": "Dettes Clients",
+    "invoices": "Factures",
+    "statistics": "Statistiques",
+    "profit": "Profit",
+    "warranty": "Garantie",
+    "settings": "Paramètres",
+    "feedback": "Signaler / Suggérer",
+    "community": "Entraide",
+    "messages": "Messages",
+    "team": "Équipe",
+    "services": "Services & Outils"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "add": "Ajouter",
+    "search": "Rechercher",
+    "loading": "Chargement...",
+    "all": "Tout",
+    "none": "Aucun",
+    "actions": "Actions",
+    "print": "Imprimer",
+    "export": "Exporter",
+    "back": "Retour",
+    "confirm": "Confirmer",
+    "close": "Fermer",
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "settings": {
+    "language": "Langue",
+    "brandColor": "Couleur de marque",
+    "uploadLogo": "Télécharger un logo",
+    "removeLogo": "Supprimer le logo"
+  },
+  "language": {
+    "title": "Choisissez votre langue",
+    "description": "Sélectionnez la langue d'affichage de l'application. Vous pourrez la changer à tout moment.",
+    "label": "Langue",
+    "fr": "Français",
+    "ar": "العربية",
+    "en": "English",
+    "confirm": "Continuer"
+  }
+}

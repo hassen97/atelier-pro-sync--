@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-const UPDATE_INTERVAL = 2 * 60 * 1000; // 2 minutes
+const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 export function usePresence(userId: string | undefined) {
   const lastUpdate = useRef<number>(0);
@@ -11,8 +11,8 @@ export function usePresence(userId: string | undefined) {
 
     const updatePresence = async () => {
       const now = Date.now();
-      // Throttle: skip if updated less than 30s ago
-      if (now - lastUpdate.current < 30000) return;
+      // Throttle: skip if updated less than 2 min ago
+      if (now - lastUpdate.current < 120000) return;
       lastUpdate.current = now;
 
       await supabase
