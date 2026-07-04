@@ -80,6 +80,7 @@ const Services = lazyWithRetry(() => import("./pages/Services"));
 const Vault = lazyWithRetry(() => import("./pages/Vault"));
 const PanicAnalyzer = lazyWithRetry(() => import("./pages/PanicAnalyzer"));
 const Referrals = lazyWithRetry(() => import("./pages/Referrals"));
+const OAuthConsent = lazyWithRetry(() => import("./pages/OAuthConsent"));
 
 
 const queryClient = new QueryClient({
@@ -121,6 +122,9 @@ const App = () => (
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/landing" element={<LandingPage />} />
                 <Route path="/checkout" element={<Checkout />} />
+
+                {/* OAuth consent screen for MCP / external agent integrations */}
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 
                 {/* Onboarding route - standalone layout */}
                 <Route path="/onboarding/setup" element={
