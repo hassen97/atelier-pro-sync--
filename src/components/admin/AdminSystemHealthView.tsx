@@ -13,6 +13,7 @@ import {
   useHealthLastCheck,
   useHealthAlertHistory,
   type HealthAlertSettings,
+  type HealthAlertLogRow,
 } from "@/hooks/useSystemHealth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
