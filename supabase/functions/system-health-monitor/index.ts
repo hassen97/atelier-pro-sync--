@@ -63,6 +63,16 @@ serve(async (req) => {
       return jsonResp({ error: "Unauthorized" }, 401);
     }
 
+    // ── Heartbeat: record that a check ran, on EVERY authorized run ──
+    // Separate from health_alert_last_sent_at (which only tracks real sends).
+    // This is the primary "is the cron alive?" signal for the dashboard.
+    await admin
+      .from("platform_settings")
+      .upsert(
+        { key: "health_last_check_at", value: new Date().toISOString() },
+        { onConflict: "key" },
+      );
+
     // ── Load settings ──
     const { data: rows } = await admin
       .from("platform_settings")
@@ -72,8 +82,19 @@ serve(async (req) => {
 
     const enabled = settings["health_alerts_enabled"] === "true";
     if (!enabled && !isTest) {
+      // Still log a heartbeat row so the history proves the monitor is alive.
+      await admin.from("health_alert_log").insert({
+        is_test: false,
+        had_issues: false,
+        slow_count: 0,
+        bloat_count: 0,
+        webhook_sent: false,
+        email_queued: false,
+        summary: "Vérification exécutée — alertes désactivées.",
+      });
       return jsonResp({ ok: true, skipped: "alerts_disabled" });
     }
+
 
     const slowThreshold = Number(settings["health_slow_query_threshold_s"] || 5);
     const bloatRatio = Number(settings["health_bloat_ratio_threshold"] || 30);
