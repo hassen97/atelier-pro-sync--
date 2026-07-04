@@ -48,6 +48,10 @@ import {
   Wrench,
   Save,
   Webhook,
+  Clock,
+  CheckCircle2,
+  WifiOff,
+  History,
 } from "lucide-react";
 import {
   BarChart,
@@ -60,7 +64,25 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 
-const BLOAT_THRESHOLD = 20; // %
+// Fallback thresholds used only until the admin-configured alert settings load.
+const FALLBACK_BLOAT_RATIO = 30; // %
+const FALLBACK_SLOW_THRESHOLD_S = 5;
+const FALLBACK_MIN_SIZE_MB = 50;
+const CHECK_INTERVAL_MIN = 5; // cron runs every 5 minutes
+const STALE_AFTER_MIN = 10; // two missed cycles => monitoring likely stopped
+
+function formatAgo(iso: string | null): { text: string; minutes: number | null } {
+  if (!iso) return { text: "jamais", minutes: null };
+  const ms = Date.now() - new Date(iso).getTime();
+  if (isNaN(ms)) return { text: "inconnu", minutes: null };
+  const mins = Math.max(0, Math.floor(ms / 60000));
+  if (mins < 1) return { text: "à l'instant", minutes: 0 };
+  if (mins === 1) return { text: "il y a 1 min", minutes: 1 };
+  if (mins < 60) return { text: `il y a ${mins} min`, minutes: mins };
+  const h = Math.floor(mins / 60);
+  return { text: `il y a ${h} h`, minutes: mins };
+}
+
 
 function shortTableName(full: string) {
   // "public.products" -> "products" (keep non-public schema prefix for clarity)
