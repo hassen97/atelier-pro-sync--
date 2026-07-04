@@ -579,6 +579,42 @@ export type Database = {
         }
         Relationships: []
       }
+      health_alert_log: {
+        Row: {
+          bloat_count: number
+          created_at: string
+          email_queued: boolean
+          had_issues: boolean
+          id: string
+          is_test: boolean
+          slow_count: number
+          summary: string | null
+          webhook_sent: boolean
+        }
+        Insert: {
+          bloat_count?: number
+          created_at?: string
+          email_queued?: boolean
+          had_issues?: boolean
+          id?: string
+          is_test?: boolean
+          slow_count?: number
+          summary?: string | null
+          webhook_sent?: boolean
+        }
+        Update: {
+          bloat_count?: number
+          created_at?: string
+          email_queued?: boolean
+          had_issues?: boolean
+          id?: string
+          is_test?: boolean
+          slow_count?: number
+          summary?: string | null
+          webhook_sent?: boolean
+        }
+        Relationships: []
+      }
       inventory_access_codes: {
         Row: {
           code: string
