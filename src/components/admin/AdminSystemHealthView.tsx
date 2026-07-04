@@ -201,7 +201,72 @@ export function AdminSystemHealthView() {
         </div>
       </div>
 
+      {/* Monitoring status strip — primary "is the automation alive?" signal */}
+      <div
+        className={cn(
+          "rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6",
+          isStale
+            ? "border-red-500/30 bg-red-500/[0.06]"
+            : "border-emerald-500/20 bg-emerald-500/[0.04]",
+        )}
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex h-2.5 w-2.5">
+            {!isStale && (
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+            )}
+            <span
+              className={cn(
+                "relative inline-flex rounded-full h-2.5 w-2.5",
+                isStale ? "bg-red-500" : "bg-emerald-400",
+              )}
+            />
+          </span>
+          <span
+            className={cn(
+              "text-sm font-semibold",
+              isStale ? "text-red-300" : "text-emerald-300",
+            )}
+          >
+            {isStale ? "Surveillance possiblement arrêtée" : "Surveillance active"}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs">
+          <span className="flex items-center gap-1.5 text-slate-400">
+            <Clock className="h-3.5 w-3.5" />
+            {lastCheck.isLoading ? (
+              <span className="text-slate-500">Chargement…</span>
+            ) : (
+              <>
+                Dernière vérification :{" "}
+                <span className={cn("font-medium", isStale ? "text-red-300" : "text-slate-200")}>
+                  {lastCheckAgo.text}
+                </span>
+              </>
+            )}
+          </span>
+          {!isStale && (
+            <span className="flex items-center gap-1.5 text-slate-400">
+              <Timer className="h-3.5 w-3.5" />
+              Prochaine prévue : ~
+              <span className="font-medium text-slate-200">
+                {nextCheckMin === null ? "?" : `${nextCheckMin} min`}
+              </span>
+            </span>
+          )}
+        </div>
+
+        {isStale && (
+          <div className="sm:ml-auto flex items-center gap-1.5 text-[11px] text-red-300/90">
+            <WifiOff className="h-3.5 w-3.5" />
+            Aucune vérification depuis plus de {STALE_AFTER_MIN} min
+          </div>
+        )}
+      </div>
+
       {/* Metric cards */}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {conns.isLoading ? (
           <CardSkeleton />
