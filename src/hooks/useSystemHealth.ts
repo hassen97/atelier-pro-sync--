@@ -251,6 +251,66 @@ export function useTestHealthAlert() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Monitoring heartbeat + alert history
+// ─────────────────────────────────────────────────────────────
+
+/** Timestamp of the last time the health monitor ran (any outcome). */
+export function useHealthLastCheck() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["system-health", "last-check"],
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "health_last_check_at")
+        .maybeSingle();
+      if (error) throw error;
+      return data?.value ?? null;
+    },
+    enabled: !!user,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
+}
+
+export interface HealthAlertLogRow {
+  id: string;
+  created_at: string;
+  is_test: boolean;
+  had_issues: boolean;
+  slow_count: number;
+  bloat_count: number;
+  webhook_sent: boolean;
+  email_queued: boolean;
+  summary: string | null;
+}
+
+/** Last 20 health-monitor runs, newest first. */
+export function useHealthAlertHistory() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["system-health", "alert-history"],
+    queryFn: async (): Promise<HealthAlertLogRow[]> => {
+      const { data, error } = await supabase
+        .from("health_alert_log")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return (data ?? []) as HealthAlertLogRow[];
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+}
+
+
+
+// ─────────────────────────────────────────────────────────────
 // Manual emergency maintenance (VACUUM / ANALYZE)
 // ─────────────────────────────────────────────────────────────
 
