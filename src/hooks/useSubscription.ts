@@ -218,6 +218,103 @@ export function useAdminSetSubscription() {
   });
 }
 
+export interface AdjustResult {
+  newExpiresAt: string | null;
+  planId: string;
+  wasUnlimited: boolean;
+}
+
+/**
+ * Admin (God Mode): add / remove / gift months on a shop's CURRENT subscription
+ * without changing the plan. Shifts expires_at relative to the current expiry
+ * (or now if already expired). Returns the new expiry so callers can notify.
+ */
+export function useAdminAdjustSubscriptionMonths() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      months,
+    }: {
+      userId: string;
+      months: number;
+    }): Promise<AdjustResult> => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Find the current active/trialing subscription for this shop
+      const { data: sub, error: subErr } = await supabase
+        .from("shop_subscriptions")
+        .select("id, plan_id, expires_at, status")
+        .eq("user_id", userId)
+        .in("status", ["active", "trialing"])
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (subErr) throw subErr;
+      if (!sub) {
+        throw new Error("Aucun abonnement actif à ajuster. Attribuez d'abord un plan.");
+      }
+
+      // Unlimited (no expiry) subscriptions can't be shifted by months
+      if (sub.expires_at === null) {
+        return { newExpiresAt: null, planId: sub.plan_id, wasUnlimited: true };
+      }
+
+      const now = new Date();
+      const current = new Date(sub.expires_at);
+      // Base date: current expiry if still in the future, otherwise now
+      const base = current.getTime() > now.getTime() ? current : now;
+      const next = new Date(base);
+      next.setMonth(next.getMonth() + months);
+      // Never set the expiry in the past
+      if (next.getTime() < now.getTime()) {
+        next.setTime(now.getTime());
+      }
+
+      const { error: updErr } = await supabase
+        .from("shop_subscriptions")
+        .update({
+          expires_at: next.toISOString(),
+          status: "active",
+          set_by_admin: user?.id,
+        })
+        .eq("id", sub.id);
+      if (updErr) throw updErr;
+
+      return { newExpiresAt: next.toISOString(), planId: sub.plan_id, wasUnlimited: false };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-data"] });
+      qc.invalidateQueries({ queryKey: ["admin-shop-subscriptions"] });
+    },
+  });
+}
+
+/** Admin (God Mode): notify a shop owner of a subscription bonus (in-app + push + email) */
+export function useNotifySubscriptionBonus() {
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      months,
+      newExpiresAt,
+      customMessage,
+    }: {
+      userId: string;
+      months: number;
+      newExpiresAt: string | null;
+      customMessage?: string;
+    }) => {
+      const { data, error } = await supabase.functions.invoke("notify-subscription-bonus", {
+        body: { userId, months, newExpiresAt, customMessage },
+      });
+      if (error) throw error;
+      return data as { channels: { inApp: boolean; push: number; email: boolean } };
+    },
+  });
+}
+
+
+
 /** Load current subscriptions for all shops (admin) */
 export function useAdminShopSubscriptions() {
   return useQuery({
