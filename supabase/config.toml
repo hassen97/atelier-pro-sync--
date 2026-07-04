@@ -13,3 +13,5 @@ project_id = "rgikflkocotkljbajzrb"
     verify_jwt = false
   [functions.demo-provision]
     verify_jwt = false
+  [functions.mcp]
+    verify_jwt = false
