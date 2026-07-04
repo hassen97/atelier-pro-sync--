@@ -130,6 +130,17 @@ serve(async (req) => {
           !isNaN(lastMs) &&
           Date.now() - lastMs < COOLDOWN_MINUTES * 60 * 1000
         ) {
+          await admin.from("health_alert_log").insert({
+            is_test: false,
+            had_issues: hasIssues,
+            slow_count: slowQueries.length,
+            bloat_count: bloatedTables.length,
+            webhook_sent: false,
+            email_queued: false,
+            summary: hasIssues
+              ? "Problème(s) détecté(s) — alerte en cooldown (déjà notifiée)."
+              : "Vérification exécutée — aucun problème.",
+          });
           return jsonResp({
             ok: true,
             skipped: "cooldown",
@@ -140,8 +151,18 @@ serve(async (req) => {
     }
 
     if (!hasIssues && !isTest) {
+      await admin.from("health_alert_log").insert({
+        is_test: false,
+        had_issues: false,
+        slow_count: 0,
+        bloat_count: 0,
+        webhook_sent: false,
+        email_queued: false,
+        summary: "Vérification exécutée — aucun problème détecté. ✅",
+      });
       return jsonResp({ ok: true, hasIssues: false });
     }
+
 
     // ── Build alert payload ──
     const summaryLines: string[] = [];
