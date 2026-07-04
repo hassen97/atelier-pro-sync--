@@ -122,6 +122,9 @@ const App = () => (
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/landing" element={<LandingPage />} />
                 <Route path="/checkout" element={<Checkout />} />
+
+                {/* OAuth consent screen for MCP / external agent integrations */}
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 
                 {/* Onboarding route - standalone layout */}
                 <Route path="/onboarding/setup" element={
