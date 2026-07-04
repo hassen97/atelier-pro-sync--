@@ -426,7 +426,9 @@ export function AdminSystemHealthView() {
               </thead>
               <tbody>
                 {tables.map((t) => {
-                  const bloated = Number(t.dead_ratio) > BLOAT_THRESHOLD;
+                  const bloated =
+                    Number(t.dead_ratio) > cfgBloatRatio &&
+                    Number(t.total_size_mb) >= cfgMinSizeMb;
                   return (
                     <tr
                       key={t.table_name}
