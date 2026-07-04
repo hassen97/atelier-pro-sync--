@@ -256,7 +256,19 @@ serve(async (req) => {
         .eq("key", "health_alert_last_sent_at");
     }
 
+    // ── Record this run in the alert history log ──
+    await admin.from("health_alert_log").insert({
+      is_test: isTest,
+      had_issues: hasIssues,
+      slow_count: slowQueries.length,
+      bloat_count: bloatedTables.length,
+      webhook_sent: result.webhookSent === true,
+      email_queued: result.emailQueued === true,
+      summary: summaryText,
+    });
+
     return jsonResp(result);
+
   } catch (e) {
     return jsonResp({ error: String((e as Error)?.message ?? e) }, 500);
   }
