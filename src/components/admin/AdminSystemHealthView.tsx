@@ -10,8 +10,11 @@ import {
   useSaveHealthAlertSettings,
   useTestHealthAlert,
   useRunMaintenance,
+  useHealthLastCheck,
+  useHealthAlertHistory,
   type HealthAlertSettings,
 } from "@/hooks/useSystemHealth";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
