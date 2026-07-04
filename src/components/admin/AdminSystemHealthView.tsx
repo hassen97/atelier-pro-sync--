@@ -102,6 +102,8 @@ export function AdminSystemHealthView() {
   const saveAlerts = useSaveHealthAlertSettings();
   const testAlert = useTestHealthAlert();
   const runMaintenance = useRunMaintenance();
+  const lastCheck = useHealthLastCheck();
+  const history = useHealthAlertHistory();
 
   // Local editable copy of the alert settings form
   const [form, setForm] = useState<HealthAlertSettings | null>(null);
@@ -114,31 +116,64 @@ export function AdminSystemHealthView() {
     { table: string; mode: "vacuum_analyze" | "analyze" } | null
   >(null);
 
+  // ── Aligned thresholds: read from the same saved alert settings the
+  // background monitor uses, so the summary badge and the alert engine
+  // never disagree about what counts as a problem. ──
+  const cfgBloatRatio = alertSettings.data?.bloatRatio ?? FALLBACK_BLOAT_RATIO;
+  const cfgSlowThreshold =
+    alertSettings.data?.slowThresholdS ?? FALLBACK_SLOW_THRESHOLD_S;
+  const cfgMinSizeMb = alertSettings.data?.minSizeMb ?? FALLBACK_MIN_SIZE_MB;
+
   const tables = sizes.data ?? [];
   const totalSizeMb = tables.reduce((sum, t) => sum + Number(t.total_size_mb || 0), 0);
   const slowCount = slow.data?.length ?? 0;
   const totalConns = conns.data?.total ?? 0;
-  const bloatedCount = tables.filter((t) => Number(t.dead_ratio) > BLOAT_THRESHOLD).length;
+  // Matches detect_health_issues: bloat ratio AND minimum size both exceeded.
+  const bloatedCount = tables.filter(
+    (t) =>
+      Number(t.dead_ratio) > cfgBloatRatio &&
+      Number(t.total_size_mb) >= cfgMinSizeMb,
+  ).length;
+  // Matches the alert engine's slow-query threshold (not just the > 1s list).
+  const slowCriticalCount = (slow.data ?? []).filter(
+    (q) => Number(q.duration_seconds) >= cfgSlowThreshold,
+  ).length;
 
-  // Derived system status
+  // Monitoring heartbeat
+  const lastCheckAgo = formatAgo(lastCheck.data ?? null);
+  const isStale =
+    lastCheckAgo.minutes === null || lastCheckAgo.minutes > STALE_AFTER_MIN;
+  const nextCheckMin =
+    lastCheckAgo.minutes === null
+      ? null
+      : Math.max(0, CHECK_INTERVAL_MIN - (lastCheckAgo.minutes % CHECK_INTERVAL_MIN));
+
+  // Derived system status — aligned with the configured alert thresholds.
   let status: { label: string; color: "green" | "amber" | "red"; sub: string } = {
     label: "Sain",
     color: "green",
     sub: "Tous les indicateurs sont normaux",
   };
-  if (slowCount > 0 || totalConns > 80 || totalSizeMb > 5000) {
+  if (slowCriticalCount > 0 || bloatedCount > 0) {
     status = {
       label: "Critique",
       color: "red",
-      sub: slowCount > 0 ? `${slowCount} requête(s) lente(s)` : "Charge élevée détectée",
+      sub:
+        slowCriticalCount > 0
+          ? `${slowCriticalCount} requête(s) lente(s) (> ${cfgSlowThreshold}s)`
+          : `${bloatedCount} table(s) avec bloat élevé (> ${cfgBloatRatio}%)`,
     };
-  } else if (bloatedCount > 0 || totalConns > 50 || totalSizeMb > 2000) {
+  } else if (slowCount > 0 || totalConns > 80) {
     status = {
       label: "Attention",
       color: "amber",
-      sub: bloatedCount > 0 ? `${bloatedCount} table(s) avec bloat élevé` : "Surveillance recommandée",
+      sub:
+        slowCount > 0
+          ? `${slowCount} requête(s) lente(s) (< seuil d'alerte)`
+          : "Charge de connexions élevée",
     };
   }
+
 
   const top5 = [...tables]
     .sort((a, b) => Number(b.total_size_mb) - Number(a.total_size_mb))
