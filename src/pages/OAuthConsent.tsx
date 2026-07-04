@@ -12,6 +12,8 @@ type OAuthApi = {
   denyAuthorization: (id: string) => Promise<{ data: any; error: any }>;
 };
 
+const CANONICAL_OAUTH_ORIGIN = "https://atelier-pro-syncc.lovable.app";
+
 function oauthApi(): OAuthApi {
   return (supabase.auth as unknown as { oauth: OAuthApi }).oauth;
 }
@@ -40,6 +42,13 @@ export default function OAuthConsent() {
       const { data, error } = await oauthApi().getAuthorizationDetails(authorizationId);
       if (!active) return;
       if (error) {
+        if (
+          String(error.message ?? "").toLowerCase().includes("unauthorized request origin") &&
+          window.location.origin !== CANONICAL_OAUTH_ORIGIN
+        ) {
+          window.location.href = `${CANONICAL_OAUTH_ORIGIN}${window.location.pathname}${window.location.search}`;
+          return;
+        }
         setError(error.message);
         return;
       }
