@@ -752,3 +752,97 @@ function CardError({ label }: { label: string }) {
     </div>
   );
 }
+
+function HealthAlertHistory({
+  history,
+}: {
+  history: {
+    data?: HealthAlertLogRow[];
+    isLoading: boolean;
+    isError: boolean;
+  };
+}) {
+  if (history.isLoading) {
+    return (
+      <div className="py-6 flex justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+      </div>
+    );
+  }
+  if (history.isError) {
+    return (
+      <p className="text-sm text-red-400 py-4">
+        Historique indisponible.
+      </p>
+    );
+  }
+  const rows = history.data ?? [];
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-slate-500 py-4">
+        Aucune vérification enregistrée pour le moment. La première apparaîtra
+        après le prochain cycle automatique.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {rows.map((r) => {
+        const when = new Date(r.created_at).toLocaleString("fr-FR", {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const channels: string[] = [];
+        if (r.webhook_sent) channels.push("webhook");
+        if (r.email_queued) channels.push("e-mail");
+        return (
+          <div
+            key={r.id}
+            className={cn(
+              "rounded-lg border p-3 flex items-start gap-3",
+              r.had_issues
+                ? "border-amber-500/25 bg-amber-500/[0.04]"
+                : "border-white/[0.06] bg-white/[0.02]",
+            )}
+          >
+            {r.had_issues ? (
+              <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-slate-200">
+                  {when}
+                  {r.is_test && (
+                    <span className="ml-2 text-[10px] uppercase tracking-wide text-slate-500">
+                      test
+                    </span>
+                  )}
+                </span>
+                {channels.length > 0 && (
+                  <span className="text-[10px] text-[#00D4FF] shrink-0">
+                    {channels.join(" · ")}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-2 whitespace-pre-wrap">
+                {r.summary || "Vérification exécutée."}
+              </p>
+              {r.had_issues && (
+                <p className="text-[10px] text-amber-400/80 mt-1">
+                  {r.slow_count} requête(s) lente(s) · {r.bloat_count} table(s)
+                  en bloat
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
