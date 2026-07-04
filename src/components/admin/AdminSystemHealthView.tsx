@@ -400,7 +400,7 @@ export function AdminSystemHealthView() {
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle className="h-4 w-4 text-slate-400" />
           <h3 className="text-sm font-semibold text-white">
-            Tables &amp; bloat ({">"} {BLOAT_THRESHOLD}% surligné)
+            Tables &amp; bloat ({">"} {cfgBloatRatio}% surligné)
           </h3>
         </div>
         {sizes.isLoading ? (
