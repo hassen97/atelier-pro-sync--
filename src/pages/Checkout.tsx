@@ -367,6 +367,47 @@ export default function Checkout() {
               </Badge>
             ))}
           </div>
+
+          {/* Promo code */}
+          <div className="mt-5 pt-4" style={{ borderTop: "1px solid hsla(0, 0%, 100%, 0.06)" }}>
+            {appliedPromo && discountAmount > 0 ? (
+              <div className="flex items-center justify-between rounded-lg px-3 py-2.5"
+                   style={{ background: "hsla(142, 71%, 45%, 0.1)", border: "1px solid hsla(142, 71%, 45%, 0.25)" }}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Ticket className="h-4 w-4 shrink-0" style={{ color: "hsl(142 71% 55%)" }} />
+                  <span className="text-sm font-medium truncate" style={{ color: "hsl(142 71% 70%)" }}>
+                    {appliedPromo.code} · −{discountAmount} {plan.currency}
+                  </span>
+                </div>
+                <button onClick={clearPromo} className="shrink-0 p-1 rounded hover:bg-white/10" aria-label="Retirer le code">
+                  <X className="h-4 w-4" style={{ color: "hsl(240 5% 60%)" }} />
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="flex gap-2">
+                  <Input
+                    value={promoInput}
+                    onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyPromo(); } }}
+                    placeholder="Code promo"
+                    className="uppercase"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => applyPromo()}
+                    disabled={promoChecking || !promoInput.trim()}
+                  >
+                    {promoChecking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Appliquer"}
+                  </Button>
+                </div>
+                {promoError && (
+                  <p className="text-xs mt-2" style={{ color: "hsl(0 72% 60%)" }}>{promoError}</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Step 1: Select payment method */}
