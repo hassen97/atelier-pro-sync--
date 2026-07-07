@@ -463,7 +463,7 @@ export default function Checkout() {
               {gateway.config && Object.keys(gateway.config).length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-sm mb-4" style={{ color: "hsl(240 5% 55%)" }}>
-                    Effectuez votre paiement de <strong style={{ color: "hsl(217 91% 60%)" }}>{plan.price} {plan.currency}</strong> en utilisant les informations suivantes :
+                    Effectuez votre paiement de <strong style={{ color: "hsl(217 91% 60%)" }}>{finalPrice} {plan.currency}</strong> en utilisant les informations suivantes :
                   </p>
                   {Object.entries(gateway.config).filter(([_, v]) => v).map(([key, value]) => (
                     <div key={key} className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid hsla(0, 0%, 100%, 0.05)" }}>
