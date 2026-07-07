@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Wrench, Lock, AtSign, Phone, Mail, MessageCircle, Store, UserCog, User, AlertCircle, CheckCircle, Globe } from "lucide-react";
+import { Loader2, Wrench, Lock, AtSign, Phone, Mail, MessageCircle, Store, UserCog, User, AlertCircle, CheckCircle, Globe, Ticket, Gift } from "lucide-react";
 import { countries, currencies, getCurrencyForCountry } from "@/data/countries";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
