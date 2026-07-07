@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   ArrowLeft, Check, Upload, Loader2, Smartphone, CreditCard,
-  Landmark, Globe, Bitcoin, Image, ChevronRight, Clock, Zap, Camera
+  Landmark, Globe, Bitcoin, Image, ChevronRight, Clock, Zap, Camera, Ticket, X
 } from "lucide-react";
 import { ProofPickerSheet } from "@/components/ui/ProofPickerSheet";
 
@@ -44,8 +44,90 @@ export default function Checkout() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Promo code state
+  const [promoInput, setPromoInput] = useState("");
+  const [promoChecking, setPromoChecking] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{
+    id: string;
+    code: string;
+    discount_type: "percent" | "fixed";
+    discount_value: number;
+  } | null>(null);
+
   const plan = plans?.find(p => p.id === planId);
   const gateway = gateways?.find(g => g.gateway_key === selectedGateway);
+
+  const discountAmount = (() => {
+    if (!plan || !appliedPromo) return 0;
+    const raw = appliedPromo.discount_type === "percent"
+      ? (plan.price * appliedPromo.discount_value) / 100
+      : appliedPromo.discount_value;
+    return Math.min(plan.price, Math.max(0, Math.round(raw * 100) / 100));
+  })();
+  const finalPrice = plan ? Math.max(0, Math.round((plan.price - discountAmount) * 100) / 100) : 0;
+
+  const promoReasons: Record<string, string> = {
+    not_found: "Code promo introuvable.",
+    inactive: "Ce code promo n'est plus actif.",
+    expired: "Ce code promo a expiré.",
+    max_uses_reached: "Ce code promo a atteint sa limite d'utilisation.",
+    already_used: "Vous avez déjà utilisé ce code promo.",
+    empty: "Veuillez saisir un code.",
+  };
+
+  const applyPromo = async (raw?: string) => {
+    const code = (raw ?? promoInput).trim();
+    if (!code) return;
+    setPromoChecking(true);
+    setPromoError(null);
+    try {
+      const res = await validatePromoCode(code);
+      if (res.valid && res.promo_code_id) {
+        setAppliedPromo({
+          id: res.promo_code_id,
+          code: res.code || code.toUpperCase(),
+          discount_type: res.discount_type!,
+          discount_value: Number(res.discount_value),
+        });
+        setPromoInput(res.code || code.toUpperCase());
+      } else {
+        setAppliedPromo(null);
+        setPromoError(promoReasons[res.reason] || "Code promo invalide.");
+      }
+    } catch {
+      setPromoError("Impossible de vérifier le code pour l'instant.");
+    } finally {
+      setPromoChecking(false);
+    }
+  };
+
+  const clearPromo = () => {
+    setAppliedPromo(null);
+    setPromoInput("");
+    setPromoError(null);
+  };
+
+  // Prefill promo code saved at signup (auto-apply if still valid)
+  useEffect(() => {
+    if (!user || appliedPromo || promoInput) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("pending_promo_code")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const saved = (data as any)?.pending_promo_code as string | null;
+      if (!cancelled && saved) {
+        setPromoInput(saved);
+        applyPromo(saved);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
 
   const handleStartTrial = async () => {
     if (!user) return;
