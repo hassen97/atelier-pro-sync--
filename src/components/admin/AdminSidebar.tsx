@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Store, Megaphone, MessageSquare, LogOut, KeyRound,
   Settings, Users, CreditCard, Tags, ClipboardList, Shield,
-  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox, HeartPulse, Rocket,
+  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox, HeartPulse, Rocket, Ticket,
 } from "lucide-react";
 import { usePendingServiceRequestCount } from "@/hooks/useAdminServiceRequests";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
-  | "settings" | "employees" | "plans" | "gateways" | "feature_flags"
+  | "settings" | "employees" | "plans" | "promo_codes" | "gateways" | "feature_flags"
   | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
   | "services_catalog" | "services_requests" | "system_health" | "growth_engine";
 
@@ -44,6 +44,7 @@ const navSections: { label: string; items: NavItem[] }[] = [
     label: "Commercial",
     items: [
       { id: "plans",         label: "Tarifs & Plans", icon: Tags },
+      { id: "promo_codes",   label: "Codes promo",    icon: Ticket },
       { id: "orders",        label: "Commandes",      icon: ClipboardList },
       { id: "gateways",      label: "Paiements",      icon: CreditCard },
       { id: "growth_engine", label: "Growth Engine",  icon: Rocket, badge: "Nouveau" },
