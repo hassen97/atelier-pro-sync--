@@ -115,9 +115,29 @@ export default function Auth() {
       setAuthTab("register");
       setLoginRole("owner");
     }
+    // Prefill promo code from ?promo=
+    const promo = params.get("promo");
+    if (promo) {
+      setRegisterPromo(promo.toUpperCase());
+      setAuthTab("register");
+      setLoginRole("owner");
+    }
+    // First-visit 7-day trial offer: valid only if the countdown is still live
+    const trial = params.get("trial");
+    if (trial === "7") {
+      const startRaw = localStorage.getItem("rp_trial_offer_start");
+      const start = startRaw ? Number(startRaw) : NaN;
+      const stillLive = Number.isFinite(start) && Date.now() - start < 24 * 60 * 60 * 1000;
+      if (stillLive) {
+        setTrialOffer(true);
+        setAuthTab("register");
+        setLoginRole("owner");
+      }
+    }
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   // Redirect already-authenticated users — but NOT while the blueprint loader
   // is playing, so the owner login animation can finish before we navigate.
