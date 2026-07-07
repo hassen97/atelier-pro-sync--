@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, Link, useNavigate, Navigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePublicPlans } from "@/hooks/useSubscriptionPlans";
@@ -6,6 +6,8 @@ import { useEnabledGateways, useCreateOrder } from "@/hooks/useCheckout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { validatePromoCode } from "@/hooks/usePromoCodes";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
