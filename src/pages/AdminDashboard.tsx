@@ -12,6 +12,7 @@ import { AdminResetRequests } from "@/components/admin/AdminResetRequests";
 import { AdminSettingsView } from "@/components/admin/AdminSettingsView";
 import { AdminEmployeesView } from "@/components/admin/AdminEmployeesView";
 import { AdminPlansView } from "@/components/admin/AdminPlansView";
+import { AdminPromoCodesView } from "@/components/admin/AdminPromoCodesView";
 import { AdminPaymentGatewaysView } from "@/components/admin/AdminPaymentGatewaysView";
 import { AdminFeatureFlagsView } from "@/components/admin/AdminFeatureFlagsView";
 import { AdminWaitlistView } from "@/components/admin/AdminWaitlistView";
@@ -31,7 +32,7 @@ import { cn } from "@/lib/utils";
 
 type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
-  | "settings" | "employees" | "plans" | "gateways" | "feature_flags"
+  | "settings" | "employees" | "plans" | "promo_codes" | "gateways" | "feature_flags"
   | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
   | "services_catalog" | "services_requests" | "system_health" | "growth_engine";
 
@@ -41,6 +42,7 @@ const viewLabels: Record<AdminView, string> = {
   employees:       "Employes",
   waitlist:        "Liste d'attente",
   plans:           "Tarifs & Plans",
+  promo_codes:     "Codes promo",
   gateways:        "Paiements",
   orders:          "Commandes",
   reset_requests:  "Demandes",
@@ -230,6 +232,7 @@ const AdminDashboard = () => {
             {activeView === "settings"        && <AdminSettingsView />}
             {activeView === "employees"       && <AdminEmployeesView />}
             {activeView === "plans"           && <AdminPlansView />}
+            {activeView === "promo_codes"     && <AdminPromoCodesView />}
             {activeView === "gateways"        && <AdminPaymentGatewaysView />}
             {activeView === "feature_flags"   && <AdminFeatureFlagsView />}
             {activeView === "waitlist"        && <AdminWaitlistView />}
