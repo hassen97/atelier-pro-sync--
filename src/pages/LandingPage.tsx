@@ -16,6 +16,7 @@ import { SEO } from "@/components/seo/SEO";
 import { getUpdateStatus, applyUpdateNow } from "@/lib/swUpdate";
 import { UpdateCheckOverlay } from "@/components/landing/UpdateCheckOverlay";
 import repairProLogo from "@/assets/repairpro-logo.png";
+import { TrialCountdownBanner } from "@/components/landing/TrialCountdownBanner";
 
 
 /* ── animation variants ── */
