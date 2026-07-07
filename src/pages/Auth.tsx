@@ -41,6 +41,8 @@ export default function Auth() {
   const [useSameWhatsapp, setUseSameWhatsapp] = useState(true);
   const [registerWhatsapp, setRegisterWhatsapp] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPromo, setRegisterPromo] = useState("");
+  const [trialOffer, setTrialOffer] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
