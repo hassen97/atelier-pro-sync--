@@ -444,6 +444,68 @@ export default function Auth() {
         console.error("[Auth] referral capture error:", refErr);
       }
 
+      // Promo code capture (best-effort). Store on the profile so it auto-applies
+      // at checkout. Validation is server-side; invalid codes are silently skipped.
+      try {
+        const code = registerPromo.trim().toUpperCase();
+        if (code) {
+          const { data: res } = await supabase.rpc("validate_promo_code" as any, { _code: code });
+          if (res && (res as any).valid) {
+            const { data: { user: pu } } = await supabase.auth.getUser();
+            if (pu) {
+              await supabase
+                .from("profiles")
+                .update({ pending_promo_code: (res as any).code || code })
+                .eq("user_id", pu.id);
+            }
+          }
+        }
+      } catch (promoErr) {
+        console.error("[Auth] promo capture error:", promoErr);
+      }
+
+      // First-visit 7-day trial: grant while the just-created session is active.
+      try {
+        const startRaw = localStorage.getItem("rp_trial_offer_start");
+        const start = startRaw ? Number(startRaw) : NaN;
+        const stillLive = Number.isFinite(start) && Date.now() - start < 24 * 60 * 60 * 1000;
+        if (trialOffer && stillLive) {
+          const { data: { user: tu } } = await supabase.auth.getUser();
+          if (tu) {
+            // Pick the cheapest Pro plan (excluding Entreprise) for the trial
+            const { data: proPlan } = await supabase
+              .from("subscription_plans")
+              .select("id")
+              .ilike("name", "%Pro%")
+              .not("name", "ilike", "%Entreprise%")
+              .order("price", { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            if (proPlan?.id) {
+              const now = new Date();
+              const trialEnd = new Date(now);
+              trialEnd.setDate(trialEnd.getDate() + 7);
+              await supabase
+                .from("shop_subscriptions")
+                .update({ status: "canceled" })
+                .eq("user_id", tu.id);
+              await supabase.from("shop_subscriptions").insert({
+                user_id: tu.id,
+                plan_id: proPlan.id,
+                status: "trialing",
+                started_at: now.toISOString(),
+                expires_at: trialEnd.toISOString(),
+                trial_ends_at: trialEnd.toISOString(),
+              });
+              localStorage.removeItem("rp_trial_offer_start");
+            }
+          }
+        }
+      } catch (trialErr) {
+        console.error("[Auth] trial grant error:", trialErr);
+      }
+
+
       // Notify the platform admin (best-effort, never blocks)
       try {
         await supabase.functions.invoke("notify-admin-signup", {
