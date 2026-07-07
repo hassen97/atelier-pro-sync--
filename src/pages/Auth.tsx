@@ -523,7 +523,7 @@ export default function Auth() {
       await supabase.auth.signOut();
       setRegisterUsername(""); setRegisterPassword(""); setRegisterFullName("");
       setRegisterCountry("TN"); setRegisterCurrency("TND"); setConfirmPassword("");
-      setRegisterPhone(""); setUseSameWhatsapp(true); setRegisterWhatsapp(""); setRegisterEmail("");
+      setRegisterPhone(""); setUseSameWhatsapp(true); setRegisterWhatsapp(""); setRegisterEmail(""); setRegisterPromo("");
     }
 
     setLoading(false);
