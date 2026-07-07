@@ -343,9 +343,20 @@ export default function Checkout() {
               <p className="text-sm" style={{ color: "hsl(240 5% 50%)" }}>{plan.description}</p>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-bold" style={{ color: "hsl(217 91% 60%)" }}>
-                {plan.price} {plan.currency}
-              </span>
+              {appliedPromo && discountAmount > 0 ? (
+                <>
+                  <span className="text-sm line-through mr-2" style={{ color: "hsl(240 5% 45%)" }}>
+                    {plan.price} {plan.currency}
+                  </span>
+                  <span className="text-2xl font-bold" style={{ color: "hsl(142 71% 55%)" }}>
+                    {finalPrice} {plan.currency}
+                  </span>
+                </>
+              ) : (
+                <span className="text-2xl font-bold" style={{ color: "hsl(217 91% 60%)" }}>
+                  {plan.price} {plan.currency}
+                </span>
+              )}
               {plan.period && <span className="text-sm ml-1" style={{ color: "hsl(240 5% 45%)" }}>{plan.period}</span>}
             </div>
           </div>
