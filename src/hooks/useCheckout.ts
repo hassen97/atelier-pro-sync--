@@ -31,12 +31,16 @@ export function useCreateOrder() {
       amount,
       currency,
       proofFile,
+      promoCodeId,
+      discountApplied,
     }: {
       planId: string;
       gatewayKey: string;
       amount: number;
       currency: string;
       proofFile: File;
+      promoCodeId?: string | null;
+      discountApplied?: number;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -50,7 +54,7 @@ export function useCreateOrder() {
       if (uploadError) throw uploadError;
 
       // Create order
-      const { error: insertError } = await supabase
+      const { data: order, error: insertError } = await supabase
         .from("subscription_orders" as any)
         .insert({
           user_id: user.id,
@@ -59,8 +63,24 @@ export function useCreateOrder() {
           amount,
           currency,
           proof_url: filePath,
-        });
+        })
+        .select("id")
+        .single();
       if (insertError) throw insertError;
+
+      // Record promo redemption (best-effort, never blocks the order)
+      if (promoCodeId && order) {
+        try {
+          await supabase.from("promo_redemptions" as any).insert({
+            promo_code_id: promoCodeId,
+            user_id: user.id,
+            order_id: (order as any).id,
+            discount_applied: discountApplied ?? 0,
+          });
+        } catch (e) {
+          console.error("[useCreateOrder] promo redemption failed:", e);
+        }
+      }
 
       return { success: true };
     },
@@ -71,6 +91,7 @@ export function useCreateOrder() {
     onError: (err: any) => toast.error(err.message || "Erreur lors de l'envoi"),
   });
 }
+
 
 export function useMyOrders() {
   return useQuery({
