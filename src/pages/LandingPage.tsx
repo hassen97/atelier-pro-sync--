@@ -16,6 +16,7 @@ import { SEO } from "@/components/seo/SEO";
 import { getUpdateStatus, applyUpdateNow } from "@/lib/swUpdate";
 import { UpdateCheckOverlay } from "@/components/landing/UpdateCheckOverlay";
 import repairProLogo from "@/assets/repairpro-logo.png";
+import { TrialCountdownBanner } from "@/components/landing/TrialCountdownBanner";
 
 
 /* ── animation variants ── */
@@ -194,6 +195,9 @@ export default function LandingPage() {
           </motion.div>
         )}
       </nav>
+
+      {/* ─── First-visit trial offer ─── */}
+      {!user && <TrialCountdownBanner />}
 
       {/* ─── Hero ─── */}
       <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 overflow-hidden">

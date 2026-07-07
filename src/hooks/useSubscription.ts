@@ -166,6 +166,21 @@ export function useAdminReviewOrder() {
             set_by_admin: user?.id,
           });
         if (subErr) throw subErr;
+
+        // Count any promo code redeemed for this order (best-effort)
+        try {
+          const { data: redemption } = await supabase
+            .from("promo_redemptions" as any)
+            .select("promo_code_id")
+            .eq("order_id", orderId)
+            .maybeSingle();
+          const promoCodeId = (redemption as any)?.promo_code_id as string | undefined;
+          if (promoCodeId) {
+            await supabase.rpc("increment_promo_usage" as any, { _promo_code_id: promoCodeId });
+          }
+        } catch (e) {
+          console.error("[useAdminReviewOrder] promo usage increment failed:", e);
+        }
       }
     },
     onSuccess: () => {

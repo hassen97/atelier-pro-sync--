@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, Link, useNavigate, Navigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePublicPlans } from "@/hooks/useSubscriptionPlans";
@@ -6,11 +6,13 @@ import { useEnabledGateways, useCreateOrder } from "@/hooks/useCheckout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { validatePromoCode } from "@/hooks/usePromoCodes";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   ArrowLeft, Check, Upload, Loader2, Smartphone, CreditCard,
-  Landmark, Globe, Bitcoin, Image, ChevronRight, Clock, Zap, Camera
+  Landmark, Globe, Bitcoin, Image, ChevronRight, Clock, Zap, Camera, Ticket, X
 } from "lucide-react";
 import { ProofPickerSheet } from "@/components/ui/ProofPickerSheet";
 
@@ -42,8 +44,90 @@ export default function Checkout() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Promo code state
+  const [promoInput, setPromoInput] = useState("");
+  const [promoChecking, setPromoChecking] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{
+    id: string;
+    code: string;
+    discount_type: "percent" | "fixed";
+    discount_value: number;
+  } | null>(null);
+
   const plan = plans?.find(p => p.id === planId);
   const gateway = gateways?.find(g => g.gateway_key === selectedGateway);
+
+  const discountAmount = (() => {
+    if (!plan || !appliedPromo) return 0;
+    const raw = appliedPromo.discount_type === "percent"
+      ? (plan.price * appliedPromo.discount_value) / 100
+      : appliedPromo.discount_value;
+    return Math.min(plan.price, Math.max(0, Math.round(raw * 100) / 100));
+  })();
+  const finalPrice = plan ? Math.max(0, Math.round((plan.price - discountAmount) * 100) / 100) : 0;
+
+  const promoReasons: Record<string, string> = {
+    not_found: "Code promo introuvable.",
+    inactive: "Ce code promo n'est plus actif.",
+    expired: "Ce code promo a expiré.",
+    max_uses_reached: "Ce code promo a atteint sa limite d'utilisation.",
+    already_used: "Vous avez déjà utilisé ce code promo.",
+    empty: "Veuillez saisir un code.",
+  };
+
+  const applyPromo = async (raw?: string) => {
+    const code = (raw ?? promoInput).trim();
+    if (!code) return;
+    setPromoChecking(true);
+    setPromoError(null);
+    try {
+      const res = await validatePromoCode(code);
+      if (res.valid && res.promo_code_id) {
+        setAppliedPromo({
+          id: res.promo_code_id,
+          code: res.code || code.toUpperCase(),
+          discount_type: res.discount_type!,
+          discount_value: Number(res.discount_value),
+        });
+        setPromoInput(res.code || code.toUpperCase());
+      } else {
+        setAppliedPromo(null);
+        setPromoError(promoReasons[res.reason] || "Code promo invalide.");
+      }
+    } catch {
+      setPromoError("Impossible de vérifier le code pour l'instant.");
+    } finally {
+      setPromoChecking(false);
+    }
+  };
+
+  const clearPromo = () => {
+    setAppliedPromo(null);
+    setPromoInput("");
+    setPromoError(null);
+  };
+
+  // Prefill promo code saved at signup (auto-apply if still valid)
+  useEffect(() => {
+    if (!user || appliedPromo || promoInput) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("pending_promo_code")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const saved = (data as any)?.pending_promo_code as string | null;
+      if (!cancelled && saved) {
+        setPromoInput(saved);
+        applyPromo(saved);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
 
   const handleStartTrial = async () => {
     if (!user) return;
@@ -200,12 +284,21 @@ export default function Checkout() {
     createOrder.mutate({
       planId: plan.id,
       gatewayKey: selectedGateway,
-      amount: plan.price,
+      amount: finalPrice,
       currency: plan.currency,
       proofFile,
+      promoCodeId: appliedPromo?.id ?? null,
+      discountApplied: discountAmount,
     }, {
       onSuccess: async () => {
         if (user) {
+          // Consume the saved promo so it isn't reused
+          if (appliedPromo) {
+            await supabase
+              .from("profiles")
+              .update({ pending_promo_code: null })
+              .eq("user_id", user.id);
+          }
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["onboarding-status", user.id] }),
             queryClient.invalidateQueries({ queryKey: ["my-subscription", user.id] }),
@@ -250,9 +343,20 @@ export default function Checkout() {
               <p className="text-sm" style={{ color: "hsl(240 5% 50%)" }}>{plan.description}</p>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-bold" style={{ color: "hsl(217 91% 60%)" }}>
-                {plan.price} {plan.currency}
-              </span>
+              {appliedPromo && discountAmount > 0 ? (
+                <>
+                  <span className="text-sm line-through mr-2" style={{ color: "hsl(240 5% 45%)" }}>
+                    {plan.price} {plan.currency}
+                  </span>
+                  <span className="text-2xl font-bold" style={{ color: "hsl(142 71% 55%)" }}>
+                    {finalPrice} {plan.currency}
+                  </span>
+                </>
+              ) : (
+                <span className="text-2xl font-bold" style={{ color: "hsl(217 91% 60%)" }}>
+                  {plan.price} {plan.currency}
+                </span>
+              )}
               {plan.period && <span className="text-sm ml-1" style={{ color: "hsl(240 5% 45%)" }}>{plan.period}</span>}
             </div>
           </div>
@@ -262,6 +366,47 @@ export default function Checkout() {
                 <Check className="h-3 w-3 mr-1" /> {f}
               </Badge>
             ))}
+          </div>
+
+          {/* Promo code */}
+          <div className="mt-5 pt-4" style={{ borderTop: "1px solid hsla(0, 0%, 100%, 0.06)" }}>
+            {appliedPromo && discountAmount > 0 ? (
+              <div className="flex items-center justify-between rounded-lg px-3 py-2.5"
+                   style={{ background: "hsla(142, 71%, 45%, 0.1)", border: "1px solid hsla(142, 71%, 45%, 0.25)" }}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Ticket className="h-4 w-4 shrink-0" style={{ color: "hsl(142 71% 55%)" }} />
+                  <span className="text-sm font-medium truncate" style={{ color: "hsl(142 71% 70%)" }}>
+                    {appliedPromo.code} · −{discountAmount} {plan.currency}
+                  </span>
+                </div>
+                <button onClick={clearPromo} className="shrink-0 p-1 rounded hover:bg-white/10" aria-label="Retirer le code">
+                  <X className="h-4 w-4" style={{ color: "hsl(240 5% 60%)" }} />
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="flex gap-2">
+                  <Input
+                    value={promoInput}
+                    onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyPromo(); } }}
+                    placeholder="Code promo"
+                    className="uppercase"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => applyPromo()}
+                    disabled={promoChecking || !promoInput.trim()}
+                  >
+                    {promoChecking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Appliquer"}
+                  </Button>
+                </div>
+                {promoError && (
+                  <p className="text-xs mt-2" style={{ color: "hsl(0 72% 60%)" }}>{promoError}</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -318,7 +463,7 @@ export default function Checkout() {
               {gateway.config && Object.keys(gateway.config).length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-sm mb-4" style={{ color: "hsl(240 5% 55%)" }}>
-                    Effectuez votre paiement de <strong style={{ color: "hsl(217 91% 60%)" }}>{plan.price} {plan.currency}</strong> en utilisant les informations suivantes :
+                    Effectuez votre paiement de <strong style={{ color: "hsl(217 91% 60%)" }}>{finalPrice} {plan.currency}</strong> en utilisant les informations suivantes :
                   </p>
                   {Object.entries(gateway.config).filter(([_, v]) => v).map(([key, value]) => (
                     <div key={key} className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid hsla(0, 0%, 100%, 0.05)" }}>

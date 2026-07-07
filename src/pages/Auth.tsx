@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Wrench, Lock, AtSign, Phone, Mail, MessageCircle, Store, UserCog, User, AlertCircle, CheckCircle, Globe } from "lucide-react";
+import { Loader2, Wrench, Lock, AtSign, Phone, Mail, MessageCircle, Store, UserCog, User, AlertCircle, CheckCircle, Globe, Ticket, Gift } from "lucide-react";
 import { countries, currencies, getCurrencyForCountry } from "@/data/countries";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,6 +41,8 @@ export default function Auth() {
   const [useSameWhatsapp, setUseSameWhatsapp] = useState(true);
   const [registerWhatsapp, setRegisterWhatsapp] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPromo, setRegisterPromo] = useState("");
+  const [trialOffer, setTrialOffer] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,9 +115,29 @@ export default function Auth() {
       setAuthTab("register");
       setLoginRole("owner");
     }
+    // Prefill promo code from ?promo=
+    const promo = params.get("promo");
+    if (promo) {
+      setRegisterPromo(promo.toUpperCase());
+      setAuthTab("register");
+      setLoginRole("owner");
+    }
+    // First-visit 7-day trial offer: valid only if the countdown is still live
+    const trial = params.get("trial");
+    if (trial === "7") {
+      const startRaw = localStorage.getItem("rp_trial_offer_start");
+      const start = startRaw ? Number(startRaw) : NaN;
+      const stillLive = Number.isFinite(start) && Date.now() - start < 24 * 60 * 60 * 1000;
+      if (stillLive) {
+        setTrialOffer(true);
+        setAuthTab("register");
+        setLoginRole("owner");
+      }
+    }
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   // Redirect already-authenticated users — but NOT while the blueprint loader
   // is playing, so the owner login animation can finish before we navigate.
@@ -422,6 +444,68 @@ export default function Auth() {
         console.error("[Auth] referral capture error:", refErr);
       }
 
+      // Promo code capture (best-effort). Store on the profile so it auto-applies
+      // at checkout. Validation is server-side; invalid codes are silently skipped.
+      try {
+        const code = registerPromo.trim().toUpperCase();
+        if (code) {
+          const { data: res } = await supabase.rpc("validate_promo_code" as any, { _code: code });
+          if (res && (res as any).valid) {
+            const { data: { user: pu } } = await supabase.auth.getUser();
+            if (pu) {
+              await supabase
+                .from("profiles")
+                .update({ pending_promo_code: (res as any).code || code })
+                .eq("user_id", pu.id);
+            }
+          }
+        }
+      } catch (promoErr) {
+        console.error("[Auth] promo capture error:", promoErr);
+      }
+
+      // First-visit 7-day trial: grant while the just-created session is active.
+      try {
+        const startRaw = localStorage.getItem("rp_trial_offer_start");
+        const start = startRaw ? Number(startRaw) : NaN;
+        const stillLive = Number.isFinite(start) && Date.now() - start < 24 * 60 * 60 * 1000;
+        if (trialOffer && stillLive) {
+          const { data: { user: tu } } = await supabase.auth.getUser();
+          if (tu) {
+            // Pick the cheapest Pro plan (excluding Entreprise) for the trial
+            const { data: proPlan } = await supabase
+              .from("subscription_plans")
+              .select("id")
+              .ilike("name", "%Pro%")
+              .not("name", "ilike", "%Entreprise%")
+              .order("price", { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            if (proPlan?.id) {
+              const now = new Date();
+              const trialEnd = new Date(now);
+              trialEnd.setDate(trialEnd.getDate() + 7);
+              await supabase
+                .from("shop_subscriptions")
+                .update({ status: "canceled" })
+                .eq("user_id", tu.id);
+              await supabase.from("shop_subscriptions").insert({
+                user_id: tu.id,
+                plan_id: proPlan.id,
+                status: "trialing",
+                started_at: now.toISOString(),
+                expires_at: trialEnd.toISOString(),
+                trial_ends_at: trialEnd.toISOString(),
+              });
+              localStorage.removeItem("rp_trial_offer_start");
+            }
+          }
+        }
+      } catch (trialErr) {
+        console.error("[Auth] trial grant error:", trialErr);
+      }
+
+
       // Notify the platform admin (best-effort, never blocks)
       try {
         await supabase.functions.invoke("notify-admin-signup", {
@@ -439,7 +523,7 @@ export default function Auth() {
       await supabase.auth.signOut();
       setRegisterUsername(""); setRegisterPassword(""); setRegisterFullName("");
       setRegisterCountry("TN"); setRegisterCurrency("TND"); setConfirmPassword("");
-      setRegisterPhone(""); setUseSameWhatsapp(true); setRegisterWhatsapp(""); setRegisterEmail("");
+      setRegisterPhone(""); setUseSameWhatsapp(true); setRegisterWhatsapp(""); setRegisterEmail(""); setRegisterPromo("");
     }
 
     setLoading(false);
@@ -731,6 +815,24 @@ export default function Auth() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
                   <Input id="confirm-password" type="password" placeholder="••••••••" value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)} className="pl-10 auth-input" required disabled={loading} />
+                </div>
+              </div>
+
+              {trialOffer && (
+                <div className="rounded-lg px-3 py-2.5 flex items-center gap-2 border border-emerald-500/30 bg-emerald-500/10">
+                  <Gift className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span className="text-xs text-emerald-300">
+                    Offre spéciale : 7 jours d'essai Pro offerts à la création de votre compte 🎉
+                  </span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="register-promo" className="text-zinc-400 text-sm">Code promo (optionnel)</Label>
+                <div className="relative">
+                  <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
+                  <Input id="register-promo" type="text" placeholder="BIENVENUE20" value={registerPromo}
+                    onChange={(e) => setRegisterPromo(e.target.value.toUpperCase())} className="pl-10 auth-input uppercase" disabled={loading} />
                 </div>
               </div>
 
