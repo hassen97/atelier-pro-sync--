@@ -1123,6 +1123,7 @@ export type Database = {
           language: string | null
           last_online_at: string | null
           last_verification_reminder_sent_at: string | null
+          pending_promo_code: string | null
           phone: string | null
           referral_code: string | null
           registration_ip: string | null
@@ -1151,6 +1152,7 @@ export type Database = {
           language?: string | null
           last_online_at?: string | null
           last_verification_reminder_sent_at?: string | null
+          pending_promo_code?: string | null
           phone?: string | null
           referral_code?: string | null
           registration_ip?: string | null
@@ -1179,6 +1181,7 @@ export type Database = {
           language?: string | null
           last_online_at?: string | null
           last_verification_reminder_sent_at?: string | null
+          pending_promo_code?: string | null
           phone?: string | null
           referral_code?: string | null
           registration_ip?: string | null
@@ -1195,6 +1198,83 @@ export type Database = {
           whatsapp_phone?: string | null
         }
         Relationships: []
+      }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          updated_at: string
+          used_count: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          discount_type: string
+          discount_value: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          updated_at?: string
+          used_count?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          updated_at?: string
+          used_count?: number
+        }
+        Relationships: []
+      }
+      promo_redemptions: {
+        Row: {
+          created_at: string
+          discount_applied: number
+          id: string
+          order_id: string | null
+          promo_code_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          discount_applied?: number
+          id?: string
+          order_id?: string | null
+          promo_code_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          discount_applied?: number
+          id?: string
+          order_id?: string | null
+          promo_code_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_redemptions_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       push_subscriptions: {
         Row: {
@@ -2520,6 +2600,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_promo_usage: {
+        Args: { _promo_code_id: string }
+        Returns: undefined
+      }
       is_conversation_participant: {
         Args: { _conv_id: string; _user_id: string }
         Returns: boolean
@@ -2546,6 +2630,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      validate_promo_code: { Args: { _code: string }; Returns: Json }
     }
     Enums: {
       app_role:
