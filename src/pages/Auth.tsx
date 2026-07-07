@@ -818,6 +818,24 @@ export default function Auth() {
                 </div>
               </div>
 
+              {trialOffer && (
+                <div className="rounded-lg px-3 py-2.5 flex items-center gap-2 border border-emerald-500/30 bg-emerald-500/10">
+                  <Gift className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span className="text-xs text-emerald-300">
+                    Offre spéciale : 7 jours d'essai Pro offerts à la création de votre compte 🎉
+                  </span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="register-promo" className="text-zinc-400 text-sm">Code promo (optionnel)</Label>
+                <div className="relative">
+                  <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
+                  <Input id="register-promo" type="text" placeholder="BIENVENUE20" value={registerPromo}
+                    onChange={(e) => setRegisterPromo(e.target.value.toUpperCase())} className="pl-10 auth-input uppercase" disabled={loading} />
+                </div>
+              </div>
+
               {HCAPTCHA_SITE_KEY && (
                 <div className="flex justify-center">
                   <HCaptcha
