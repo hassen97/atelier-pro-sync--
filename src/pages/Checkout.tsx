@@ -284,12 +284,21 @@ export default function Checkout() {
     createOrder.mutate({
       planId: plan.id,
       gatewayKey: selectedGateway,
-      amount: plan.price,
+      amount: finalPrice,
       currency: plan.currency,
       proofFile,
+      promoCodeId: appliedPromo?.id ?? null,
+      discountApplied: discountAmount,
     }, {
       onSuccess: async () => {
         if (user) {
+          // Consume the saved promo so it isn't reused
+          if (appliedPromo) {
+            await supabase
+              .from("profiles")
+              .update({ pending_promo_code: null })
+              .eq("user_id", user.id);
+          }
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["onboarding-status", user.id] }),
             queryClient.invalidateQueries({ queryKey: ["my-subscription", user.id] }),
