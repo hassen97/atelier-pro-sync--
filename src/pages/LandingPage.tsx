@@ -196,6 +196,9 @@ export default function LandingPage() {
         )}
       </nav>
 
+      {/* ─── First-visit trial offer ─── */}
+      {!user && <TrialCountdownBanner />}
+
       {/* ─── Hero ─── */}
       <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 overflow-hidden">
         <motion.div className="relative z-10 mx-auto max-w-5xl px-4 text-center sm:px-6" variants={stagger} initial="hidden" animate="visible">
