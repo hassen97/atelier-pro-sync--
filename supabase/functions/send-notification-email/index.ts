@@ -62,10 +62,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (action !== 'send' && !isAdmin) {
+    const privileged = isServiceCall || isAdmin
+    if (action !== 'send' && !privileged) {
       return json({ error: 'Platform admin required' }, 403)
     }
-    if (action === 'send' && !isServiceCall && !isAdmin) {
+    if (action === 'send' && !privileged) {
       return json({ error: 'Not authorized' }, 403)
     }
 
