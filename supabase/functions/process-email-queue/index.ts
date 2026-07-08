@@ -7,6 +7,58 @@ const DEFAULT_SEND_DELAY_MS = 200
 const DEFAULT_AUTH_TTL_MINUTES = 15
 const DEFAULT_TRANSACTIONAL_TTL_MINUTES = 60
 
+// App (transactional) emails are delivered through Resend via the Lovable
+// connector gateway. Auth emails keep using the built-in Lovable path.
+const RESEND_GATEWAY_URL = 'https://connector-gateway.lovable.dev/resend/emails'
+const RESEND_FROM = 'RepairPro <Notify@getheavencoin.com>'
+
+// Error that carries an HTTP status so the shared 429/403 handling below works.
+class EmailSendError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'EmailSendError'
+    this.status = status
+  }
+}
+
+// Send an app email through Resend (connector gateway). Throws EmailSendError
+// on non-2xx so the queue's retry / rate-limit / DLQ logic applies.
+async function sendViaResend(
+  payload: Record<string, any>,
+  opts: { lovableApiKey: string; resendApiKey: string }
+): Promise<void> {
+  const body: Record<string, unknown> = {
+    from: RESEND_FROM,
+    to: [payload.to],
+    subject: payload.subject,
+  }
+  if (payload.html) body.html = payload.html
+  if (payload.text) body.text = payload.text
+  if (payload.reply_to) body.reply_to = payload.reply_to
+
+  const res = await fetch(RESEND_GATEWAY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${opts.lovableApiKey}`,
+      'X-Connection-Api-Key': opts.resendApiKey,
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    // Only 429 gets the shared rate-limit cooldown. Everything else (incl. 403
+    // "domain not verified" while DNS is still propagating) uses the normal
+    // retry path so emails aren't dead-lettered prematurely.
+    if (res.status === 429) {
+      throw new EmailSendError(`Resend rate limited [429]: ${errText}`, 429)
+    }
+    throw new Error(`Resend send failed [${res.status}]: ${errText}`)
+  }
+}
+
 // Check if an error is a rate-limit (429) response.
 // Uses EmailAPIError.status when available (email-js >=0.x with structured errors),
 // falls back to parsing the error message for older versions.
@@ -80,6 +132,7 @@ async function moveToDlq(
 
 Deno.serve(async (req) => {
   const apiKey = Deno.env.get('LOVABLE_API_KEY')
+  const resendApiKey = Deno.env.get('RESEND_API_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
@@ -246,33 +299,42 @@ Deno.serve(async (req) => {
       }
 
       try {
-        await sendLovableEmail(
-          {
-            run_id: payload.run_id,
-            to: payload.to,
-            from: payload.from,
-            sender_domain: payload.sender_domain,
-            subject: payload.subject,
-            html: payload.html,
-            text: payload.text,
-            purpose: payload.purpose,
-            label: payload.label,
-            idempotency_key: payload.idempotency_key,
-            unsubscribe_token: payload.unsubscribe_token,
-            message_id: payload.message_id,
-          },
-          // sendUrl is optional — when LOVABLE_SEND_URL is not set, the library
-          // falls back to the default Lovable API endpoint (https://api.lovable.dev).
-          // Set LOVABLE_SEND_URL as a Supabase secret to override (e.g. for local dev).
-          // Pass idempotencyKey explicitly so the Idempotency-Key header is always
-          // set for app emails (the API accepts idempotency_key + purpose=transactional
-          // in place of run_id).
-          {
-            apiKey,
-            sendUrl: Deno.env.get('LOVABLE_SEND_URL'),
-            idempotencyKey: payload.idempotency_key ?? payload.run_id,
+        if (queue === 'transactional_emails') {
+          // App emails go through Resend (bypasses the Lovable email path).
+          if (!resendApiKey) {
+            throw new EmailSendError('RESEND_API_KEY not configured', 500)
           }
-        )
+          await sendViaResend(payload, { lovableApiKey: apiKey, resendApiKey })
+        } else {
+          // Auth emails keep using the built-in Lovable path.
+          await sendLovableEmail(
+            {
+              run_id: payload.run_id,
+              to: payload.to,
+              from: payload.from,
+              sender_domain: payload.sender_domain,
+              subject: payload.subject,
+              html: payload.html,
+              text: payload.text,
+              purpose: payload.purpose,
+              label: payload.label,
+              idempotency_key: payload.idempotency_key,
+              unsubscribe_token: payload.unsubscribe_token,
+              message_id: payload.message_id,
+            },
+            // sendUrl is optional — when LOVABLE_SEND_URL is not set, the library
+            // falls back to the default Lovable API endpoint (https://api.lovable.dev).
+            // Set LOVABLE_SEND_URL as a Supabase secret to override (e.g. for local dev).
+            // Pass idempotencyKey explicitly so the Idempotency-Key header is always
+            // set for app emails (the API accepts idempotency_key + purpose=transactional
+            // in place of run_id).
+            {
+              apiKey,
+              sendUrl: Deno.env.get('LOVABLE_SEND_URL'),
+              idempotencyKey: payload.idempotency_key ?? payload.run_id,
+            }
+          )
+        }
 
         // Log success
         await supabase.from('email_send_log').insert({
