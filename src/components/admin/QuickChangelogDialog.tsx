@@ -23,6 +23,7 @@ export function QuickChangelogDialog({ open, onOpenChange }: Props) {
   const [features, setFeatures] = useState("");
   const [fixes, setFixes] = useState("");
   const [justPublished, setJustPublished] = useState(false);
+  const [alsoEmail, setAlsoEmail] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -30,6 +31,7 @@ export function QuickChangelogDialog({ open, onOpenChange }: Props) {
       setFeatures("");
       setFixes("");
       setJustPublished(false);
+      setAlsoEmail(false);
     }
   }, [open]);
 
