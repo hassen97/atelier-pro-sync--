@@ -77,9 +77,12 @@ export function useUpdateEmailTemplate() {
   });
 }
 
-export async function previewEmailTemplate(template_key: string) {
+export async function previewEmailTemplate(
+  template_key: string,
+  overrides?: Partial<EmailTemplate>,
+) {
   const { data, error } = await supabase.functions.invoke("send-notification-email", {
-    body: { action: "preview", template_key },
+    body: { action: "preview", template_key, overrides },
   });
   if (error) throw error;
   return data as { subject: string; html: string };
