@@ -49,10 +49,13 @@ async function sendViaResend(
 
   if (!res.ok) {
     const errText = await res.text()
-    throw new EmailSendError(
-      `Resend send failed [${res.status}]: ${errText}`,
-      res.status
-    )
+    // Only 429 gets the shared rate-limit cooldown. Everything else (incl. 403
+    // "domain not verified" while DNS is still propagating) uses the normal
+    // retry path so emails aren't dead-lettered prematurely.
+    if (res.status === 429) {
+      throw new EmailSendError(`Resend rate limited [429]: ${errText}`, 429)
+    }
+    throw new Error(`Resend send failed [${res.status}]: ${errText}`)
   }
 }
 
