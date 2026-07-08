@@ -133,6 +133,16 @@ export function QuickChangelogDialog({ open, onOpenChange }: Props) {
           </div>
         </div>
 
+        <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+          <Checkbox checked={alsoEmail} onCheckedChange={(v) => setAlsoEmail(v === true)} />
+          <span className="text-sm text-slate-300 flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5 text-[#00D4FF]" />
+            Envoyer aussi par e-mail à toutes les boutiques
+          </span>
+        </label>
+
+
+
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button
             variant="outline"
