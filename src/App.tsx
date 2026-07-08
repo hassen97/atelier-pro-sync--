@@ -68,6 +68,7 @@ const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const AdminDashboard = lazyWithRetry(() => import("./pages/AdminDashboard"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
+const UpdatePassword = lazyWithRetry(() => import("./pages/UpdatePassword"));
 const Warranty = lazyWithRetry(() => import("./pages/Warranty"));
 const RepairTracking = lazyWithRetry(() => import("./pages/RepairTracking"));
 const LandingPage = lazyWithRetry(() => import("./pages/LandingPage"));
