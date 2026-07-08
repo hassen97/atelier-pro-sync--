@@ -113,8 +113,10 @@ Deno.serve(async (req) => {
     if (action === 'preview') {
       const tpl = await loadTemplate(body.template_key ?? '')
       if (!tpl) return json({ error: 'Unknown template' }, 400)
+      // Merge unsaved edits so the admin sees a live preview.
+      const merged = { ...tpl, ...(body.overrides ?? {}) } as EmailTemplateRow
       const vars = { ...(SAMPLE_VARS[tpl.template_key] ?? {}), ...(body.variables ?? {}) }
-      const { subject, html } = renderEmail(tpl, vars)
+      const { subject, html } = renderEmail(merged, vars)
       return json({ subject, html })
     }
 
