@@ -120,6 +120,7 @@ const App = () => (
                 <Route path="/track/:token" element={<RepairTracking />} />
                 <Route path="/r/:token" element={<RepairTracking />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/update-password" element={<UpdatePassword />} />
                 <Route path="/landing" element={<LandingPage />} />
                 <Route path="/checkout" element={<Checkout />} />
 
