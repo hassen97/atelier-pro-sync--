@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { renderEmail, type EmailTemplateRow } from "../_shared/notification-templates.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
