@@ -246,6 +246,7 @@ const AdminDashboard = () => {
             {activeView === "services_requests" && <AdminServiceRequestsView />}
             {activeView === "system_health"     && <AdminSystemHealthView />}
             {activeView === "growth_engine"     && <AdminGrowthEngineView />}
+            {activeView === "email_templates"   && <AdminEmailTemplatesView />}
           </div>
         </main>
       </div>
