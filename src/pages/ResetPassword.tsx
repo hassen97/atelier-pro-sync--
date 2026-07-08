@@ -107,9 +107,10 @@ export default function ResetPassword() {
                 <Alert className="border-emerald-500/30 bg-emerald-500/10">
                   <CheckCircle className="h-4 w-4 text-emerald-500" />
                   <AlertDescription className="text-emerald-600 dark:text-emerald-400">
-                    Si un compte correspond aux informations fournies, l'administrateur
-                    vous contactera par téléphone ou WhatsApp pour vous fournir un nouveau
-                    mot de passe.
+                    Si un compte correspond aux informations fournies, un e-mail contenant
+                    un lien de réinitialisation vous a été envoyé. Vérifiez votre boîte de
+                    réception. L'administrateur peut également vous contacter par téléphone
+                    ou WhatsApp.
                   </AlertDescription>
                 </Alert>
                 <Button
