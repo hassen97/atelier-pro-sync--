@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Store, Megaphone, MessageSquare, LogOut, KeyRound,
   Settings, Users, CreditCard, Tags, ClipboardList, Shield,
-  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox, HeartPulse, Rocket, Ticket,
+  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox, HeartPulse, Rocket, Ticket, Mail,
 } from "lucide-react";
 import { usePendingServiceRequestCount } from "@/hooks/useAdminServiceRequests";
 import { useAuth } from "@/contexts/AuthContext";
