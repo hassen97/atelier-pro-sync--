@@ -7,6 +7,55 @@ const DEFAULT_SEND_DELAY_MS = 200
 const DEFAULT_AUTH_TTL_MINUTES = 15
 const DEFAULT_TRANSACTIONAL_TTL_MINUTES = 60
 
+// App (transactional) emails are delivered through Resend via the Lovable
+// connector gateway. Auth emails keep using the built-in Lovable path.
+const RESEND_GATEWAY_URL = 'https://connector-gateway.lovable.dev/resend/emails'
+const RESEND_FROM = 'RepairPro <Notify@getheavencoin.com>'
+
+// Error that carries an HTTP status so the shared 429/403 handling below works.
+class EmailSendError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'EmailSendError'
+    this.status = status
+  }
+}
+
+// Send an app email through Resend (connector gateway). Throws EmailSendError
+// on non-2xx so the queue's retry / rate-limit / DLQ logic applies.
+async function sendViaResend(
+  payload: Record<string, any>,
+  opts: { lovableApiKey: string; resendApiKey: string }
+): Promise<void> {
+  const body: Record<string, unknown> = {
+    from: RESEND_FROM,
+    to: [payload.to],
+    subject: payload.subject,
+  }
+  if (payload.html) body.html = payload.html
+  if (payload.text) body.text = payload.text
+  if (payload.reply_to) body.reply_to = payload.reply_to
+
+  const res = await fetch(RESEND_GATEWAY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${opts.lovableApiKey}`,
+      'X-Connection-Api-Key': opts.resendApiKey,
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new EmailSendError(
+      `Resend send failed [${res.status}]: ${errText}`,
+      res.status
+    )
+  }
+}
+
 // Check if an error is a rate-limit (429) response.
 // Uses EmailAPIError.status when available (email-js >=0.x with structured errors),
 // falls back to parsing the error message for older versions.
