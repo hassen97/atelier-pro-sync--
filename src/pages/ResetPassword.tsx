@@ -54,6 +54,17 @@ export default function ResetPassword() {
       await supabase
         .from("password_reset_requests" as any)
         .insert({ username: trimmedUsername || `phone:${trimmedPhone}`, phone: trimmedPhone || null } as any);
+
+      // Also send an automatic reset-link email if we can match the username.
+      if (trimmedUsername) {
+        supabase.functions
+          .invoke("send-password-reset", {
+            body: { username: trimmedUsername, redirect_origin: window.location.origin },
+          })
+          .catch(() => {
+            /* never leak whether an account exists */
+          });
+      }
       setSuccess(true);
     } catch {
       // Silently swallow errors and still show success — we never want to
