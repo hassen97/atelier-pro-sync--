@@ -57,6 +57,7 @@ const viewLabels: Record<AdminView, string> = {
   services_requests: "Demandes services",
   system_health:     "Santé Système",
   growth_engine:     "Growth Engine",
+  email_templates:   "Modèles d'e-mails",
 };
 
 const AdminDashboard = () => {
