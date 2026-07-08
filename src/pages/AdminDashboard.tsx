@@ -25,6 +25,7 @@ import { AdminServicesView } from "@/components/admin/AdminServicesView";
 import { AdminServiceRequestsView } from "@/components/admin/AdminServiceRequestsView";
 import { AdminSystemHealthView } from "@/components/admin/AdminSystemHealthView";
 import { AdminGrowthEngineView } from "@/components/admin/AdminGrowthEngineView";
+import { AdminEmailTemplatesView } from "@/components/admin/AdminEmailTemplatesView";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAdminSignupNotifier } from "@/hooks/useAdminSignupNotifier";
