@@ -1,59 +1,34 @@
-# Promo Codes + First-Visit 7-Day Trial
+# Fix: App emails (incl. signup notifications) not sending
 
-Two features:
-1. **Promo codes** — admin-created discount codes; users can enter a code at signup, and the discount is applied when they pay for a plan at checkout.
-2. **First-visit offer** — a 24-hour per-visitor countdown on the landing page with a "Claim 7 days free" button; signing up while the countdown is live auto-grants a 7-day Pro trial.
+## What's broken
 
----
+Signup alerts are enqueued correctly, but the **shared email queue worker** never delivers them. Over the last 2 days: **0 sent, 335 failed, 67 dead-lettered** — 100% of app emails.
 
-## 1. Promo Codes (discount on a plan)
+Every failure is the same email-API rejection:
 
-### Database
-New table `public.promo_codes`:
-- `id`, `code` (unique, uppercased), `discount_type` ('percent' | 'fixed'), `discount_value` numeric, `max_uses` int null (null = unlimited), `used_count` int default 0, `expires_at` timestamptz null, `is_active` bool default true, `created_by`, `created_at`.
+```text
+400 missing_parameter
+"Missing run_id or idempotency_key"
+"App emails can omit run_id by providing idempotency_key with purpose=transactional."
+```
 
-New table `public.promo_redemptions`:
-- `id`, `promo_code_id`, `user_id`, `order_id` null, `discount_applied` numeric, `created_at`. Unique `(promo_code_id, user_id)` so a code can't be reused by the same shop.
+The enqueue side already sends `purpose: "transactional"` + `idempotency_key`, and `process-email-queue` reads and forwards them. The problem is the `@lovable.dev/email-js` dependency in `process-email-queue/index.ts` is imported **unpinned** (`npm:@lovable.dev/email-js`), and the resolved version does not actually forward `idempotency_key`/`purpose` to the email API — so the API sees neither `run_id` nor `idempotency_key` and rejects the send. Auth emails use a separate path, which is why only app emails (signup alerts, etc.) are affected.
 
-RLS/GRANTs:
-- `promo_codes`: platform_admin full manage; **no direct client SELECT** (prevents code enumeration). Reads happen through a validation function.
-- `promo_redemptions`: user can read own rows; insert scoped to `auth.uid()`; platform_admin full access; service_role all.
-- Security-definer RPC `validate_promo_code(_code text)` → returns `{ valid, discount_type, discount_value, reason }` (checks active, not expired, under max_uses, not already redeemed by caller). Granted to `authenticated` (and `anon` for signup-time checks).
+## Fix
 
-### Admin — God Mode panel
-New `src/components/admin/AdminPromoCodesView.tsx` (+ hook `src/hooks/usePromoCodes.ts`): list codes with usage/expiry/status, create (code, percent/fixed value, optional max uses, optional expiry), toggle active, delete. Add it to the admin dashboard navigation next to `AdminPlansView`.
+1. **Refresh the managed email infrastructure** so `process-email-queue` is redeployed with a current, compatible worker/library that forwards `idempotency_key` + `purpose` correctly. This is the safe, idempotent managed path and also re-verifies the queue RPCs, cron, and vault key.
 
-### Signup capture
-In `src/pages/Auth.tsx` register form: optional "Promo code" input. On submit, validate via `validate_promo_code`; if valid, store it on the new profile (new `profiles.pending_promo_code` column) during the existing post-signup window (where fingerprint/referral are already written). Invalid code shows an inline warning but never blocks signup. Also accept `?promo=CODE` in the URL to prefill.
+2. **If the refresh alone doesn't resolve it**, pin the email library to a known-good version in `supabase/functions/process-email-queue/index.ts` (replace the floating `npm:@lovable.dev/email-js` import with a pinned `npm:@lovable.dev/email-js@<version>`) and redeploy the function, so the deployed code stops drifting to a broken release.
 
-### Checkout — apply discount
-In `src/pages/Checkout.tsx` + `src/hooks/useCheckout.ts`:
-- Prefill the promo field from `profiles.pending_promo_code`; allow entering/clearing a code with an "Apply" button that calls `validate_promo_code`.
-- Show original price struck through and the discounted total; compute `percent` or `fixed` discount, floored at 0.
-- `useCreateOrder` submits the discounted `amount` plus `promo_code_id`, and writes a `promo_redemptions` row.
-- When an admin approves the order (`useAdminReviewOrder`), increment `promo_codes.used_count` for that redemption.
+3. **Redeploy** `process-email-queue` (and confirm the cron job that runs it exists while items are queued).
 
----
+## Verify
 
-## 2. First-Visit 7-Day Trial Countdown
+- Trigger a test signup alert and watch `email_send_log`: new rows should be `sent`, not `failed`.
+- Confirm the target inbox (`hassen.brg97@gmail.com`) receives the notification.
+- The 67 dead-lettered messages are stale expired attempts and won't auto-retry; once sending works, new signups will notify normally. No need to replay the old DLQ items (they're duplicate/expired signup events).
 
-### Landing page (`src/pages/LandingPage.tsx`)
-- New `src/components/landing/TrialCountdownBanner.tsx`: on first visit, store `rp_trial_offer_start = Date.now()` in localStorage. Offer window = start + 24h. Render a live countdown (HH:MM:SS) with a "Réclamer 7 jours gratuits" CTA.
-- While active, CTA links to `/auth?tab=register&trial=7`. After expiry, the banner hides and normal signup CTAs remain.
+## Notes
 
-### Grant on signup (`src/pages/Auth.tsx`)
-- Read `?trial=7` and re-check `rp_trial_offer_start` (still within 24h) at submit time so the flag can't be forged past expiry.
-- If valid, in the post-signup active-session window insert a `shop_subscriptions` row: cheapest Pro plan (`name ILIKE '%Pro%'` excluding Entreprise), `status='trialing'`, `expires_at = now + 7 days` (deactivate any existing sub first), mirroring the existing `handleStartTrial` logic in Checkout. Clear the localStorage flag afterward.
-- The existing `TrialBanner` in the dashboard already renders the countdown for `status='trialing'`, so the remaining trial time shows automatically after login.
-
----
-
-## Technical Notes
-- Trials require an account, so the "7 days free" is granted at signup, not to anonymous visitors — the countdown only creates urgency to sign up in time.
-- Promo validation is server-side via a security-definer RPC; the `promo_codes` table is never directly readable by clients.
-- No changes to the frozen Returns/RMA module or existing subscription-bonus feature.
-- Migrations include GRANTs for every new table per project rules.
-
-## Files
-- New: `supabase` migration (tables, RLS, RPC), `src/hooks/usePromoCodes.ts`, `src/components/admin/AdminPromoCodesView.tsx`, `src/components/landing/TrialCountdownBanner.tsx`
-- Edit: `src/pages/Auth.tsx`, `src/pages/Checkout.tsx`, `src/hooks/useCheckout.ts`, `src/hooks/useSubscription.ts` (admin approve → increment usage), admin dashboard nav, `src/pages/LandingPage.tsx`
+- No changes to `notify-admin-signup` logic, admin settings, or the DB are required — settings are already correct (`admin_notify_email_enabled=true`, recipient set, browser alerts on).
+- This fix restores **all** app emails, not just signup alerts.

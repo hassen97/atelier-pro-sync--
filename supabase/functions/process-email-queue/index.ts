@@ -1,4 +1,4 @@
-import { sendLovableEmail } from 'npm:@lovable.dev/email-js'
+import { sendLovableEmail } from 'npm:@lovable.dev/email-js@0.1.0'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const MAX_RETRIES = 5
@@ -264,7 +264,14 @@ Deno.serve(async (req) => {
           // sendUrl is optional — when LOVABLE_SEND_URL is not set, the library
           // falls back to the default Lovable API endpoint (https://api.lovable.dev).
           // Set LOVABLE_SEND_URL as a Supabase secret to override (e.g. for local dev).
-          { apiKey, sendUrl: Deno.env.get('LOVABLE_SEND_URL') }
+          // Pass idempotencyKey explicitly so the Idempotency-Key header is always
+          // set for app emails (the API accepts idempotency_key + purpose=transactional
+          // in place of run_id).
+          {
+            apiKey,
+            sendUrl: Deno.env.get('LOVABLE_SEND_URL'),
+            idempotencyKey: payload.idempotency_key ?? payload.run_id,
+          }
         )
 
         // Log success
