@@ -165,11 +165,11 @@ Deno.serve(async (req) => {
         ),
       )
 
-      const vars = { ...(SAMPLE_VARS.changelog, ...(body.variables ?? {})) } as TemplateVars
+      const vars = (body.variables ?? {}) as TemplateVars
+      const { subject, html } = renderEmail(tpl, vars)
       let sent = 0
       for (const email of emails) {
         try {
-          const { subject, html } = renderEmail(tpl, vars)
           await enqueue(email, subject, html, 'changelog')
           sent++
         } catch (e) {
