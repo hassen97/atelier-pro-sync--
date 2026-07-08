@@ -420,6 +420,54 @@ export type Database = {
         }
         Relationships: []
       }
+      email_templates: {
+        Row: {
+          accent_color: string
+          body: string
+          button_label: string
+          footer: string
+          heading: string
+          id: string
+          intro: string
+          is_enabled: boolean
+          preheader: string
+          subject: string
+          template_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          accent_color?: string
+          body?: string
+          button_label?: string
+          footer?: string
+          heading?: string
+          id?: string
+          intro?: string
+          is_enabled?: boolean
+          preheader?: string
+          subject?: string
+          template_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          accent_color?: string
+          body?: string
+          button_label?: string
+          footer?: string
+          heading?: string
+          id?: string
+          intro?: string
+          is_enabled?: boolean
+          preheader?: string
+          subject?: string
+          template_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       email_unsubscribe_tokens: {
         Row: {
           created_at: string
@@ -2135,6 +2183,33 @@ export type Database = {
           price?: number
           sort_order?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      subscription_reminder_log: {
+        Row: {
+          expires_at: string | null
+          id: string
+          sent_at: string
+          subscription_id: string
+          threshold_days: number
+          user_id: string
+        }
+        Insert: {
+          expires_at?: string | null
+          id?: string
+          sent_at?: string
+          subscription_id: string
+          threshold_days: number
+          user_id: string
+        }
+        Update: {
+          expires_at?: string | null
+          id?: string
+          sent_at?: string
+          subscription_id?: string
+          threshold_days?: number
+          user_id?: string
         }
         Relationships: []
       }
