@@ -20,9 +20,14 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    // Only allow service-role (cron) callers.
+    // Allow service-role callers or the cron job (shared secret header).
     const authHeader = req.headers.get('Authorization') ?? ''
-    if (authHeader !== `Bearer ${serviceKey}`) {
+    const cronSecret = req.headers.get('x-cron-secret') ?? ''
+    const expectedSecret = Deno.env.get('EXPIRY_CRON_SECRET') ?? ''
+    const authorized =
+      authHeader === `Bearer ${serviceKey}` ||
+      (expectedSecret !== '' && cronSecret === expectedSecret)
+    if (!authorized) {
       return json({ error: 'Not authorized' }, 401)
     }
 
