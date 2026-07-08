@@ -18,6 +18,7 @@ interface Body {
   template_key?: string
   to?: string
   variables?: TemplateVars
+  overrides?: Partial<EmailTemplateRow>
 }
 
 Deno.serve(async (req) => {
