@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Bug, Copy, Send, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sparkles, Bug, Copy, Send, Check, Mail } from "lucide-react";
 import { useCreateAnnouncement } from "@/hooks/useAnnouncements";
 import { formatForFacebook } from "@/lib/changelogFormat";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface Props {
