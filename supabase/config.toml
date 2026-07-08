@@ -15,3 +15,9 @@ project_id = "rgikflkocotkljbajzrb"
     verify_jwt = false
   [functions.mcp]
     verify_jwt = false
+  [functions.send-notification-email]
+    verify_jwt = false
+  [functions.send-password-reset]
+    verify_jwt = false
+  [functions.subscription-expiry-reminder]
+    verify_jwt = false
