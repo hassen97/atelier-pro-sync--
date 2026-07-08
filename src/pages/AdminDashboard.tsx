@@ -25,6 +25,7 @@ import { AdminServicesView } from "@/components/admin/AdminServicesView";
 import { AdminServiceRequestsView } from "@/components/admin/AdminServiceRequestsView";
 import { AdminSystemHealthView } from "@/components/admin/AdminSystemHealthView";
 import { AdminGrowthEngineView } from "@/components/admin/AdminGrowthEngineView";
+import { AdminEmailTemplatesView } from "@/components/admin/AdminEmailTemplatesView";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAdminSignupNotifier } from "@/hooks/useAdminSignupNotifier";
@@ -34,7 +35,7 @@ type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
   | "settings" | "employees" | "plans" | "promo_codes" | "gateways" | "feature_flags"
   | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
-  | "services_catalog" | "services_requests" | "system_health" | "growth_engine";
+  | "services_catalog" | "services_requests" | "system_health" | "growth_engine" | "email_templates";
 
 const viewLabels: Record<AdminView, string> = {
   overview:        "Dashboard",
@@ -57,6 +58,7 @@ const viewLabels: Record<AdminView, string> = {
   services_requests: "Demandes services",
   system_health:     "Santé Système",
   growth_engine:     "Growth Engine",
+  email_templates:   "Modèles d'e-mails",
 };
 
 const AdminDashboard = () => {
@@ -244,6 +246,7 @@ const AdminDashboard = () => {
             {activeView === "services_requests" && <AdminServiceRequestsView />}
             {activeView === "system_health"     && <AdminSystemHealthView />}
             {activeView === "growth_engine"     && <AdminGrowthEngineView />}
+            {activeView === "email_templates"   && <AdminEmailTemplatesView />}
           </div>
         </main>
       </div>

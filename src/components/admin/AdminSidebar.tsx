@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Store, Megaphone, MessageSquare, LogOut, KeyRound,
   Settings, Users, CreditCard, Tags, ClipboardList, Shield,
-  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox, HeartPulse, Rocket, Ticket,
+  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox, HeartPulse, Rocket, Ticket, Mail,
 } from "lucide-react";
 import { usePendingServiceRequestCount } from "@/hooks/useAdminServiceRequests";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +12,7 @@ type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
   | "settings" | "employees" | "plans" | "promo_codes" | "gateways" | "feature_flags"
   | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
-  | "services_catalog" | "services_requests" | "system_health" | "growth_engine";
+  | "services_catalog" | "services_requests" | "system_health" | "growth_engine" | "email_templates";
 
 interface AdminSidebarProps {
   active: AdminView;
@@ -73,6 +73,7 @@ const navSections: { label: string; items: NavItem[] }[] = [
       { id: "system_health",   label: "Santé Système",  icon: HeartPulse, badge: "Nouveau" },
       { id: "signup_attempts", label: "Tentatives",     icon: Shield },
       { id: "feature_flags",   label: "Feature Flags",  icon: Flag },
+      { id: "email_templates", label: "Modèles d'e-mails", icon: Mail },
       { id: "settings",        label: "Paramètres",     icon: Settings },
     ],
   },

@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Bug, Copy, Send, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sparkles, Bug, Copy, Send, Check, Mail } from "lucide-react";
 import { useCreateAnnouncement } from "@/hooks/useAnnouncements";
 import { formatForFacebook } from "@/lib/changelogFormat";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface Props {
@@ -21,6 +23,7 @@ export function QuickChangelogDialog({ open, onOpenChange }: Props) {
   const [features, setFeatures] = useState("");
   const [fixes, setFixes] = useState("");
   const [justPublished, setJustPublished] = useState(false);
+  const [alsoEmail, setAlsoEmail] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -28,6 +31,7 @@ export function QuickChangelogDialog({ open, onOpenChange }: Props) {
       setFeatures("");
       setFixes("");
       setJustPublished(false);
+      setAlsoEmail(false);
     }
   }, [open]);
 
@@ -52,9 +56,23 @@ export function QuickChangelogDialog({ open, onOpenChange }: Props) {
     create.mutate(
       { title, new_features: features, changes_fixes: fixes, target_user_id: null },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           setJustPublished(true);
           toast.success("Changelog envoyé à toutes les boutiques");
+          if (alsoEmail) {
+            try {
+              const { data, error } = await supabase.functions.invoke("send-notification-email", {
+                body: {
+                  action: "broadcast_changelog",
+                  variables: { version_date: title, features, fixes },
+                },
+              });
+              if (error) throw error;
+              toast.success(`E-mail envoyé à ${data?.sent ?? 0} boutique(s)`);
+            } catch (e: any) {
+              toast.error(e?.message ?? "Échec de l'envoi des e-mails");
+            }
+          }
         },
       }
     );
@@ -114,6 +132,16 @@ export function QuickChangelogDialog({ open, onOpenChange }: Props) {
             />
           </div>
         </div>
+
+        <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+          <Checkbox checked={alsoEmail} onCheckedChange={(v) => setAlsoEmail(v === true)} />
+          <span className="text-sm text-slate-300 flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5 text-[#00D4FF]" />
+            Envoyer aussi par e-mail à toutes les boutiques
+          </span>
+        </label>
+
+
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button
