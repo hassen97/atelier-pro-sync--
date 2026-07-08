@@ -56,9 +56,23 @@ export function QuickChangelogDialog({ open, onOpenChange }: Props) {
     create.mutate(
       { title, new_features: features, changes_fixes: fixes, target_user_id: null },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           setJustPublished(true);
           toast.success("Changelog envoyé à toutes les boutiques");
+          if (alsoEmail) {
+            try {
+              const { data, error } = await supabase.functions.invoke("send-notification-email", {
+                body: {
+                  action: "broadcast_changelog",
+                  variables: { version_date: title, features, fixes },
+                },
+              });
+              if (error) throw error;
+              toast.success(`E-mail envoyé à ${data?.sent ?? 0} boutique(s)`);
+            } catch (e: any) {
+              toast.error(e?.message ?? "Échec de l'envoi des e-mails");
+            }
+          }
         },
       }
     );
