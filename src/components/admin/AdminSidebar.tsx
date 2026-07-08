@@ -12,7 +12,7 @@ type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
   | "settings" | "employees" | "plans" | "promo_codes" | "gateways" | "feature_flags"
   | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
-  | "services_catalog" | "services_requests" | "system_health" | "growth_engine";
+  | "services_catalog" | "services_requests" | "system_health" | "growth_engine" | "email_templates";
 
 interface AdminSidebarProps {
   active: AdminView;
