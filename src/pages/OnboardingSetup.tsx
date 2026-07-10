@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { ensureSession, withSessionRetry } from "@/lib/authWrite";
 
 const STEPS = [
   { id: 1, label: "Identité", icon: Store },
