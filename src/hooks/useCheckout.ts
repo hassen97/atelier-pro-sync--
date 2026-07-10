@@ -80,7 +80,7 @@ export function useCreateOrder() {
         try {
           await supabase.from("promo_redemptions" as any).insert({
             promo_code_id: promoCodeId,
-            user_id: user.id,
+            user_id: uid,
             order_id: (order as any).id,
             discount_applied: discountApplied ?? 0,
           });
