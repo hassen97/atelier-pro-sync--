@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
               plan_name: planName.get(sub.plan_id) || 'votre offre',
               days_left: Math.max(daysLeft, 0),
               expires_date: expiresDate,
-              renew_url: 'https://atelier-pro-syncc.lovable.app/checkout',
+              renew_url: 'https://www.getheavencoin.com/checkout',
             },
           }),
         })
