@@ -211,10 +211,10 @@ export const SAMPLE_VARS: Record<string, TemplateVars> = {
     email: 'ahmed@example.com',
     phone: '+216 20 123 456',
     country: 'TN',
-    shop_url: 'https://atelier-pro-syncc.lovable.app/admin',
+    shop_url: 'https://www.getheavencoin.com/admin',
   },
   password_reset: {
-    reset_url: 'https://atelier-pro-syncc.lovable.app/auth#recovery',
+    reset_url: 'https://www.getheavencoin.com/auth#recovery',
     expiry_hours: 1,
   },
   subscription_expiry: {
@@ -222,12 +222,12 @@ export const SAMPLE_VARS: Record<string, TemplateVars> = {
     plan_name: 'Pro',
     days_left: 3,
     expires_date: '15 juillet 2026',
-    renew_url: 'https://atelier-pro-syncc.lovable.app/checkout',
+    renew_url: 'https://www.getheavencoin.com/checkout',
   },
   changelog: {
     version_date: 'Mise à jour du 8 juillet 2026',
     features: 'Nouveau tableau de bord financier\nModèles d\'e-mails personnalisables',
     fixes: 'Correction de l\'affichage mobile du POS',
-    app_url: 'https://atelier-pro-syncc.lovable.app',
+    app_url: 'https://www.getheavencoin.com',
   },
 }

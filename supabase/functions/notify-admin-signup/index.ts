@@ -119,8 +119,8 @@ Deno.serve(async (req) => {
         console.log("[notify-admin-signup] signup_admin template missing/disabled — skipping email");
       } else {
         const shopUrl = userId
-          ? "https://atelier-pro-syncc.lovable.app/admin"
-          : "https://atelier-pro-syncc.lovable.app/admin";
+          ? "https://www.getheavencoin.com/admin"
+          : "https://www.getheavencoin.com/admin";
         const rendered = renderEmail(tpl, {
           full_name,
           username,
