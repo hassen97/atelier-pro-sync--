@@ -145,23 +145,28 @@ export default function Checkout() {
       const trialEnd = new Date(now);
       trialEnd.setDate(trialEnd.getDate() + 3);
 
+      // Guarantee the auth token is attached so RLS `auth.uid()` is populated.
+      const uid = await ensureSession();
+
       // Deactivate any existing subscriptions
       await supabase
         .from("shop_subscriptions")
         .update({ status: "canceled" })
-        .eq("user_id", user.id);
+        .eq("user_id", uid);
 
-      const { error } = await supabase
-        .from("shop_subscriptions")
-        .insert({
-          user_id: user.id,
-          plan_id: trialPlan.id,
-          status: "trialing",
-          started_at: now.toISOString(),
-          expires_at: trialEnd.toISOString(),
-        });
+      await withSessionRetry(async () => {
+        const { error } = await supabase
+          .from("shop_subscriptions")
+          .insert({
+            user_id: uid,
+            plan_id: trialPlan.id,
+            status: "trialing",
+            started_at: now.toISOString(),
+            expires_at: trialEnd.toISOString(),
+          });
+        if (error) throw error;
+      });
 
-      if (error) throw error;
 
       // Invalidate caches that gate routing & subscription state, otherwise
       // ProtectedRoute would re-read its stale "no subscription" snapshot
