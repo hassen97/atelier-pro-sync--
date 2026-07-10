@@ -9,7 +9,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const PUBLIC_BASE_URL = "https://atelier-pro-sync.lovable.app";
+const PUBLIC_BASE_URL = "https://www.getheavencoin.com";
 const MIN_HOURS_BETWEEN_REMINDERS = 24; // 1 day (deadline is short: 48h total)
 const MAX_REMINDERS = 2;
 const FIRST_REMINDER_DAYS = 1; // J+1 after signup
