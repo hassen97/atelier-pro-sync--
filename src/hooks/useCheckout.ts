@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ensureSession, withSessionRetry } from "@/lib/authWrite";
 
 export interface EnabledGateway {
   id: string;
@@ -42,38 +43,44 @@ export function useCreateOrder() {
       promoCodeId?: string | null;
       discountApplied?: number;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      // Guarantee the auth token is attached so RLS `auth.uid()` is populated.
+      const uid = await ensureSession();
 
       // Upload proof screenshot
       const ext = proofFile.name.split('.').pop();
-      const filePath = `${user.id}/${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("payment-proofs")
-        .upload(filePath, proofFile);
-      if (uploadError) throw uploadError;
+      const filePath = `${uid}/${Date.now()}.${ext}`;
+      await withSessionRetry(async () => {
+        const { error: uploadError } = await supabase.storage
+          .from("payment-proofs")
+          .upload(filePath, proofFile);
+        if (uploadError) throw uploadError;
+      });
 
       // Create order
-      const { data: order, error: insertError } = await supabase
-        .from("subscription_orders" as any)
-        .insert({
-          user_id: user.id,
-          plan_id: planId,
-          gateway_key: gatewayKey,
-          amount,
-          currency,
-          proof_url: filePath,
-        })
-        .select("id")
-        .single();
-      if (insertError) throw insertError;
+      const order = await withSessionRetry(async () => {
+        const { data, error: insertError } = await supabase
+          .from("subscription_orders" as any)
+          .insert({
+            user_id: uid,
+            plan_id: planId,
+            gateway_key: gatewayKey,
+            amount,
+            currency,
+            proof_url: filePath,
+          })
+          .select("id")
+          .single();
+        if (insertError) throw insertError;
+        return data;
+      });
+
 
       // Record promo redemption (best-effort, never blocks the order)
       if (promoCodeId && order) {
         try {
           await supabase.from("promo_redemptions" as any).insert({
             promo_code_id: promoCodeId,
-            user_id: user.id,
+            user_id: uid,
             order_id: (order as any).id,
             discount_applied: discountApplied ?? 0,
           });

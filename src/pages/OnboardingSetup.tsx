@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { ensureSession, withSessionRetry } from "@/lib/authWrite";
 
 const STEPS = [
   { id: 1, label: "Identité", icon: Store },
@@ -75,38 +76,53 @@ export default function OnboardingSetup() {
 
     setSaving(true);
     try {
-      let logoUrl = logoPreview;
+      // Guarantee the auth token is attached so RLS `auth.uid()` is populated.
+      const uid = await ensureSession();
 
-      // Upload logo if new file selected
+      // Save shop settings FIRST (the critical step). Upsert on user_id so it
+      // works whether or not the trigger-created row exists, and always
+      // satisfies the owner RLS check.
+      await withSessionRetry(async () => {
+        const { error } = await supabase
+          .from("shop_settings")
+          .upsert(
+            {
+              user_id: uid,
+              shop_name: shopName.trim(),
+              address: address.trim() || null,
+              phone: phone.trim() || null,
+              whatsapp_phone: whatsappPhone.trim() || null,
+              email: email.trim() || null,
+              google_maps_url: googleMapsUrl.trim() || null,
+              store_hours: storeHours.trim() || null,
+              onboarding_completed: true,
+              updated_at: new Date().toISOString(),
+            } as any,
+            { onConflict: "user_id" }
+          );
+        if (error) throw error;
+      });
+
+      // Upload logo AFTER the shop is saved, and make it non-blocking so a
+      // storage hiccup can never strand the user at the final step.
       if (logoFile) {
-        const ext = logoFile.name.split(".").pop();
-        const path = `${user.id}/logo.${ext}`;
-        const { error: uploadError } = await supabase.storage
-          .from("shop-logos")
-          .upload(path, logoFile, { upsert: true });
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("shop-logos").getPublicUrl(path);
-        logoUrl = urlData.publicUrl;
+        try {
+          const ext = logoFile.name.split(".").pop();
+          const path = `${uid}/logo.${ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from("shop-logos")
+            .upload(path, logoFile, { upsert: true });
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage.from("shop-logos").getPublicUrl(path);
+          await supabase
+            .from("shop_settings")
+            .update({ logo_url: urlData.publicUrl } as any)
+            .eq("user_id", uid);
+        } catch (logoErr) {
+          console.error("[Onboarding] logo upload failed (non-blocking):", logoErr);
+          toast.message("Boutique enregistrée. Le logo n'a pas pu être ajouté, vous pourrez le faire depuis les réglages.");
+        }
       }
-
-      // Update shop_settings
-      const { error } = await supabase
-        .from("shop_settings")
-        .update({
-          shop_name: shopName.trim(),
-          address: address.trim() || null,
-          phone: phone.trim() || null,
-          whatsapp_phone: whatsappPhone.trim() || null,
-          email: email.trim() || null,
-          google_maps_url: googleMapsUrl.trim() || null,
-          store_hours: storeHours.trim() || null,
-          logo_url: logoUrl,
-          onboarding_completed: true,
-          updated_at: new Date().toISOString(),
-        } as any)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
 
       toast.success("Configuration terminée ! Bienvenue sur RepairPro 🎉");
       // Navigate to plan selection
@@ -117,6 +133,7 @@ export default function OnboardingSetup() {
       setSaving(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex items-center justify-center p-4">
