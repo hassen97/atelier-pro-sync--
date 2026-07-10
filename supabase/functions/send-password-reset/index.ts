@@ -43,9 +43,9 @@ Deno.serve(async (req) => {
       : authEmail
     if (!authEmail || !targetEmail) return ok()
 
-    // Build recovery link tied to the auth user.
-    const origin = String(body.redirect_origin ?? '').replace(/\/$/, '') ||
-      'https://atelier-pro-syncc.lovable.app'
+    // Build recovery link tied to the auth user. Always use the canonical
+    // domain so reset links land on the branded site regardless of caller.
+    const origin = 'https://www.getheavencoin.com'
     const redirectTo = `${origin}/update-password`
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
