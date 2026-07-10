@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { validatePromoCode } from "@/hooks/usePromoCodes";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { ensureSession, withSessionRetry } from "@/lib/authWrite";
 import {
   ArrowLeft, Check, Upload, Loader2, Smartphone, CreditCard,
   Landmark, Globe, Bitcoin, Image, ChevronRight, Clock, Zap, Camera, Ticket, X
