@@ -1,87 +1,35 @@
-# Fix "new row violates row-level security policy" at final signup step
-
 ## What's happening
 
-New shop owners hit `new row violates row-level security policy` on the **last onboarding step** (the "Configurez votre boutique" → Finalisation screen, and/or the plan/trial step right after). Evidence from the database: multiple recent accounts are stuck with `onboarding_completed = false`, `shop_name` still the default "Mon Atelier", and no subscription — including an account created at the exact time in the screenshot.
+The health-alert emails ("⚠️ 1 requête(s) lente(s) (> 5s) • PID 904891 — 10199.48s") are a **false alarm**. The flagged "slow query" is Supabase Realtime's logical-replication connection:
 
-Root causes:
+```text
+START_REPLICATION SLOT supabase_realtime_messages_replication_slot_...
+backend_type = walsender   state = active   wait_event = WalSenderWaitForWal
+```
 
-1. **Session/JWT not fully attached when the write fires.** The onboarding and trial writes run as soon as the page has a `user` object, but on slow/mobile networks the auth token isn't always attached to the database request yet. When that happens the database sees `auth.uid()` as `NULL`, so every `WITH CHECK (user_id = auth.uid())` policy rejects the row. This is intermittent, which is why many users succeed and some fail at the same step.
-2. **Fragile onboarding write.** Onboarding does a bare `UPDATE shop_settings ... WHERE user_id = user.id`. If the row is missing or the write races the session, it fails or silently updates nothing (leaving `shop_name = "Mon Atelier"`). It also uploads the logo first, so a storage RLS rejection aborts the whole step.
+This walsender is a long-lived streaming connection that powers the app's realtime features. It is permanently in the `active` state (by design), so its "duration" grows to hours. The `detect_health_issues` DB function only checks `state = 'active'` and duration > threshold — it does not exclude replication/background backends, so it mistakes this healthy connection for a runaway query and alerts every run (throttled to ~1 email per 30-min cooldown).
+
+Real database health is normal: memory 42%, disk 45%, connections 10/60, 0 restarts, no genuinely long-running client queries, no replication-slot bloat.
 
 ## The fix
 
-**1. Guard all post-auth writes behind a confirmed session**
-- In `OnboardingSetup.tsx` and `Checkout.tsx` (`handleStartTrial`, order creation), before any insert/update/upload, re-fetch and await a valid session (`supabase.auth.getSession()` / `getUser()`), and if missing, refresh once and retry. This guarantees `auth.uid()` is populated for the RLS `WITH CHECK`.
-- Add a short one-time retry wrapper: if a write fails with an RLS/`42501` error, refresh the session and retry once before surfacing the toast.
+Update the `detect_health_issues` function (via migration) so the slow-query detection only considers real client/application queries and ignores replication, vacuum, and other background backends.
 
-**2. Make the onboarding save robust**
-- Switch the `shop_settings` write to an **upsert keyed on `user_id`** (with `user_id` set explicitly) so it works whether or not the trigger row exists and always satisfies the RLS check.
-- Move the shop-settings save **before** the optional logo upload, and make the logo upload non-blocking (if the logo upload fails, still save the shop and continue) so a storage hiccup can't strand the user at the final step.
-
-**3. Verify RLS/storage policies (confirm, adjust only if the repro shows a gap)**
-- Confirm `shop_settings` has a working INSERT/UPDATE path for owners, `shop_subscriptions` insert policy, and the `shop-logos` / `payment-proofs` storage insert policies. These currently look correct; only add a missing policy if reproduction proves one is needed.
-
-**4. Reproduce end-to-end (as requested)**
-- Run an automated signup with a fresh username through the real flow: signup → login → onboarding (fill shop, submit) → plan/trial step → land on `/dashboard`. Capture the exact failing operation and confirm the fix reaches the dashboard cleanly. Re-run to confirm it's stable.
-
-## Full signup flow logic (diagram)
+Add to the slow-query subquery:
 
 ```text
-                 ┌─────────────────────────────────────────────┐
-                 │  /auth  (Register tab)                       │
-                 │  username → internal email, password, shop   │
-                 │  country/currency/phone, optional promo/ref  │
-                 └───────────────┬─────────────────────────────┘
-                                 │ signUp()  (client, REST fallback)
-                                 ▼
-        ┌──────────────────────────────────────────────────────────┐
-        │  auth.users row created                                    │
-        │  TRIGGER handle_new_user() (SECURITY DEFINER), isolated:   │
-        │    1) profiles      (verification_status = 'verified')     │
-        │    2) user_roles    ('super_admin')                        │
-        │    3) shop_settings (defaults: shop_name 'Mon Atelier')    │
-        │    4) waitlist gift → optional 3-day Pro trial             │
-        └───────────────┬──────────────────────────────────────────┘
-                         │ best-effort while session live:
-                         │  fingerprint, referral, promo, trial-offer
-                         ▼
-                 ┌───────────────────────────┐
-                 │  User signs in (/auth)     │  ← session established
-                 └───────────────┬───────────┘
-                                 ▼
-              ┌──────────────────────────────────────────┐
-              │  ProtectedRoute checks:                    │
-              │   role + onboarding_completed + subscription│
-              └───────┬───────────────────────┬───────────┘
-                      │ onboarding not done    │ done + sub
-                      ▼                        ▼
-        ┌──────────────────────────┐   ┌──────────────┐
-        │ /onboarding              │   │ /dashboard    │
-        │  step1 identity+logo     │   └──────────────┘
-        │  step2 contact           │
-        │  step3 FINALISATION ──── upsert shop_settings │  ← FIX: session-guarded upsert,
-        │        (+ optional logo) │                        logo non-blocking
-        └───────────┬──────────────┘
-                    ▼
-        ┌──────────────────────────────────────────┐
-        │ /checkout?onboarding=true                  │
-        │   • Start 3-day trial → insert             │  ← FIX: session-guarded insert
-        │     shop_subscriptions (status 'trialing') │
-        │   • or submit paid order → upload proof +  │
-        │     insert subscription_orders (pending)   │
-        └───────────┬────────────────────────────────┘
-                    ▼
-              ┌──────────────┐
-              │ /dashboard    │
-              └──────────────┘
+AND a.backend_type = 'client backend'
+AND a.query NOT ILIKE 'START_REPLICATION%'
 ```
 
-## Files touched
+Everything else in the function stays the same, so genuine slow app queries are still detected and the bloat check is untouched.
 
-- `src/pages/OnboardingSetup.tsx` — session guard + retry, upsert `shop_settings`, non-blocking logo.
-- `src/pages/Checkout.tsx` — session guard + retry around trial insert and order creation.
-- (Possibly) `src/hooks/useCheckout.ts` — same guard for the order/proof path.
-- A migration **only if** reproduction reveals a genuinely missing RLS/storage policy.
+## After the change
 
-No changes to the signup trigger or the frozen modules.
+- No code redeploy needed — `system-health-monitor` calls the function through RPC, so the corrected logic takes effect on the next scheduled run.
+- The recurring false alerts stop; you'll only get emails for actual slow client queries or table bloat.
+
+## Technical detail
+
+- One migration: `CREATE OR REPLACE FUNCTION public.detect_health_issues(...)` with the two added `WHERE` conditions in the `v_slow` subquery. Same signature, `SECURITY DEFINER`, and `search_path` as the current definition.
+- Optional (not required): also skip the `WalSenderWaitForWal` wait_event, but filtering on `backend_type = 'client backend'` already fully covers this case.
