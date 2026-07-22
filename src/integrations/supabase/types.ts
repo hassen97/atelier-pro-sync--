@@ -2608,6 +2608,7 @@ export type Database = {
         Args: { _closed_by_name?: string; _report?: Json; _shop_id: string }
         Returns: string
       }
+      dashboard_stats: { Args: { _shop_id: string }; Returns: Json }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
