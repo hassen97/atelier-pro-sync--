@@ -27,7 +27,7 @@ export function useCustomerHistory(customerId: string | undefined) {
       if (!user || !customerId) return [];
       const { data, error } = await supabase
         .from("sales")
-        .select("id, total_amount, amount_paid, payment_method, created_at")
+        .select("id, total_amount, amount_paid, payment_method, created_at, sale_items(id)")
         .eq("user_id", user.id)
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
