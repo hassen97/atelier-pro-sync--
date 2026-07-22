@@ -17,103 +17,39 @@ export interface DashboardStats {
   totalCustomers: number;
 }
 
+const EMPTY_STATS: DashboardStats = {
+  salesTotal: 0,
+  salesThisMonth: 0,
+  salesLastMonth: 0,
+  salesTrendPct: null,
+  repairsInProgress: 0,
+  repairsCompleted: 0,
+  repairsPending: 0,
+  stockAlerts: 0,
+  customerDebts: 0,
+  supplierDebts: 0,
+  totalProducts: 0,
+  totalCustomers: 0,
+};
+
 export function useDashboardStats() {
   const { user } = useAuth();
 
   return useQuery({
     queryKey: ["dashboard-stats", user?.id],
     queryFn: async (): Promise<DashboardStats> => {
-      if (!user) {
-        return {
-          salesTotal: 0,
-          salesThisMonth: 0,
-          salesLastMonth: 0,
-          salesTrendPct: null,
-          repairsInProgress: 0,
-          repairsCompleted: 0,
-          repairsPending: 0,
-          stockAlerts: 0,
-          customerDebts: 0,
-          supplierDebts: 0,
-          totalProducts: 0,
-          totalCustomers: 0,
-        };
-      }
+      if (!user) return EMPTY_STATS;
 
-      // Fetch all data in parallel
-      const [
-        repairsResult,
-        productsResult,
-        customersResult,
-        suppliersResult,
-        salesResult,
-        returnsResult,
-      ] = await Promise.all([
-        supabase
-          .from("repairs")
-          .select("id, status, total_cost")
-          .eq("user_id", user.id),
-        supabase
-          .from("products")
-          .select("id, quantity, min_quantity")
-          .eq("user_id", user.id),
-        supabase
-          .from("customers")
-          .select("id, balance")
-          .eq("user_id", user.id),
-        supabase
-          .from("suppliers")
-          .select("id, balance")
-          .eq("user_id", user.id),
-        supabase
-          .from("sales")
-          .select("id, total_amount, created_at")
-          .eq("user_id", user.id),
-        supabase
-          .from("product_returns")
-          .select("id, refund_amount")
-          .eq("user_id", user.id),
-      ]);
+      // Single-round-trip aggregate call — replaces 6 full-table scans
+      // that were previously done client-side every 30 seconds.
+      const { data, error } = await supabase.rpc("dashboard_stats" as any, {
+        _shop_id: user.id,
+      });
+      if (error) throw error;
 
-      const repairs = repairsResult.data || [];
-      const products = productsResult.data || [];
-      const customers = customersResult.data || [];
-      const suppliers = suppliersResult.data || [];
-      const sales = salesResult.data || [];
-      const returns = returnsResult.data || [];
-      const totalRefunds = returns.reduce((sum, r) => sum + (Number(r.refund_amount) || 0), 0);
-
-      // Calculate stats
-      const repairsInProgress = repairs.filter(r => r.status === "in_progress").length;
-      const repairsCompleted = repairs.filter(r => r.status === "completed" || r.status === "delivered").length;
-      const repairsPending = repairs.filter(r => r.status === "pending").length;
-      
-      const stockAlerts = products.filter(p => p.quantity <= p.min_quantity).length;
-      
-      const customerDebts = customers.reduce((sum, c) => {
-        const balance = Number(c.balance) || 0;
-        return sum + (balance < 0 ? Math.abs(balance) : 0);
-      }, 0);
-      
-      const supplierDebts = suppliers.reduce((sum, s) => {
-        const balance = Number(s.balance) || 0;
-        return sum + (balance < 0 ? Math.abs(balance) : 0);
-      }, 0);
-
-      const salesTotal = sales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0) - totalRefunds;
-
-      // Month-over-month sales comparison
-      const now = new Date();
-      const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-      const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-      let salesThisMonth = 0;
-      let salesLastMonth = 0;
-      for (const s of sales) {
-        const ts = s.created_at ? new Date(s.created_at).getTime() : 0;
-        const amount = Number(s.total_amount) || 0;
-        if (ts >= startThisMonth) salesThisMonth += amount;
-        else if (ts >= startLastMonth) salesLastMonth += amount;
-      }
+      const d = (data ?? {}) as Record<string, any>;
+      const salesThisMonth = Number(d.salesThisMonth) || 0;
+      const salesLastMonth = Number(d.salesLastMonth) || 0;
       const salesTrendPct =
         salesLastMonth > 0
           ? ((salesThisMonth - salesLastMonth) / salesLastMonth) * 100
@@ -122,22 +58,22 @@ export function useDashboardStats() {
           : null;
 
       return {
-        salesTotal,
+        salesTotal: Number(d.salesTotal) || 0,
         salesThisMonth,
         salesLastMonth,
         salesTrendPct,
-        repairsInProgress,
-        repairsCompleted,
-        repairsPending,
-        stockAlerts,
-        customerDebts,
-        supplierDebts,
-        totalProducts: products.length,
-        totalCustomers: customers.length,
+        repairsInProgress: Number(d.repairsInProgress) || 0,
+        repairsCompleted: Number(d.repairsCompleted) || 0,
+        repairsPending: Number(d.repairsPending) || 0,
+        stockAlerts: Number(d.stockAlerts) || 0,
+        customerDebts: Number(d.customerDebts) || 0,
+        supplierDebts: Number(d.supplierDebts) || 0,
+        totalProducts: Number(d.totalProducts) || 0,
+        totalCustomers: Number(d.totalCustomers) || 0,
       };
     },
     enabled: !!user,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000,
   });
 }
 
@@ -186,10 +122,9 @@ export function useLowStockAlerts(limit = 5) {
         .limit(20);
 
       if (error) throw error;
-      
-      // Filter and limit products with low stock
+
       return (data || [])
-        .filter(p => p.quantity <= p.min_quantity)
+        .filter((p) => p.quantity <= p.min_quantity)
         .slice(0, limit);
     },
     enabled: !!user,
