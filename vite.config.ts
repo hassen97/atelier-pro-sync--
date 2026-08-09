@@ -22,19 +22,20 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      strategies: "generateSW",
+      // Single worker: src/sw.ts owns precaching, runtime caching and push.
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       injectRegister: false, // we register manually with iframe guard in main.tsx
       devOptions: {
         enabled: false, // never run SW in dev / Lovable preview
       },
       manifest: false, // we ship our own /public/manifest.json
-      workbox: {
-        importScripts: ["/sw-custom.js"],
-        navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions/],
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
         // Heavy libs that are dynamically imported on demand — keep them out
-        // of the precache manifest to shrink the publish payload.
+        // of the precache manifest to shrink the publish payload. They are
+        // cached on first use by a runtime route in src/sw.ts.
         globIgnores: [
           "**/xlsx-*.js",
           "**/jspdf*.js",
@@ -47,31 +48,9 @@ export default defineConfig(({ mode }) => ({
           "**/receiptPdf-*.js",
         ],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        cleanupOutdatedCaches: true,
-        skipWaiting: true,
-        clientsClaim: true,
-        runtimeCaching: [
-          // Don't cache HTML aggressively — keep it fresh
-          {
-            urlPattern: ({ request }) => request.destination === "document",
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "html-cache",
-              networkTimeoutSeconds: 3,
-            },
-          },
-          // Cache the excluded heavy chunks on first use instead of precaching
-          {
-            urlPattern: /\/assets\/(xlsx|jspdf|html2canvas|purify\.es|index\.es|JsBarcode|BarChart|PieChart|receiptPdf)-[^/]+\.js$/,
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "heavy-libs",
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
-          },
-        ],
       },
     }),
+
   ].filter(Boolean),
   resolve: {
     alias: {
