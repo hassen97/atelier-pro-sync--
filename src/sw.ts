@@ -13,17 +13,51 @@
 //     "Nouvelle version disponible" flow can reload once into the new build.
 
 import { clientsClaim } from "workbox-core";
-import {
-  cleanupOutdatedCaches,
-  createHandlerBoundToURL,
-  precacheAndRoute,
-} from "workbox-precaching";
+import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst, StaleWhileRevalidate } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
-declare let self: ServiceWorkerGlobalScope & {
+// Minimal worker-scope typing: the project's tsconfig uses the DOM lib, which
+// does not expose the worker globals, and pulling in the webworker lib here
+// would conflict with it. `self.__WB_MANIFEST` must stay a literal expression
+// so vite-plugin-pwa can inject the precache manifest into it at build time.
+interface ExtendableEvt {
+  waitUntil(promise: Promise<unknown>): void;
+}
+interface PushEvt extends ExtendableEvt {
+  data: { json(): Record<string, unknown>; text(): string } | null;
+}
+interface NotificationClickEvt extends ExtendableEvt {
+  notification: { close(): void; data?: { url?: string } };
+}
+interface WorkerClient {
+  url: string;
+  focus?(): Promise<unknown>;
+  navigate?(url: string): Promise<unknown>;
+}
+declare let self: {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
+  skipWaiting(): void;
+  registration: {
+    showNotification(
+      title: string,
+      options: Record<string, unknown>,
+    ): Promise<void>;
+  };
+  clients: {
+    matchAll(options: Record<string, unknown>): Promise<WorkerClient[]>;
+    openWindow?(url: string): Promise<unknown>;
+  };
+  addEventListener(type: "push", cb: (event: PushEvt) => void): void;
+  addEventListener(
+    type: "notificationclick",
+    cb: (event: NotificationClickEvt) => void,
+  ): void;
+  addEventListener(
+    type: "message",
+    cb: (event: { data?: { type?: string } }) => void,
+  ): void;
 };
 
 // ---------------------------------------------------------------------------
@@ -33,28 +67,19 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 // ---------------------------------------------------------------------------
-// 2. SPA navigations — network first, fall back to the cached shell offline.
+// 2. SPA navigations — network first, so a new deploy is picked up quickly;
+//    falls back to the cached shell when offline.
 // ---------------------------------------------------------------------------
-const NAVIGATION_DENYLIST = [/^\/~oauth/, /^\/api/, /^\/functions/];
-
 registerRoute(
   new NavigationRoute(
     new NetworkFirst({
       cacheName: "html-cache",
       networkTimeoutSeconds: 3,
-    }).handle.bind(
-      new NetworkFirst({ cacheName: "html-cache", networkTimeoutSeconds: 3 }),
-    ) as never,
-    { denylist: NAVIGATION_DENYLIST },
+    }),
+    { denylist: [/^\/~oauth/, /^\/api/, /^\/functions/] },
   ),
 );
 
-// Offline fallback to the precached shell for app routes.
-registerRoute(
-  new NavigationRoute(createHandlerBoundToURL("/index.html"), {
-    denylist: NAVIGATION_DENYLIST,
-  }),
-);
 
 // ---------------------------------------------------------------------------
 // 3. Heavy lazy chunks excluded from the precache manifest — cache on use.
