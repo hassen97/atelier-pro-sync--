@@ -135,6 +135,14 @@ const App = () => (
                 } />
                 
                 {/* Admin route - separate layout */}
+                {/* TEMPORARY: one-time Live DB restore bridge */}
+                <Route path="/db-restore" element={
+                  <ProtectedRoute>
+                    <DbRestore />
+                  </ProtectedRoute>
+                } />
+
+                {/* Admin route - separate layout */}
                 <Route path="/admin" element={
                   <ProtectedRoute>
                     <AdminDashboard />
