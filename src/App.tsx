@@ -81,6 +81,7 @@ const Services = lazyWithRetry(() => import("./pages/Services"));
 const Vault = lazyWithRetry(() => import("./pages/Vault"));
 const PanicAnalyzer = lazyWithRetry(() => import("./pages/PanicAnalyzer"));
 const Referrals = lazyWithRetry(() => import("./pages/Referrals"));
+const DbRestore = lazyWithRetry(() => import("./pages/DbRestore"));
 
 
 const queryClient = new QueryClient({
@@ -133,6 +134,14 @@ const App = () => (
                   </ProtectedRoute>
                 } />
                 
+                {/* Admin route - separate layout */}
+                {/* TEMPORARY: one-time Live DB restore bridge */}
+                <Route path="/db-restore" element={
+                  <ProtectedRoute>
+                    <DbRestore />
+                  </ProtectedRoute>
+                } />
+
                 {/* Admin route - separate layout */}
                 <Route path="/admin" element={
                   <ProtectedRoute>
