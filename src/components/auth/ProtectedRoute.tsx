@@ -181,7 +181,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // Platform admin redirect logic. Admins live in /admin.
-  const adminAllowedPaths = ["/admin"];
+  // "/db-restore" is the temporary Live-restore bridge; remove it with the page.
+  const adminAllowedPaths = ["/admin", "/db-restore"];
   if (
     isPlatformAdmin &&
     !adminAllowedPaths.includes(location.pathname) &&
