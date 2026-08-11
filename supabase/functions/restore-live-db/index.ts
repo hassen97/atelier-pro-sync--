@@ -79,11 +79,16 @@ const q = (id: string) => `"${id.replace(/"/g, '""')}"`;
 
 // ── EXPORT (run in Test) ───────────────────────────────────────
 async function doExport() {
+  const steps: string[] = [];
+  let stage = "connect";
   const pg = new PgClient(DB_URL);
-  await pg.connect();
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY);
   try {
+    await pg.connect();
+    steps.push("connected to database");
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    stage = "list tables";
     const tables = await publicTables(pg);
+    steps.push(`found ${tables.length} public tables`);
     const payload: Record<string, unknown> = {
       generated_at: new Date().toISOString(),
       source: SUPABASE_URL,
@@ -91,6 +96,7 @@ async function doExport() {
     const tableData: Record<string, unknown[]> = {};
     const counts: Record<string, number> = {};
     for (const t of tables) {
+      stage = `dump public.${t}`;
       const r = await pg.queryObject<{ data: unknown[] }>(
         `SELECT COALESCE(json_agg(row_to_json(x)), '[]'::json) AS data FROM public.${q(t)} x`,
       );
@@ -98,7 +104,9 @@ async function doExport() {
       tableData[t] = rows;
       counts[t] = rows.length;
     }
+    steps.push("dumped all public tables");
     payload.tables = tableData;
+
 
     for (const [schema, name] of [["auth", "users"], ["auth", "identities"]]) {
       const cols = await insertableColumns(pg, schema, name);
