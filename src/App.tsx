@@ -123,6 +123,8 @@ const App = () => (
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
                 <Route path="/landing" element={<LandingPage />} />
+                <Route path="/index" element={<Navigate to="/" replace />} />
+                <Route path="/home" element={<Navigate to="/" replace />} />
                 <Route path="/checkout" element={<Checkout />} />
 
 
