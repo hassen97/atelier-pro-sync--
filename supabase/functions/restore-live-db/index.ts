@@ -1,6 +1,6 @@
 // TEMPORARY admin-only bridge: copies the Test database into the Live database.
 // Delete this function (and the /db-restore page) once the restore is done.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Client as PgClient } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
