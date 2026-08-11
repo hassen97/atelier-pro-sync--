@@ -109,6 +109,7 @@ async function doExport() {
 
 
     for (const [schema, name] of [["auth", "users"], ["auth", "identities"]]) {
+      stage = `dump ${schema}.${name}`;
       const cols = await insertableColumns(pg, schema, name);
       const sel = cols.map(q).join(", ");
       const r = await pg.queryObject<{ data: unknown[] }>(
@@ -118,11 +119,13 @@ async function doExport() {
       const rows = (r.rows[0]?.data ?? []) as unknown[];
       payload[`auth_${name}`] = { columns: cols, rows };
       counts[`auth.${name}`] = rows.length;
+      steps.push(`dumped ${schema}.${name} (${rows.length} rows)`);
     }
 
     // Storage manifest with signed URLs (7 days)
     const files: { bucket: string; path: string; url: string; contentType: string }[] = [];
     for (const bucket of BUCKETS) {
+      stage = `list storage bucket ${bucket}`;
       const paths = await listBucket(admin, bucket, "");
       for (const p of paths) {
         const { data: signed } = await admin.storage
@@ -137,24 +140,32 @@ async function doExport() {
           });
         }
       }
+      steps.push(`bucket ${bucket}: ${paths.length} file(s)`);
     }
     payload.files = files;
 
+    stage = "compress payload";
     const raw = new TextEncoder().encode(JSON.stringify(payload));
     const gz = await gzip(raw);
+    steps.push(`compressed payload (${gz.byteLength} bytes)`);
+    stage = "upload payload";
     const key = `payload-${Date.now()}.json.gz`;
     const up = await admin.storage.from(PAYLOAD_BUCKET).upload(key, gz, {
       contentType: "application/gzip",
       upsert: true,
     });
     if (up.error) throw up.error;
+    stage = "sign payload url";
     const { data: signed, error: sErr } = await admin.storage
       .from(PAYLOAD_BUCKET)
       .createSignedUrl(key, 60 * 60 * 24 * 3);
     if (sErr) throw sErr;
+    steps.push("payload uploaded and signed");
 
     return json({
       ok: true,
+      stage: "done",
+      steps,
       payloadUrl: signed?.signedUrl,
       key,
       sizeBytes: gz.byteLength,
@@ -162,10 +173,13 @@ async function doExport() {
       fileCount: files.length,
       counts,
     });
+  } catch (e) {
+    return json({ error: `Export failed at "${stage}": ${String((e as Error)?.message ?? e)}`, stage, steps }, 500);
   } finally {
-    await pg.end();
+    await pg.end().catch(() => {});
   }
 }
+
 
 async function listBucket(
   admin: ReturnType<typeof createClient>,
