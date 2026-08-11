@@ -79,6 +79,46 @@ function handleUpdateReady() {
   document.addEventListener("visibilitychange", applyWhenHidden);
 }
 
+// ---------------------------------------------------------------------------
+// Self-healing for a stale precached shell.
+//
+// If a browser still holds an old service worker, it can serve an app shell
+// whose hashed asset bundles no longer exist on the server — the page then
+// renders nothing at all (white screen). Detect that by probing the entry
+// script the running document points at: when the network says 404/410, the
+// cached shell is dead. In that case wipe caches, unregister every worker and
+// reload exactly once (guarded by sessionStorage so it can never loop).
+// ---------------------------------------------------------------------------
+
+const STALE_SHELL_GUARD = "sw_stale_shell_recovered";
+
+async function recoverFromStaleShell(): Promise<boolean> {
+  try {
+    if (sessionStorage.getItem(STALE_SHELL_GUARD)) return false;
+
+    const entry = getCurrentEntrySignature();
+    // Only meaningful for a built (hashed) entry served from /assets.
+    if (!entry || !/\/assets\/index-/.test(entry)) return false;
+
+    const res = await fetch(entry, { cache: "no-store", method: "GET" });
+    if (res.status !== 404 && res.status !== 410) return false;
+
+    sessionStorage.setItem(STALE_SHELL_GUARD, "1");
+
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+
+    reloadOnce();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
 
@@ -90,6 +130,10 @@ export function registerServiceWorker() {
     });
     return;
   }
+
+  // A dead cached shell must be cleared before anything else runs.
+  void recoverFromStaleShell();
+
 
   // When the new worker takes control (skipWaiting + clientsClaim), reload
   // once to swap in the fresh hashed chunks.
