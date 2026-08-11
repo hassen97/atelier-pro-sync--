@@ -79,11 +79,16 @@ const q = (id: string) => `"${id.replace(/"/g, '""')}"`;
 
 // ── EXPORT (run in Test) ───────────────────────────────────────
 async function doExport() {
+  const steps: string[] = [];
+  let stage = "connect";
   const pg = new PgClient(DB_URL);
-  await pg.connect();
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY);
   try {
+    await pg.connect();
+    steps.push("connected to database");
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    stage = "list tables";
     const tables = await publicTables(pg);
+    steps.push(`found ${tables.length} public tables`);
     const payload: Record<string, unknown> = {
       generated_at: new Date().toISOString(),
       source: SUPABASE_URL,
@@ -91,6 +96,7 @@ async function doExport() {
     const tableData: Record<string, unknown[]> = {};
     const counts: Record<string, number> = {};
     for (const t of tables) {
+      stage = `dump public.${t}`;
       const r = await pg.queryObject<{ data: unknown[] }>(
         `SELECT COALESCE(json_agg(row_to_json(x)), '[]'::json) AS data FROM public.${q(t)} x`,
       );
@@ -98,9 +104,12 @@ async function doExport() {
       tableData[t] = rows;
       counts[t] = rows.length;
     }
+    steps.push("dumped all public tables");
     payload.tables = tableData;
 
+
     for (const [schema, name] of [["auth", "users"], ["auth", "identities"]]) {
+      stage = `dump ${schema}.${name}`;
       const cols = await insertableColumns(pg, schema, name);
       const sel = cols.map(q).join(", ");
       const r = await pg.queryObject<{ data: unknown[] }>(
@@ -110,11 +119,13 @@ async function doExport() {
       const rows = (r.rows[0]?.data ?? []) as unknown[];
       payload[`auth_${name}`] = { columns: cols, rows };
       counts[`auth.${name}`] = rows.length;
+      steps.push(`dumped ${schema}.${name} (${rows.length} rows)`);
     }
 
     // Storage manifest with signed URLs (7 days)
     const files: { bucket: string; path: string; url: string; contentType: string }[] = [];
     for (const bucket of BUCKETS) {
+      stage = `list storage bucket ${bucket}`;
       const paths = await listBucket(admin, bucket, "");
       for (const p of paths) {
         const { data: signed } = await admin.storage
@@ -129,24 +140,32 @@ async function doExport() {
           });
         }
       }
+      steps.push(`bucket ${bucket}: ${paths.length} file(s)`);
     }
     payload.files = files;
 
+    stage = "compress payload";
     const raw = new TextEncoder().encode(JSON.stringify(payload));
     const gz = await gzip(raw);
+    steps.push(`compressed payload (${gz.byteLength} bytes)`);
+    stage = "upload payload";
     const key = `payload-${Date.now()}.json.gz`;
     const up = await admin.storage.from(PAYLOAD_BUCKET).upload(key, gz, {
       contentType: "application/gzip",
       upsert: true,
     });
     if (up.error) throw up.error;
+    stage = "sign payload url";
     const { data: signed, error: sErr } = await admin.storage
       .from(PAYLOAD_BUCKET)
       .createSignedUrl(key, 60 * 60 * 24 * 3);
     if (sErr) throw sErr;
+    steps.push("payload uploaded and signed");
 
     return json({
       ok: true,
+      stage: "done",
+      steps,
       payloadUrl: signed?.signedUrl,
       key,
       sizeBytes: gz.byteLength,
@@ -154,10 +173,13 @@ async function doExport() {
       fileCount: files.length,
       counts,
     });
+  } catch (e) {
+    return json({ error: `Export failed at "${stage}": ${String((e as Error)?.message ?? e)}`, stage, steps }, 500);
   } finally {
-    await pg.end();
+    await pg.end().catch(() => {});
   }
 }
+
 
 async function listBucket(
   admin: ReturnType<typeof createClient>,
@@ -188,36 +210,56 @@ async function listBucket(
 
 // ── IMPORT (run in Live) ───────────────────────────────────────
 async function doImport(payloadUrl: string, skipFiles: boolean) {
-  const res = await fetch(payloadUrl);
-  if (!res.ok) return json({ error: `Payload fetch failed (${res.status})` }, 400);
-  const payload = JSON.parse(
-    new TextDecoder().decode(await gunzip(new Uint8Array(await res.arrayBuffer()))),
-  ) as any;
+  const steps: string[] = [];
+  let stage = "fetch payload";
+  const res = await fetch(payloadUrl).catch((e) => {
+    throw new Error(`payload fetch error: ${String(e)}`);
+  });
+  if (!res.ok) return json({ error: `Payload fetch failed (${res.status})`, stage, steps }, 400);
+  stage = "decompress payload";
+  let payload: any;
+  try {
+    payload = JSON.parse(
+      new TextDecoder().decode(await gunzip(new Uint8Array(await res.arrayBuffer()))),
+    );
+  } catch (e) {
+    return json({ error: `Payload decode failed: ${String((e as Error)?.message ?? e)}`, stage, steps }, 400);
+  }
+  steps.push(`payload loaded (from ${payload.source}, generated ${payload.generated_at})`);
 
   const pg = new PgClient(DB_URL);
+  stage = "connect";
   await pg.connect();
+  steps.push("connected to database");
   const report: Record<string, unknown> = { source: payload.source, generatedAt: payload.generated_at };
   const inserted: Record<string, number> = {};
   try {
+    stage = "list tables";
     const localTables = await publicTables(pg);
+    steps.push(`target has ${localTables.length} public tables`);
     await pg.queryArray("BEGIN");
     await pg.queryArray("SET LOCAL session_replication_role = 'replica'");
 
     // Wipe
+    stage = "truncate public tables";
     const truncList = localTables.map((t) => `public.${q(t)}`).join(", ");
     await pg.queryArray(`TRUNCATE TABLE ${truncList} CASCADE`);
+    stage = "clear auth tables";
     await pg.queryArray("DELETE FROM auth.identities");
     await pg.queryArray("DELETE FROM auth.sessions");
     await pg.queryArray("DELETE FROM auth.refresh_tokens");
     await pg.queryArray("DELETE FROM auth.users");
+    steps.push("wiped existing rows (public + auth)");
 
     // Auth first
     for (const name of ["users", "identities"]) {
       const src = payload[`auth_${name}`];
       if (!src?.rows?.length) continue;
+      stage = `insert auth.${name}`;
       const localCols = await insertableColumns(pg, "auth", name);
       const cols = localCols.filter((c) => src.columns.includes(c));
       inserted[`auth.${name}`] = await insertRows(pg, "auth", name, cols, src.rows);
+      steps.push(`inserted auth.${name}: ${inserted[`auth.${name}`]} rows`);
     }
 
     // Public tables
@@ -227,11 +269,14 @@ async function doImport(payloadUrl: string, skipFiles: boolean) {
         inserted[t] = 0;
         continue;
       }
+      stage = `insert public.${t}`;
       const cols = await insertableColumns(pg, "public", t);
       inserted[t] = await insertRows(pg, "public", t, cols, rows);
     }
+    steps.push("inserted all public table rows");
 
     // Resync sequences
+    stage = "resync sequences";
     await pg.queryArray(`
       DO $$
       DECLARE r record; mx bigint;
@@ -251,17 +296,28 @@ async function doImport(payloadUrl: string, skipFiles: boolean) {
       END $$;
     `);
 
+    stage = "commit";
     await pg.queryArray("COMMIT");
+    steps.push("transaction committed");
     report.inserted = inserted;
   } catch (e) {
     await pg.queryArray("ROLLBACK").catch(() => {});
-    await pg.end();
-    return json({ error: `Import failed: ${String((e as Error)?.message ?? e)}`, inserted }, 500);
+    await pg.end().catch(() => {});
+    return json(
+      {
+        error: `Import failed at "${stage}": ${String((e as Error)?.message ?? e)}`,
+        stage,
+        steps,
+        inserted,
+      },
+      500,
+    );
   }
-  await pg.end();
+  await pg.end().catch(() => {});
 
   // Storage copy (outside the transaction)
   if (!skipFiles && Array.isArray(payload.files)) {
+    stage = "copy storage files";
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     let copied = 0;
     const failures: string[] = [];
@@ -282,10 +338,14 @@ async function doImport(payloadUrl: string, skipFiles: boolean) {
     }
     report.filesCopied = copied;
     report.fileFailures = failures;
+    steps.push(`storage: ${copied} copied, ${failures.length} failed`);
+  } else {
+    steps.push("storage copy skipped");
   }
 
-  return json({ ok: true, ...report });
+  return json({ ok: true, stage: "done", steps, ...report });
 }
+
 
 async function insertRows(
   pg: PgClient,
