@@ -105,10 +105,6 @@ export default function LandingPage() {
   const { data: plans } = usePublicPlans();
   const { startDemo, loading: demoLoading } = useDemoLogin();
 
-  // On open: run a status-returning update check, then drive the 3D overlay.
-  //  - "current": play a brief confirmation beat, then reveal the landing page.
-  //  - "update":  show a blocking refresh prompt (mandatory) until the user
-  //               clears the cache and reloads into the latest version.
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
@@ -135,8 +131,6 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const ctaLink = user ? "/dashboard" : "/auth";
-
   const handlePlanClick = (planId: string) => {
     if (user) {
       navigate(`/checkout?plan=${planId}`);
@@ -147,7 +141,6 @@ export default function LandingPage() {
 
   const displayPlans = plans || [];
 
-  // 3D update-check overlay while we verify the visitor is on the latest build.
   if (updatePhase !== "done") {
     return <UpdateCheckOverlay state={updatePhase} onRefresh={() => applyUpdateNow()} />;
   }
@@ -168,7 +161,6 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5 relative z-10">
             <img src={repairProLogo} alt="RepairPro" className="h-8 w-8 rounded-lg" width={32} height={32} />
-
             <span className="text-lg font-bold tracking-tight" style={{ color: "hsl(0 0% 98%)" }}>
               RepairPro
             </span>
@@ -325,60 +317,61 @@ export default function LandingPage() {
           >
             <span className="lp-gradient-text">Votre Boutique</span>
             <br />
-            <span className="lp-gradient-text-accent">Élevé au Niveau Supérieur.</span>
+            <span className="lp-gradient-text-accent">Élevée au Niveau Supérieur.</span>
           </motion.h1>
 
           <motion.p
             variants={fadeUp}
-            className="mx-auto mt-6 max-w-2xl text-base sm:text-lg"
-            style={{ color: "hsl(240 5% 55%)", lineHeight: 1.7 }}
+            className="mx-auto mt-6 max-w-2xl text-base sm:text-lg text-muted-foreground"
+            style={{ lineHeight: 1.7 }}
           >
             Inventaire intelligent, suivi de réparation en temps réel et facturation en un clic. Reprenez le contrôle
             total de votre activité de réparation mobile.
           </motion.p>
 
-          {/* CTA: 3 actions — Démo / Créer un compte / Connexion */}
+          {/* CTA: Optimized Hierarchy */}
           <motion.div
             variants={fadeUp}
             className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
           >
+            <Link to="/auth?tab=register" className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                className="lp-glow-btn rounded-full px-8 h-12 text-sm font-semibold w-full"
+                style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+              >
+                <UserPlus className="mr-2 h-5 w-5" /> Créer un compte
+              </Button>
+            </Link>
+
             <Button
               size="lg"
+              variant="outline"
               onClick={startDemo}
               disabled={demoLoading}
-              className="lp-glow-btn rounded-full px-7 h-12 text-sm font-semibold w-full sm:w-auto"
-              style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+              className="rounded-full px-7 h-12 text-sm font-medium w-full sm:w-auto"
+              style={{
+                background: "hsla(240, 6%, 10%, 0.6)",
+                borderColor: "hsla(0, 0%, 100%, 0.12)",
+                color: "hsl(0 0% 98%)",
+              }}
             >
               {demoLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <PlayCircle className="mr-2 h-5 w-5" /> Essayer la démo
+                  <PlayCircle className="mr-2 h-4 w-4" /> Essayer la démo
                 </>
               )}
             </Button>
-            <Link to="/auth?tab=register" className="w-full sm:w-auto">
-              <Button
-                size="lg"
-                variant="outline"
-                className="rounded-full px-7 h-12 text-sm font-medium w-full"
-                style={{
-                  background: "hsla(240, 6%, 10%, 0.6)",
-                  borderColor: "hsla(0, 0%, 100%, 0.12)",
-                  color: "hsl(0 0% 98%)",
-                }}
-              >
-                <UserPlus className="mr-2 h-4 w-4" /> Créer un compte
-              </Button>
-            </Link>
-            <Link to="/auth" className="w-full sm:w-auto">
+
+            <Link to="/auth" className="w-full sm:w-auto hidden sm:block">
               <Button
                 size="lg"
                 variant="ghost"
-                className="rounded-full px-7 h-12 text-sm font-medium w-full"
-                style={{ color: "hsl(240 5% 70%)" }}
+                className="rounded-full px-4 h-12 text-sm font-medium w-full text-muted-foreground hover:text-foreground"
               >
-                <LogIn className="mr-2 h-4 w-4" /> Connexion
+                Connexion
               </Button>
             </Link>
           </motion.div>
@@ -693,7 +686,7 @@ export default function LandingPage() {
 
                   <div>
                     {plan.price === 0 ? (
-                      <Link to={ctaLink}>
+                      <Link to="/auth?tab=register">
                         <Button
                           className="w-full rounded-full lp-glow-btn"
                           style={{
@@ -751,35 +744,35 @@ export default function LandingPage() {
             Rejoignez des centaines d'ateliers qui utilisent RepairPro pour gérer leur activité au quotidien.
           </motion.p>
           <motion.div variants={fadeUp} className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link to="/auth?tab=register" className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                className="lp-glow-btn rounded-full px-8 h-12 text-sm font-semibold w-full"
+                style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+              >
+                <UserPlus className="mr-2 h-5 w-5" /> Créer un compte
+              </Button>
+            </Link>
             <Button
               size="lg"
+              variant="outline"
               onClick={startDemo}
               disabled={demoLoading}
-              className="lp-glow-btn rounded-full px-8 h-12 text-sm font-semibold w-full sm:w-auto"
-              style={{ background: "linear-gradient(135deg, hsl(217 91% 55%), hsl(217 91% 40%))", color: "white" }}
+              className="rounded-full px-8 h-12 text-sm font-medium w-full sm:w-auto"
+              style={{
+                background: "hsla(240, 6%, 10%, 0.6)",
+                borderColor: "hsla(0, 0%, 100%, 0.12)",
+                color: "hsl(0 0% 98%)",
+              }}
             >
               {demoLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <PlayCircle className="mr-2 h-5 w-5" /> Essayer la démo
+                  <PlayCircle className="mr-2 h-4 w-4" /> Essayer la démo
                 </>
               )}
             </Button>
-            <Link to="/auth?tab=register" className="w-full sm:w-auto">
-              <Button
-                size="lg"
-                variant="outline"
-                className="rounded-full px-8 h-12 text-sm font-medium w-full"
-                style={{
-                  background: "hsla(240, 6%, 10%, 0.6)",
-                  borderColor: "hsla(0, 0%, 100%, 0.12)",
-                  color: "hsl(0 0% 98%)",
-                }}
-              >
-                <UserPlus className="mr-2 h-4 w-4" /> Créer un compte
-              </Button>
-            </Link>
             <Link to="/auth" className="w-full sm:w-auto">
               <Button
                 size="lg"
@@ -806,7 +799,6 @@ export default function LandingPage() {
               height={24}
               loading="lazy"
             />
-
             <span className="font-semibold text-sm" style={{ color: "hsl(0 0% 85%)" }}>
               RepairPro
             </span>
