@@ -377,8 +377,11 @@ serve(async (req) => {
     if (!callerId) return json({ error: "Unauthorized" }, 401);
 
     const body = await req.json().catch(() => ({} as any));
-    if (!RESTORE_SECRET || body.secret !== RESTORE_SECRET) {
-      return json({ error: "Invalid restore secret" }, 403);
+    if (!RESTORE_SECRET) {
+      return json({ error: "RESTORE_SECRET is not configured in this backend", env: SUPABASE_URL }, 403);
+    }
+    if (body.secret !== RESTORE_SECRET) {
+      return json({ error: "Invalid restore secret for this backend", env: SUPABASE_URL }, 403);
     }
 
     if (body.action === "export") return await doExport();
