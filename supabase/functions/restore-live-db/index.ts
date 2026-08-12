@@ -23,7 +23,10 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const DB_URL = Deno.env.get("SUPABASE_DB_URL")!;
-const RESTORE_SECRET = Deno.env.get("RESTORE_SECRET")!;
+const RESTORE_SECRETS = [
+  Deno.env.get("RESTORE_SECRET"),
+  Deno.env.get("RESTORE_SECRET_V2"),
+].filter((s): s is string => !!s && s.length > 0);
 
 async function requireAdmin(req: Request): Promise<string | null> {
   const authHeader = req.headers.get("Authorization");
@@ -377,8 +380,11 @@ serve(async (req) => {
     if (!callerId) return json({ error: "Unauthorized" }, 401);
 
     const body = await req.json().catch(() => ({} as any));
-    if (!RESTORE_SECRET || body.secret !== RESTORE_SECRET) {
-      return json({ error: "Invalid restore secret" }, 403);
+    if (RESTORE_SECRETS.length === 0) {
+      return json({ error: "RESTORE_SECRET is not configured in this backend", env: SUPABASE_URL }, 403);
+    }
+    if (typeof body.secret !== "string" || !RESTORE_SECRETS.includes(body.secret)) {
+      return json({ error: "Invalid restore secret for this backend", env: SUPABASE_URL }, 403);
     }
 
     if (body.action === "export") return await doExport();
