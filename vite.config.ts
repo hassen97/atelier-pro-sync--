@@ -64,6 +64,7 @@ export default defineConfig(({ mode }) => ({
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
           // 3D login loader libs — heavy, only loaded lazily on owner login.
+          // Safe to split: nothing in the eager startup path imports them.
           if (
             id.includes("/three/") ||
             id.includes("/three-stdlib/") ||
@@ -71,37 +72,12 @@ export default defineConfig(({ mode }) => ({
           ) {
             return "vendor-three";
           }
-          if (
-            id.includes("node_modules/react-dom") ||
-            id.match(/node_modules\/react\//) ||
-            id.includes("node_modules/scheduler")
-          ) {
-            return "vendor-react";
-          }
-          if (id.includes("react-router")) return "vendor-router";
-          if (id.includes("@radix-ui")) return "vendor-radix";
-          if (id.includes("@supabase")) return "vendor-supabase";
-          if (id.includes("@tanstack")) return "vendor-query";
-          if (id.includes("framer-motion")) return "vendor-motion";
-          if (id.includes("lucide-react")) return "vendor-icons";
-          if (
-            id.includes("react-hook-form") ||
-            id.includes("@hookform") ||
-            id.includes("/zod/")
-          ) {
-            return "vendor-forms";
-          }
-          if (id.includes("date-fns")) return "vendor-date";
-          if (
-            id.includes("/sonner/") ||
-            id.includes("/vaul/") ||
-            id.includes("/cmdk/") ||
-            id.includes("class-variance-authority") ||
-            id.includes("tailwind-merge") ||
-            id.includes("/clsx/")
-          ) {
-            return "vendor-ui";
-          }
+          // Everything else that touches React stays in ONE chunk. Splitting
+          // react/react-dom away from its consumers lets a consumer chunk
+          // execute before React initialises, which crashed the production
+          // bundle with "Cannot read properties of undefined (reading
+          // 'forwardRef')". Do not re-split these.
+          return "vendor";
         },
       },
     },
