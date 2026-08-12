@@ -380,10 +380,10 @@ serve(async (req) => {
     if (!callerId) return json({ error: "Unauthorized" }, 401);
 
     const body = await req.json().catch(() => ({} as any));
-    if (!RESTORE_SECRET) {
+    if (RESTORE_SECRETS.length === 0) {
       return json({ error: "RESTORE_SECRET is not configured in this backend", env: SUPABASE_URL }, 403);
     }
-    if (body.secret !== RESTORE_SECRET) {
+    if (typeof body.secret !== "string" || !RESTORE_SECRETS.includes(body.secret)) {
       return json({ error: "Invalid restore secret for this backend", env: SUPABASE_URL }, 403);
     }
 
