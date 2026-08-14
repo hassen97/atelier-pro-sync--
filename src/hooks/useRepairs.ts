@@ -90,6 +90,61 @@ export function useRepairs(page = 0) {
   });
 }
 
+export interface RepairStatusCounts {
+  all: number;
+  pending: number;
+  in_progress: number;
+  completed: number;
+  rejected: number;
+  warranty: number;
+}
+
+/**
+ * Shop-wide status counts for the repairs tab badges.
+ * Narrow select (status + is_warranty only), batched to bypass the 1000-row default limit.
+ * Shares the ["repairs"] key prefix so existing mutation invalidations refresh it.
+ */
+export function useRepairStatusCounts() {
+  const effectiveUserId = useEffectiveUserId();
+
+  return useQuery({
+    queryKey: ["repairs", "status-counts", effectiveUserId],
+    queryFn: async (): Promise<RepairStatusCounts> => {
+      const empty: RepairStatusCounts = {
+        all: 0, pending: 0, in_progress: 0, completed: 0, rejected: 0, warranty: 0,
+      };
+      if (!effectiveUserId) return empty;
+
+      const PAGE = 1000;
+      const rows: { status: string | null; is_warranty: boolean | null }[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("repairs")
+          .select("status, is_warranty")
+          .eq("user_id", effectiveUserId)
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        const batch = data ?? [];
+        rows.push(...(batch as typeof rows));
+        if (batch.length < PAGE) break;
+      }
+
+      const counts = { ...empty, all: rows.length };
+      for (const r of rows) {
+        if (r.status && r.status in counts) {
+          counts[r.status as keyof RepairStatusCounts] += 1;
+        }
+        if (r.is_warranty) counts.warranty += 1;
+      }
+      return counts;
+    },
+    enabled: !!effectiveUserId,
+    staleTime: 30 * 1000,
+  });
+}
+
+
+
 /**
  * Server-side lookup by ticket_number for a numeric search query.
  * Returns at most one matching repair (ticket numbers are unique per shop).

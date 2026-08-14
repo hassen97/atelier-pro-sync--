@@ -103,7 +103,10 @@ export default function POS() {
   });
 
   // Completed repairs only
-  const completedRepairs = (rawRepairs || []).filter((r: any) => r.status === "completed");
+  const completedRepairs = useMemo(
+    () => ((rawRepairs || []) as any[]).filter((r: any) => r.status === "completed"),
+    [rawRepairs],
+  );
 
   // --- Per-user category customization & ordering ---
   const [editMode, setEditMode] = useState(false);
@@ -209,14 +212,26 @@ export default function POS() {
   // Debounce manual typing so rapid scanner input doesn't thrash the grid filter
   const debouncedSearch = useDebounce(searchQuery, 250);
 
-  const filteredProducts = products.filter((p: any) => {
-    const q = debouncedSearch.toLowerCase();
-    const matchesSearch = p.name.toLowerCase().includes(q) ||
-      (p.sku && p.sku.toLowerCase().includes(q));
-    const matchesCategory = !selectedCategory || p.category?.name === selectedCategory;
-    const matchesSubcategory = !selectedSubcategory || p.subcategory?.name === selectedSubcategory;
-    return matchesSearch && matchesCategory && matchesSubcategory;
-  });
+  const filteredProducts = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    return (products as any[]).filter((p: any) => {
+      const matchesSearch =
+        !q ||
+        p.name?.toLowerCase().includes(q) ||
+        (p.sku && p.sku.toLowerCase().includes(q));
+      const matchesCategory = !selectedCategory || p.category?.name === selectedCategory;
+      const matchesSubcategory = !selectedSubcategory || p.subcategory?.name === selectedSubcategory;
+      return matchesSearch && matchesCategory && matchesSubcategory;
+    });
+  }, [products, debouncedSearch, selectedCategory, selectedSubcategory]);
+
+  // Cap the DOM: large catalogues would otherwise mount thousands of cards per render
+  const GRID_RENDER_LIMIT = 120;
+  const visibleProducts = useMemo(
+    () => filteredProducts.slice(0, GRID_RENDER_LIMIT),
+    [filteredProducts],
+  );
+  const hiddenProductCount = filteredProducts.length - visibleProducts.length;
 
   const playBeep = useCallback(() => {
     try {
@@ -610,22 +625,29 @@ export default function POS() {
                     {products.length === 0 ? "Aucun produit dans l'inventaire." : "Aucun produit trouvé."}
                   </div>
                 ) : (
-                  <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                    {filteredProducts.map((product: any) => (
-                      <Card key={product.id} className={cn("cursor-pointer transition-all hover:shadow-soft hover:border-primary/30", product.quantity <= 0 && "opacity-50 cursor-not-allowed")} onClick={() => product.quantity > 0 && addToCart(product)}>
-                        <CardContent className="p-3">
-                          <div className="flex justify-between items-start mb-1">
-                            <h3 className="font-medium text-sm leading-tight line-clamp-2">{product.name}</h3>
-                            <Badge variant={product.quantity <= 0 ? "destructive" : "outline"} className="text-[10px] shrink-0 ml-1">{product.quantity}</Badge>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <Badge variant="secondary" className="text-[10px]">{product.category?.name || "—"}</Badge>
-                            <span className="font-bold font-mono-numbers text-primary text-sm">{format(product.sell_price)}</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                  <>
+                    <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                      {visibleProducts.map((product: any) => (
+                        <Card key={product.id} className={cn("cursor-pointer transition-all hover:shadow-soft hover:border-primary/30", product.quantity <= 0 && "opacity-50 cursor-not-allowed")} onClick={() => product.quantity > 0 && addToCart(product)}>
+                          <CardContent className="p-3">
+                            <div className="flex justify-between items-start mb-1">
+                              <h3 className="font-medium text-sm leading-tight line-clamp-2">{product.name}</h3>
+                              <Badge variant={product.quantity <= 0 ? "destructive" : "outline"} className="text-[10px] shrink-0 ml-1">{product.quantity}</Badge>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <Badge variant="secondary" className="text-[10px]">{product.category?.name || "—"}</Badge>
+                              <span className="font-bold font-mono-numbers text-primary text-sm">{format(product.sell_price)}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                    {hiddenProductCount > 0 && (
+                      <p className="py-4 text-center text-xs text-muted-foreground">
+                        {hiddenProductCount} autres produits correspondent — affinez votre recherche ou scannez le code-barres.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
