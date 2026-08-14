@@ -160,46 +160,55 @@ export default function Repairs() {
   const numericSearch = /^\d+$/.test(trimmed) ? parseInt(trimmed, 10) : null;
   const { data: ticketHit } = useRepairByTicketNumber(numericSearch);
 
-  // Transform repairs for UI
-  const baseRepairs = (rawRepairs as unknown as RepairWithCustomer[]).map((r) => transformRepair(r, shopInitials));
+  // Transform repairs for UI (memoized: this page re-renders on every keystroke/dialog toggle)
+  const baseRepairs = useMemo(
+    () => (rawRepairs as unknown as RepairWithCustomer[]).map((r) => transformRepair(r, shopInitials)),
+    [rawRepairs, shopInitials]
+  );
   // Inject the server-side numeric hit if it's not already in the current page
-  const repairs = (() => {
+  const repairs = useMemo(() => {
     if (!ticketHit) return baseRepairs;
     if (baseRepairs.some((r) => r.id === ticketHit.id)) return baseRepairs;
     return [transformRepair(ticketHit as unknown as RepairWithCustomer, shopInitials), ...baseRepairs];
-  })();
+  }, [baseRepairs, ticketHit, shopInitials]);
 
   const selectedRepair = selectedRepairId
     ? repairs.find((r) => r.id === selectedRepairId) || null
     : null;
 
-  const filteredRepairs = repairs.filter((repair) => {
-    const q = searchQuery.toLowerCase();
-    const ticketStr = repair.ticket_number ? String(repair.ticket_number) : "";
-    const ticketLabel = (repair.ticket_label || "").toLowerCase();
-    const matchesSearch =
-      !q ||
-      repair.customer.toLowerCase().includes(q) ||
-      repair.device.toLowerCase().includes(q) ||
-      repair.id.toLowerCase().includes(q) ||
-      ticketStr.includes(trimmed) ||
-      ticketLabel.includes(q) ||
-      (repair.phone && repair.phone.toLowerCase().includes(q));
-    const matchesTab = activeTab === "all" || activeTab === "warranty" ? true : repair.status === activeTab;
-    const matchesWarranty = activeTab === "warranty" ? repair.is_warranty : true;
-    return matchesSearch && matchesTab && matchesWarranty;
-  });
+  const filteredRepairs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return repairs.filter((repair) => {
+      const ticketStr = repair.ticket_number ? String(repair.ticket_number) : "";
+      const ticketLabel = (repair.ticket_label || "").toLowerCase();
+      const matchesSearch =
+        !q ||
+        repair.customer.toLowerCase().includes(q) ||
+        repair.device.toLowerCase().includes(q) ||
+        repair.id.toLowerCase().includes(q) ||
+        ticketStr.includes(trimmed) ||
+        ticketLabel.includes(q) ||
+        (repair.phone && repair.phone.toLowerCase().includes(q));
+      const matchesTab = activeTab === "all" || activeTab === "warranty" ? true : repair.status === activeTab;
+      const matchesWarranty = activeTab === "warranty" ? repair.is_warranty : true;
+      return matchesSearch && matchesTab && matchesWarranty;
+    });
+  }, [repairs, searchQuery, trimmed, activeTab]);
 
-  const getStatusCounts = () => ({
-    all: repairs.length,
-    pending: repairs.filter((r) => r.status === "pending").length,
-    in_progress: repairs.filter((r) => r.status === "in_progress").length,
-    completed: repairs.filter((r) => r.status === "completed").length,
-    rejected: repairs.filter((r) => r.status === "rejected").length,
-    warranty: repairs.filter((r) => r.is_warranty).length,
-  });
+  // Page-local fallback used until the shop-wide aggregate resolves
+  const pageCounts = useMemo(
+    () => ({
+      all: totalCount || repairs.length,
+      pending: repairs.filter((r) => r.status === "pending").length,
+      in_progress: repairs.filter((r) => r.status === "in_progress").length,
+      completed: repairs.filter((r) => r.status === "completed").length,
+      rejected: repairs.filter((r) => r.status === "rejected").length,
+      warranty: repairs.filter((r) => r.is_warranty).length,
+    }),
+    [repairs, totalCount]
+  );
 
-  const counts = getStatusCounts();
+  const counts = statusCounts ?? pageCounts;
 
   // ----- Multi-selection helpers -----
   const selectedCount = selectedIds.size;
