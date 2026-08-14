@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Search, Plus, Filter, ChevronLeft, ChevronRight, CheckSquare, X, CheckCircle2, XCircle, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -21,6 +21,7 @@ import { PaymentConfirmDialog } from "@/components/repairs/PaymentConfirmDialog"
 import {
   useRepairs,
   useRepairByTicketNumber,
+  useRepairStatusCounts,
   useCreateRepair,
   useUpdateRepair,
   useUpdateRepairStatus,
