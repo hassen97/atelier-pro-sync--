@@ -217,14 +217,17 @@ export default function Repairs() {
   const selectedCount = selectedIds.size;
   const allFilteredSelected = filteredRepairs.length > 0 && filteredRepairs.every((r) => selectedIds.has(r.id));
 
-  const handleSelectChange = (repair: ReturnType<typeof transformRepair>, checked: boolean) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(repair.id);
-      else next.delete(repair.id);
-      return next;
-    });
-  };
+  const handleSelectChange = useCallback(
+    (repair: ReturnType<typeof transformRepair>, checked: boolean) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (checked) next.add(repair.id);
+        else next.delete(repair.id);
+        return next;
+      });
+    },
+    []
+  );
 
   const toggleSelectAll = () => {
     setSelectedIds((prev) => {
