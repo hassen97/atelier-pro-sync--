@@ -61,6 +61,51 @@ export function useSales() {
   });
 }
 
+/**
+ * Unpaid sales only (amount_paid < total_amount), batched to bypass the
+ * 1000-row API limit — the narrow query behind the CustomerDebts page.
+ * Unlike `useSales`, this never loads the full (potentially large) sales
+ * history nor the nested `sale_items`.
+ */
+export function useAllUnpaidSales() {
+  const effectiveUserId = useEffectiveUserId();
+
+  return useQuery({
+    queryKey: ["sales-unpaid-all", effectiveUserId],
+    queryFn: async () => {
+      if (!effectiveUserId) return [];
+
+      const PAGE = 1000;
+      let allData: any[] = [];
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("sales")
+          .select(
+            `id, customer_id, total_amount, amount_paid, payment_method, created_at,
+             customer:customers(id, name, phone)`
+          )
+          .eq("user_id", effectiveUserId)
+          .gt("total_amount", 0)
+          .order("created_at", { ascending: false })
+          .range(from, from + PAGE - 1);
+
+        if (error) throw error;
+        if (!data || data.length === 0) { hasMore = false; break; }
+        allData = allData.concat(data);
+        if (data.length < PAGE) { hasMore = false; } else { from += PAGE; }
+      }
+
+      // Filter client-side to keep only sales with a remaining balance.
+      return allData.filter((s) => Number(s.total_amount) - Number(s.amount_paid) > 0.001);
+    },
+    enabled: !!effectiveUserId,
+    staleTime: 60 * 1000, // 1 min cache for debt page
+  });
+}
+
 export function useCreateSale() {
   const queryClient = useQueryClient();
   const effectiveUserId = useEffectiveUserId();
@@ -172,6 +217,7 @@ export function useCreateSale() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["sales-unpaid-all"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["products-all"] });
       queryClient.invalidateQueries({ queryKey: ["products-low-stock"] });
@@ -209,6 +255,7 @@ export function useUpdateSale() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["sales-unpaid-all"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["profit"] });
     },

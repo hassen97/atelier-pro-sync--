@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffectiveUserId } from "@/hooks/useTeam";
 
 export interface DashboardStats {
   salesTotal: number;
@@ -33,17 +33,17 @@ const EMPTY_STATS: DashboardStats = {
 };
 
 export function useDashboardStats() {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
 
   return useQuery({
-    queryKey: ["dashboard-stats", user?.id],
+    queryKey: ["dashboard-stats", effectiveUserId],
     queryFn: async (): Promise<DashboardStats> => {
-      if (!user) return EMPTY_STATS;
+      if (!effectiveUserId) return EMPTY_STATS;
 
       // Single-round-trip aggregate call — replaces 6 full-table scans
       // that were previously done client-side every 30 seconds.
       const { data, error } = await supabase.rpc("dashboard_stats" as any, {
-        _shop_id: user.id,
+        _shop_id: effectiveUserId,
       });
       if (error) throw error;
 
@@ -72,18 +72,18 @@ export function useDashboardStats() {
         totalCustomers: Number(d.totalCustomers) || 0,
       };
     },
-    enabled: !!user,
+    enabled: !!effectiveUserId,
     refetchInterval: 30000,
   });
 }
 
 export function useRecentRepairs(limit = 5) {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
 
   return useQuery({
-    queryKey: ["recent-repairs", user?.id, limit],
+    queryKey: ["recent-repairs", effectiveUserId, limit],
     queryFn: async () => {
-      if (!user) return [];
+      if (!effectiveUserId) return [];
 
       const { data, error } = await supabase
         .from("repairs")
@@ -95,29 +95,29 @@ export function useRecentRepairs(limit = 5) {
           total_cost,
           customer:customers(name)
         `)
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .order("created_at", { ascending: false })
         .limit(limit);
 
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!effectiveUserId,
   });
 }
 
 export function useLowStockAlerts(limit = 5) {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
 
   return useQuery({
-    queryKey: ["low-stock-alerts", user?.id, limit],
+    queryKey: ["low-stock-alerts", effectiveUserId, limit],
     queryFn: async () => {
-      if (!user) return [];
+      if (!effectiveUserId) return [];
 
       const { data, error } = await supabase
         .from("products")
         .select("id, name, sku, quantity, min_quantity")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .order("quantity", { ascending: true })
         .limit(20);
 
@@ -127,6 +127,6 @@ export function useLowStockAlerts(limit = 5) {
         .filter((p) => p.quantity <= p.min_quantity)
         .slice(0, limit);
     },
-    enabled: !!user,
+    enabled: !!effectiveUserId,
   });
 }

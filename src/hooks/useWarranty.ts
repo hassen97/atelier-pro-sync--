@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffectiveUserId } from "@/hooks/useTeam";
 import { toast } from "sonner";
 
 export interface WarrantyTicket {
@@ -32,47 +32,47 @@ export interface DefectivePart {
 }
 
 export function useWarrantyTickets() {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
   return useQuery({
-    queryKey: ["warranty-tickets", user?.id],
+    queryKey: ["warranty-tickets", effectiveUserId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!effectiveUserId) return [];
       const { data, error } = await supabase
         .from("warranty_tickets")
         .select("*, original_repair:repairs(id, device_model, customer:customers(name, phone))")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!effectiveUserId,
   });
 }
 
 export function useDefectiveParts() {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
   return useQuery({
-    queryKey: ["defective-parts", user?.id],
+    queryKey: ["defective-parts", effectiveUserId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!effectiveUserId) return [];
       const { data, error } = await supabase
         .from("defective_parts")
         .select("*, supplier:suppliers(name)")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!effectiveUserId,
   });
 }
 
 export function useSearchRepairForWarranty() {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
 
   return useMutation({
     mutationFn: async (query: string) => {
-      if (!user) throw new Error("Non authentifié");
+      if (!effectiveUserId) throw new Error("Non authentifié");
       const trimmed = query.trim();
       if (!trimmed) return [];
 
@@ -84,7 +84,7 @@ export function useSearchRepairForWarranty() {
           customer:customers(id, name, phone, email),
           repair_parts(id, product_id, quantity, unit_price)
         `)
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .or(`imei.ilike.%${trimmed}%,id.eq.${trimmed.length === 36 ? trimmed : '00000000-0000-0000-0000-000000000000'}`)
         .order("created_at", { ascending: false })
         .limit(10);
@@ -98,7 +98,7 @@ export function useSearchRepairForWarranty() {
             customer:customers!inner(id, name, phone, email),
             repair_parts(id, product_id, quantity, unit_price)
           `)
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .ilike("customer.phone", `%${trimmed}%`)
           .order("created_at", { ascending: false })
           .limit(10);
@@ -116,7 +116,7 @@ export function useSearchRepairForWarranty() {
             customer:customers!inner(id, name, phone, email),
             repair_parts(id, product_id, quantity, unit_price)
           `)
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .ilike("customer.phone", `%${trimmed}%`)
           .order("created_at", { ascending: false })
           .limit(10);
@@ -130,7 +130,7 @@ export function useSearchRepairForWarranty() {
 
 export function useCreateWarrantyTicket() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
 
   return useMutation({
     mutationFn: async (params: {
@@ -144,13 +144,13 @@ export function useCreateWarrantyTicket() {
       notes?: string;
       replaced_parts?: { product_id: string; product_name: string; quantity: number; supplier_id?: string }[];
     }) => {
-      if (!user) throw new Error("Non authentifié");
+      if (!effectiveUserId) throw new Error("Non authentifié");
 
       // 1. Create warranty ticket
       const { data: ticket, error: ticketError } = await supabase
         .from("warranty_tickets")
         .insert({
-          user_id: user.id,
+          user_id: effectiveUserId,
           original_repair_id: params.original_repair_id,
           return_reason: params.return_reason,
           action_taken: params.action_taken || null,
@@ -169,7 +169,7 @@ export function useCreateWarrantyTicket() {
       const { data: warrantyRepair, error: repairError } = await supabase
         .from("repairs")
         .insert({
-          user_id: user.id,
+          user_id: effectiveUserId,
           device_model: "Garantie",
           problem_description: `Retour garantie: ${params.return_reason}`,
           is_warranty: true,
@@ -208,7 +208,7 @@ export function useCreateWarrantyTicket() {
           await supabase
             .from("defective_parts")
             .insert({
-              user_id: user.id,
+              user_id: effectiveUserId,
               warranty_ticket_id: ticket.id,
               product_id: part.product_id,
               product_name: part.product_name,
@@ -222,7 +222,7 @@ export function useCreateWarrantyTicket() {
           await supabase
             .from("expenses")
             .insert({
-              user_id: user.id,
+              user_id: effectiveUserId,
               category: "Perte garantie",
               description: `Pièces garantie - Ticket #${ticket.id.slice(0, 8)}`,
               amount: totalPartsCostForExpense,

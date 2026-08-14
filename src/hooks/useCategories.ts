@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { useEffectiveUserId } from "@/hooks/useTeam";
 import { toast } from "sonner";
 
@@ -99,25 +98,25 @@ export function useDeleteCategory() {
 
 export function useSeedDefaultCategories() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
 
   return useMutation({
     mutationFn: async () => {
-      if (!user) throw new Error("Non authentifié");
+      if (!effectiveUserId) throw new Error("Non authentifié");
 
       // Delete existing categories for user
-      await supabase.from("categories").delete().eq("user_id", user.id);
+      await supabase.from("categories").delete().eq("user_id", effectiveUserId);
 
       const rows = [
         ...DEFAULT_REPAIR_CATEGORIES.map((name) => ({
           name,
           type: "repair" as const,
-          user_id: user.id,
+          user_id: effectiveUserId,
         })),
         ...DEFAULT_PRODUCT_CATEGORIES.map((name) => ({
           name,
           type: "product" as const,
-          user_id: user.id,
+          user_id: effectiveUserId,
         })),
       ];
 

@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffectiveUserId } from "@/hooks/useTeam";
 import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 
 export function useStatistics(period: string = "month") {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
 
   return useQuery({
-    queryKey: ["statistics", user?.id, period],
+    queryKey: ["statistics", effectiveUserId, period],
     queryFn: async () => {
-      if (!user) return null;
+      if (!effectiveUserId) return null;
 
       const now = new Date();
       let startDate: Date;
@@ -40,13 +40,13 @@ export function useStatistics(period: string = "month") {
             created_at,
             sale_items(quantity, unit_price, product_id)
           `)
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .gte("created_at", startDate.toISOString())
           .lte("created_at", endDate.toISOString()),
         supabase
           .from("product_returns")
           .select("id, refund_amount, created_at")
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .gte("created_at", startDate.toISOString())
           .lte("created_at", endDate.toISOString()),
       ]);
@@ -59,7 +59,7 @@ export function useStatistics(period: string = "month") {
       const { data: repairs, error: repairsError } = await supabase
         .from("repairs")
         .select("id, total_cost, labor_cost, parts_cost, status, problem_description, created_at")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString());
 
@@ -75,7 +75,7 @@ export function useStatistics(period: string = "month") {
           sell_price,
           category:categories(id, name)
         `)
-        .eq("user_id", user.id);
+        .eq("user_id", effectiveUserId);
 
       if (productsError) throw productsError;
 
@@ -180,6 +180,6 @@ export function useStatistics(period: string = "month") {
         },
       };
     },
-    enabled: !!user,
+    enabled: !!effectiveUserId,
   });
 }

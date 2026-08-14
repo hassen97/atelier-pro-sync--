@@ -1,51 +1,51 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffectiveUserId } from "@/hooks/useTeam";
 
 export function useCustomerHistory(customerId: string | undefined) {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
 
   const repairs = useQuery({
-    queryKey: ["customer-repairs", customerId],
+    queryKey: ["customer-repairs", effectiveUserId, customerId],
     queryFn: async () => {
-      if (!user || !customerId) return [];
+      if (!effectiveUserId || !customerId) return [];
       const { data, error } = await supabase
         .from("repairs")
         .select("id, device_model, problem_description, status, total_cost, amount_paid, deposit_date, delivery_date")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user && !!customerId,
+    enabled: !!effectiveUserId && !!customerId,
   });
 
   const sales = useQuery({
-    queryKey: ["customer-sales", customerId],
+    queryKey: ["customer-sales", effectiveUserId, customerId],
     queryFn: async () => {
-      if (!user || !customerId) return [];
+      if (!effectiveUserId || !customerId) return [];
       const { data, error } = await supabase
         .from("sales")
         .select("id, total_amount, amount_paid, payment_method, created_at, sale_items(id)")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user && !!customerId,
+    enabled: !!effectiveUserId && !!customerId,
   });
 
   const warranties = useQuery({
-    queryKey: ["customer-warranties", customerId],
+    queryKey: ["customer-warranties", effectiveUserId, customerId],
     queryFn: async () => {
-      if (!user || !customerId) return [];
+      if (!effectiveUserId || !customerId) return [];
       // Get warranty tickets linked to this customer's repairs
       const { data, error } = await supabase
         .from("warranty_tickets")
         .select("id, status, return_reason, total_cost, created_at, original_repair_id")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .in("status", ["pending", "in_progress"]);
       if (error) throw error;
       
@@ -53,7 +53,7 @@ export function useCustomerHistory(customerId: string | undefined) {
       const repairIds = (repairs.data || []).map(r => r.id);
       return (data || []).filter(w => repairIds.includes(w.original_repair_id));
     },
-    enabled: !!user && !!customerId && !!repairs.data,
+    enabled: !!effectiveUserId && !!customerId && !!repairs.data,
   });
 
   const totalRepairSpend = (repairs.data || []).reduce((sum, r) => sum + Number(r.total_cost || 0), 0);

@@ -1,20 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffectiveUserId } from "@/hooks/useTeam";
 import { startOfMonth, endOfMonth, subMonths, subDays, startOfDay, endOfDay, format as formatDate } from "date-fns";
 
 export type ProfitPeriod = string | { from: Date; to: Date };
 
 export function useProfit(period: ProfitPeriod = "month") {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
 
   const isCustom = typeof period !== "string";
   const customKey = isCustom ? `${(period as any).from.toISOString()}_${(period as any).to.toISOString()}` : period;
 
   return useQuery({
-    queryKey: ["profit", user?.id, customKey],
+    queryKey: ["profit", effectiveUserId, customKey],
     queryFn: async () => {
-      if (!user) return null;
+      if (!effectiveUserId) return null;
 
       const now = new Date();
       let startDate: Date;
@@ -73,13 +73,13 @@ export function useProfit(period: ProfitPeriod = "month") {
             total_amount,
             sale_items(quantity, unit_price, product_id)
           `)
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .gte("created_at", startDate.toISOString())
           .lte("created_at", endDate.toISOString()),
         supabase
           .from("product_returns")
           .select("id, refund_amount")
-          .eq("user_id", user.id)
+          .eq("user_id", effectiveUserId)
           .gte("created_at", startDate.toISOString())
           .lte("created_at", endDate.toISOString()),
       ]);
@@ -92,7 +92,7 @@ export function useProfit(period: ProfitPeriod = "month") {
       const { data: prevSales, error: prevSalesError } = await supabase
         .from("sales")
         .select("total_amount")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .gte("created_at", prevStartDate.toISOString())
         .lte("created_at", prevEndDate.toISOString());
 
@@ -102,7 +102,7 @@ export function useProfit(period: ProfitPeriod = "month") {
       const { data: repairs, error: repairsError } = await supabase
         .from("repairs")
         .select("id, total_cost, labor_cost, parts_cost, problem_description")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString());
 
@@ -112,7 +112,7 @@ export function useProfit(period: ProfitPeriod = "month") {
       const { data: prevRepairs, error: prevRepairsError } = await supabase
         .from("repairs")
         .select("total_cost")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .gte("created_at", prevStartDate.toISOString())
         .lte("created_at", prevEndDate.toISOString());
 
@@ -122,7 +122,7 @@ export function useProfit(period: ProfitPeriod = "month") {
       const { data: expenses, error: expensesError } = await supabase
         .from("expenses")
         .select("id, amount, category")
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .gte("expense_date", formatDate(startDate, "yyyy-MM-dd"))
         .lte("expense_date", formatDate(endDate, "yyyy-MM-dd"));
 
@@ -132,7 +132,7 @@ export function useProfit(period: ProfitPeriod = "month") {
       const { data: products, error: productsError } = await supabase
         .from("products")
         .select("id, name, cost_price, sell_price")
-        .eq("user_id", user.id);
+        .eq("user_id", effectiveUserId);
 
       if (productsError) throw productsError;
 
@@ -252,6 +252,6 @@ export function useProfit(period: ProfitPeriod = "month") {
         repairMargins,
       };
     },
-    enabled: !!user,
+    enabled: !!effectiveUserId,
   });
 }

@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useAllCustomers, useUpdateCustomer, Customer } from "@/hooks/useCustomers";
 import { useAllUnpaidRepairs, useUpdateRepair } from "@/hooks/useRepairs";
-import { useSales, useUpdateSale } from "@/hooks/useSales";
+import { useAllUnpaidSales, useUpdateSale } from "@/hooks/useSales";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { getShopInitials, formatTicketNumber } from "@/lib/utils";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ export default function CustomerDebts() {
 
   const { data: customers = [] } = useAllCustomers();
   const { data: repairs = [] } = useAllUnpaidRepairs();
-  const { data: sales = [] } = useSales();
+  const { data: sales = [] } = useAllUnpaidSales();
   const updateCustomer = useUpdateCustomer();
   const updateRepair = useUpdateRepair();
   const updateSale = useUpdateSale();

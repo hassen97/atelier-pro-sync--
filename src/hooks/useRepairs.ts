@@ -348,6 +348,7 @@ export function useUpdateRepair() {
       queryClient.invalidateQueries({ queryKey: ["repairs"] });
       queryClient.invalidateQueries({ queryKey: ["repair", data.id] });
       queryClient.invalidateQueries({ queryKey: ["recent-repairs"] });
+      queryClient.invalidateQueries({ queryKey: ["repairs-unpaid-all"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["profit"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });

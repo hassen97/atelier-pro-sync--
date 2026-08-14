@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffectiveUserId } from "@/hooks/useTeam";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
@@ -20,7 +20,7 @@ const defaultSettings: BackupSettings = {
 };
 
 export function useBackup() {
-  const { user } = useAuth();
+  const effectiveUserId = useEffectiveUserId();
   const [settings, setSettings] = useState<BackupSettings>(defaultSettings);
   const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -57,7 +57,7 @@ export function useBackup() {
 
   // Fetch all user data for backup
   const fetchAllData = useCallback(async () => {
-    if (!user) return null;
+    if (!effectiveUserId) return null;
 
     try {
       const [
@@ -71,15 +71,15 @@ export function useBackup() {
         { data: categories },
         { data: shopSettings },
       ] = await Promise.all([
-        supabase.from("products").select("*").eq("user_id", user.id),
-        supabase.from("customers").select("*").eq("user_id", user.id),
-        supabase.from("repairs").select("*").eq("user_id", user.id),
-        supabase.from("sales").select("*").eq("user_id", user.id),
-        supabase.from("expenses").select("*").eq("user_id", user.id),
-        supabase.from("suppliers").select("*").eq("user_id", user.id),
-        supabase.from("invoices").select("*").eq("user_id", user.id),
-        supabase.from("categories").select("*").eq("user_id", user.id),
-        supabase.from("shop_settings").select("*").eq("user_id", user.id),
+        supabase.from("products").select("*").eq("user_id", effectiveUserId),
+        supabase.from("customers").select("*").eq("user_id", effectiveUserId),
+        supabase.from("repairs").select("*").eq("user_id", effectiveUserId),
+        supabase.from("sales").select("*").eq("user_id", effectiveUserId),
+        supabase.from("expenses").select("*").eq("user_id", effectiveUserId),
+        supabase.from("suppliers").select("*").eq("user_id", effectiveUserId),
+        supabase.from("invoices").select("*").eq("user_id", effectiveUserId),
+        supabase.from("categories").select("*").eq("user_id", effectiveUserId),
+        supabase.from("shop_settings").select("*").eq("user_id", effectiveUserId),
       ]);
 
       return {
@@ -99,7 +99,7 @@ export function useBackup() {
       console.error("Error fetching data for backup:", error);
       return null;
     }
-  }, [user]);
+  }, [effectiveUserId]);
 
   // Export as JSON
   const exportJSON = useCallback(async () => {
@@ -231,7 +231,7 @@ export function useBackup() {
 
   // Sync now (manual sync - just saves current state to localStorage as backup record)
   const syncNow = useCallback(async () => {
-    if (!user) {
+    if (!effectiveUserId) {
       toast.error("Vous devez être connecté");
       return;
     }
@@ -265,11 +265,11 @@ export function useBackup() {
     } finally {
       setSyncing(false);
     }
-  }, [user, fetchAllData, saveSettings, generateDataHash]);
+  }, [effectiveUserId, fetchAllData, saveSettings, generateDataHash]);
 
   // Auto-sync effect
   useEffect(() => {
-    if (settings.cloudSync && user) {
+    if (settings.cloudSync && effectiveUserId) {
       // Initial sync
       syncNow();
 
@@ -290,7 +290,7 @@ export function useBackup() {
         syncIntervalRef.current = null;
       }
     }
-  }, [settings.cloudSync, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [settings.cloudSync, effectiveUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     settings,
