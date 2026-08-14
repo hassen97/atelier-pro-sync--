@@ -103,7 +103,10 @@ export default function POS() {
   });
 
   // Completed repairs only
-  const completedRepairs = (rawRepairs || []).filter((r: any) => r.status === "completed");
+  const completedRepairs = useMemo(
+    () => ((rawRepairs || []) as any[]).filter((r: any) => r.status === "completed"),
+    [rawRepairs],
+  );
 
   // --- Per-user category customization & ordering ---
   const [editMode, setEditMode] = useState(false);
@@ -209,14 +212,26 @@ export default function POS() {
   // Debounce manual typing so rapid scanner input doesn't thrash the grid filter
   const debouncedSearch = useDebounce(searchQuery, 250);
 
-  const filteredProducts = products.filter((p: any) => {
-    const q = debouncedSearch.toLowerCase();
-    const matchesSearch = p.name.toLowerCase().includes(q) ||
-      (p.sku && p.sku.toLowerCase().includes(q));
-    const matchesCategory = !selectedCategory || p.category?.name === selectedCategory;
-    const matchesSubcategory = !selectedSubcategory || p.subcategory?.name === selectedSubcategory;
-    return matchesSearch && matchesCategory && matchesSubcategory;
-  });
+  const filteredProducts = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    return (products as any[]).filter((p: any) => {
+      const matchesSearch =
+        !q ||
+        p.name?.toLowerCase().includes(q) ||
+        (p.sku && p.sku.toLowerCase().includes(q));
+      const matchesCategory = !selectedCategory || p.category?.name === selectedCategory;
+      const matchesSubcategory = !selectedSubcategory || p.subcategory?.name === selectedSubcategory;
+      return matchesSearch && matchesCategory && matchesSubcategory;
+    });
+  }, [products, debouncedSearch, selectedCategory, selectedSubcategory]);
+
+  // Cap the DOM: large catalogues would otherwise mount thousands of cards per render
+  const GRID_RENDER_LIMIT = 120;
+  const visibleProducts = useMemo(
+    () => filteredProducts.slice(0, GRID_RENDER_LIMIT),
+    [filteredProducts],
+  );
+  const hiddenProductCount = filteredProducts.length - visibleProducts.length;
 
   const playBeep = useCallback(() => {
     try {
