@@ -135,6 +135,8 @@ export default function Repairs() {
   const rawRepairs = repairsResult.data;
   const totalCount = repairsResult.count;
   const totalPages = Math.ceil(totalCount / REPAIRS_PAGE_SIZE);
+  const { data: statusCounts } = useRepairStatusCounts();
+
 
   const { data: customers = [] } = useAllCustomers();
   const effectiveUserId = useEffectiveUserId();
