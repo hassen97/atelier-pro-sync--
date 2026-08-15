@@ -3,6 +3,7 @@ import { useNotifications, type Notification as AppNotification } from "@/hooks/
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 import { useAllProducts } from "@/hooks/useProducts";
 import { useRepairs } from "@/hooks/useRepairs";
+import { useEffectiveUserId } from "@/hooks/useTeam";
 
 interface NotificationsContextType {
   notifications: AppNotification[];
@@ -17,6 +18,7 @@ interface NotificationsContextType {
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
+  const effectiveUserId = useEffectiveUserId();
   const {
     notifications,
     unreadCount,
@@ -31,12 +33,20 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     hasNotifiedProduct,
     addNotifiedRepair,
     hasNotifiedRepair,
-  } = useNotifications();
+  } = useNotifications(effectiveUserId);
   
   const { settings: notifSettings } = useNotificationSettings();
-  const { data: products } = useAllProducts();
-  const { data: repairsResult } = useRepairs();
-  const repairs = repairsResult?.data;
+  const productsQuery = useAllProducts();
+  const repairsQuery = useRepairs();
+  const products = productsQuery.data;
+  const repairs = repairsQuery.data?.data;
+
+  // Only trust query data fetched for the *current* shop — both queries use
+  // placeholderData to avoid flashes, so during an account switch or
+  // impersonation change they briefly serve the previous shop's rows, which
+  // used to generate notifications for the wrong shop.
+  const productsReady = !!effectiveUserId && !!products && !productsQuery.isPlaceholderData;
+  const repairsReady = !!effectiveUserId && !!repairs && !repairsQuery.isPlaceholderData;
 
   // Helper to send browser notification
   const sendBrowserNotification = useCallback((title: string, body: string) => {
@@ -50,7 +60,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   // Check for low stock products - uses persisted tracking
   useEffect(() => {
-    if (!notifSettings.lowStockAlerts || !products) return;
+    if (!notifSettings.lowStockAlerts || !productsReady) return;
 
     products.forEach((product) => {
       if (product.quantity <= product.min_quantity && !hasNotifiedProduct(product.id)) {
@@ -69,11 +79,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         removeNotifiedProduct(product.id);
       }
     });
-  }, [products, notifSettings.lowStockAlerts, addNotification, hasNotifiedProduct, addNotifiedProduct, removeNotifiedProduct, sendBrowserNotification]);
+  }, [products, productsReady, notifSettings.lowStockAlerts, addNotification, hasNotifiedProduct, addNotifiedProduct, removeNotifiedProduct, sendBrowserNotification]);
 
   // Check for completed/delivered repairs - uses persisted tracking
   useEffect(() => {
-    if (!repairs) return;
+    if (!repairsReady) return;
 
     repairs.forEach((repair) => {
       if (
@@ -94,7 +104,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         sendBrowserNotification(title, description);
       }
     });
-  }, [repairs, addNotification, hasNotifiedRepair, addNotifiedRepair, sendBrowserNotification]);
+  }, [repairs, repairsReady, addNotification, hasNotifiedRepair, addNotifiedRepair, sendBrowserNotification]);
 
   return (
     <NotificationsContext.Provider

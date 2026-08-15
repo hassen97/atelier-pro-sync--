@@ -10,86 +10,124 @@ export interface Notification {
   createdAt: number;
 }
 
+// Keys are scoped per shop so notifications of one shop never leak into
+// another (same browser, account switch, or admin impersonation).
 const STORAGE_KEY = "app_notifications";
 const NOTIFIED_PRODUCTS_KEY = "notified_low_stock_products";
 const NOTIFIED_REPAIRS_KEY = "notified_completed_repairs";
 
+// Legacy global keys held merged notifications from every shop that ever
+// used this browser profile — purge them once on upgrade.
+const LEGACY_KEYS = [STORAGE_KEY, NOTIFIED_PRODUCTS_KEY, NOTIFIED_REPAIRS_KEY];
+
+const scopedKey = (prefix: string, shopId: string) => `${prefix}:${shopId}`;
+
+interface ShopScopedList {
+  shopId: string | null;
+  items: Notification[];
+}
+
+interface ShopScopedSet {
+  shopId: string | null;
+  ids: Set<string>;
+}
+
 // Generate notifications based on real data
-export function useNotifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  
-  // Persisted tracking for already-notified items
-  const [notifiedProductIds, setNotifiedProductIds] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(NOTIFIED_PRODUCTS_KEY);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  });
-  
-  const [notifiedRepairIds, setNotifiedRepairIds] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(NOTIFIED_REPAIRS_KEY);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  });
+export function useNotifications(shopId: string | null) {
+  // The list carries its own shop stamp: saves always write to the shop the
+  // items belong to, even if `shopId` already moved (account switch race).
+  const [notifState, setNotifState] = useState<ShopScopedList>({ shopId: null, items: [] });
 
-  // Load notifications from localStorage on mount
+  // Persisted tracking for already-notified items (per shop)
+  const [productsState, setProductsState] = useState<ShopScopedSet>({ shopId: null, ids: new Set() });
+  const [repairsState, setRepairsState] = useState<ShopScopedSet>({ shopId: null, ids: new Set() });
+
+  // One-time cleanup of the legacy unscoped keys (cross-shop leak source).
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setNotifications(parsed);
-      } catch (e) {
-        console.error("Error parsing notifications:", e);
-        setNotifications([]);
-      }
+    LEGACY_KEYS.forEach((k) => localStorage.removeItem(k));
+  }, []);
+
+  // Load the notifications and tracking sets of the current shop
+  useEffect(() => {
+    if (!shopId) {
+      setNotifState({ shopId: null, items: [] });
+      setProductsState({ shopId: null, ids: new Set() });
+      setRepairsState({ shopId: null, ids: new Set() });
+      return;
     }
+
+    let items: Notification[] = [];
+    try {
+      const stored = localStorage.getItem(scopedKey(STORAGE_KEY, shopId));
+      if (stored) items = JSON.parse(stored);
+    } catch (e) {
+      console.error("Error parsing notifications:", e);
+      items = [];
+    }
+
+    const readIds = (key: string): Set<string> => {
+      try {
+        const stored = localStorage.getItem(key);
+        return stored ? new Set(JSON.parse(stored)) : new Set();
+      } catch {
+        return new Set();
+      }
+    };
+
+    setNotifState({ shopId, items });
+    setProductsState({ shopId, ids: readIds(scopedKey(NOTIFIED_PRODUCTS_KEY, shopId)) });
+    setRepairsState({ shopId, ids: readIds(scopedKey(NOTIFIED_REPAIRS_KEY, shopId)) });
+  }, [shopId]);
+
+  // Persist — always under the shop the state belongs to
+  useEffect(() => {
+    if (!notifState.shopId) return;
+    localStorage.setItem(scopedKey(STORAGE_KEY, notifState.shopId), JSON.stringify(notifState.items));
+  }, [notifState]);
+
+  useEffect(() => {
+    if (!productsState.shopId) return;
+    localStorage.setItem(scopedKey(NOTIFIED_PRODUCTS_KEY, productsState.shopId), JSON.stringify([...productsState.ids]));
+  }, [productsState]);
+
+  useEffect(() => {
+    if (!repairsState.shopId) return;
+    localStorage.setItem(scopedKey(NOTIFIED_REPAIRS_KEY, repairsState.shopId), JSON.stringify([...repairsState.ids]));
+  }, [repairsState]);
+
+  const addNotifiedProduct = useCallback((productId: string) => {
+    setProductsState((prev) => ({ ...prev, ids: new Set([...prev.ids, productId]) }));
   }, []);
 
-  // Save notifications to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-  }, [notifications]);
-  
-  // Persist notified product IDs
-  useEffect(() => {
-    localStorage.setItem(NOTIFIED_PRODUCTS_KEY, JSON.stringify([...notifiedProductIds]));
-  }, [notifiedProductIds]);
-  
-  // Persist notified repair IDs
-  useEffect(() => {
-    localStorage.setItem(NOTIFIED_REPAIRS_KEY, JSON.stringify([...notifiedRepairIds]));
-  }, [notifiedRepairIds]);
-  
-  const addNotifiedProduct = useCallback((productId: string) => {
-    setNotifiedProductIds((prev) => new Set([...prev, productId]));
-  }, []);
-  
   const removeNotifiedProduct = useCallback((productId: string) => {
-    setNotifiedProductIds((prev) => {
-      const next = new Set(prev);
+    setProductsState((prev) => {
+      const next = new Set(prev.ids);
       next.delete(productId);
-      return next;
+      return { ...prev, ids: next };
     });
   }, []);
-  
+
   const hasNotifiedProduct = useCallback((productId: string) => {
-    return notifiedProductIds.has(productId);
-  }, [notifiedProductIds]);
-  
+    return productsState.ids.has(productId);
+  }, [productsState.ids]);
+
   const addNotifiedRepair = useCallback((repairId: string) => {
-    setNotifiedRepairIds((prev) => new Set([...prev, repairId]));
+    setRepairsState((prev) => ({ ...prev, ids: new Set([...prev.ids, repairId]) }));
   }, []);
-  
+
   const hasNotifiedRepair = useCallback((repairId: string) => {
-    return notifiedRepairIds.has(repairId);
-  }, [notifiedRepairIds]);
+    return repairsState.ids.has(repairId);
+  }, [repairsState.ids]);
 
   const markAsRead = useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    setNotifState((prev) => ({
+      ...prev,
+      items: prev.items.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    }));
   }, []);
 
   const markAllAsRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifState((prev) => ({ ...prev, items: prev.items.map((n) => ({ ...n, read: true })) }));
   }, []);
 
   const addNotification = useCallback((notification: Omit<Notification, "id" | "createdAt">) => {
@@ -98,17 +136,21 @@ export function useNotifications() {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
     };
-    setNotifications((prev) => [newNotification, ...prev].slice(0, 50)); // Keep max 50 notifications
+    setNotifState((prev) => ({
+      ...prev,
+      items: [newNotification, ...prev.items].slice(0, 50), // Keep max 50 notifications
+    }));
   }, []);
 
   const removeNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setNotifState((prev) => ({ ...prev, items: prev.items.filter((n) => n.id !== id) }));
   }, []);
 
   const clearAllNotifications = useCallback(() => {
-    setNotifications([]);
+    setNotifState((prev) => ({ ...prev, items: [] }));
   }, []);
 
+  const notifications = notifState.items;
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return {
