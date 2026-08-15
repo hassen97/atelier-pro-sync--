@@ -67,6 +67,29 @@ export function useDefectiveParts() {
   });
 }
 
+// Warranty period reference point: delivery/hand-back date when known,
+// otherwise the deposit date. Returns null when nothing can be derived.
+export function getWarrantyBaseDate(repair: any): Date | null {
+  const base = repair?.delivery_date || repair?.created_at;
+  if (!base) return null;
+  const d = new Date(base);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function getWarrantyExpiry(repair: any, warrantyDays: number) {
+  const base = getWarrantyBaseDate(repair);
+  if (!base || !warrantyDays || warrantyDays <= 0) return null;
+  const expiry = new Date(base.getTime() + warrantyDays * 86400000);
+  const daysLeft = Math.ceil((expiry.getTime() - Date.now()) / 86400000);
+  return { expiry, daysLeft, covered: daysLeft >= 0 };
+}
+
+// Strips PostgREST .or() metacharacters so raw user input cannot break (or
+// inject into) the disjunction filter.
+function sanitizeOrTerm(value: string) {
+  return value.replace(/[\\,()%"]/g, " ").trim();
+}
+
 export function useSearchRepairForWarranty() {
   const effectiveUserId = useEffectiveUserId();
 
@@ -75,8 +98,17 @@ export function useSearchRepairForWarranty() {
       if (!effectiveUserId) throw new Error("Non authentifié");
       const trimmed = query.trim();
       if (!trimmed) return [];
+      const safe = sanitizeOrTerm(trimmed);
+      if (!safe) return [];
 
-      // Search by IMEI, repair ID, or customer phone
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(safe);
+      const isNumeric = /^\d+$/.test(safe);
+
+      // Search by IMEI, repair ID, ticket number, or customer phone
+      const filters = [`imei.ilike.%${safe}%`];
+      if (isUuid) filters.push(`id.eq.${safe}`);
+      if (isNumeric) filters.push(`ticket_number.eq.${safe}`);
+
       const { data, error } = await supabase
         .from("repairs")
         .select(`
@@ -85,45 +117,28 @@ export function useSearchRepairForWarranty() {
           repair_parts(id, product_id, quantity, unit_price)
         `)
         .eq("user_id", effectiveUserId)
-        .or(`imei.ilike.%${trimmed}%,id.eq.${trimmed.length === 36 ? trimmed : '00000000-0000-0000-0000-000000000000'}`)
+        .or(filters.join(","))
         .order("created_at", { ascending: false })
         .limit(10);
 
-      if (error) {
-        // Fallback: try searching by customer phone
-        const { data: byPhone, error: phoneError } = await supabase
-          .from("repairs")
-          .select(`
-            *,
-            customer:customers!inner(id, name, phone, email),
-            repair_parts(id, product_id, quantity, unit_price)
-          `)
-          .eq("user_id", effectiveUserId)
-          .ilike("customer.phone", `%${trimmed}%`)
-          .order("created_at", { ascending: false })
-          .limit(10);
+      if (error) throw error;
+      if (data && data.length > 0) return data;
 
-        if (phoneError) throw phoneError;
-        return byPhone || [];
-      }
+      // Fallback: search by customer phone
+      const { data: byPhone, error: phoneError } = await supabase
+        .from("repairs")
+        .select(`
+          *,
+          customer:customers!inner(id, name, phone, email),
+          repair_parts(id, product_id, quantity, unit_price)
+        `)
+        .eq("user_id", effectiveUserId)
+        .ilike("customer.phone", `%${safe}%`)
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-      // If no results by IMEI/ID, try by phone
-      if (!data || data.length === 0) {
-        const { data: byPhone } = await supabase
-          .from("repairs")
-          .select(`
-            *,
-            customer:customers!inner(id, name, phone, email),
-            repair_parts(id, product_id, quantity, unit_price)
-          `)
-          .eq("user_id", effectiveUserId)
-          .ilike("customer.phone", `%${trimmed}%`)
-          .order("created_at", { ascending: false })
-          .limit(10);
-        return byPhone || [];
-      }
-
-      return data;
+      if (phoneError) throw phoneError;
+      return byPhone || [];
     },
   });
 }
@@ -146,98 +161,30 @@ export function useCreateWarrantyTicket() {
     }) => {
       if (!effectiveUserId) throw new Error("Non authentifié");
 
-      // 1. Create warranty ticket
-      const { data: ticket, error: ticketError } = await supabase
-        .from("warranty_tickets")
-        .insert({
-          user_id: effectiveUserId,
-          original_repair_id: params.original_repair_id,
-          return_reason: params.return_reason,
-          action_taken: params.action_taken || null,
-          labor_cost: params.labor_cost || 0,
-          parts_cost: params.parts_cost || 0,
-          total_cost: params.total_cost || 0,
-          amount_paid: params.amount_paid || 0,
-          notes: params.notes || null,
-        })
-        .select()
-        .single();
+      // Atomic server-side transaction: ticket + warranty repair + stock
+      // deduction + defective parts + loss expense (see migration
+      // 20260815180000_create_warranty_ticket_rpc.sql).
+      const { data, error } = await supabase.rpc("create_warranty_ticket" as any, {
+        p_original_repair_id: params.original_repair_id,
+        p_return_reason: params.return_reason,
+        p_action_taken: params.action_taken || null,
+        p_labor_cost: params.labor_cost || 0,
+        p_parts_cost: params.parts_cost || 0,
+        p_total_cost: params.total_cost || 0,
+        p_amount_paid: params.amount_paid || 0,
+        p_notes: params.notes || null,
+        p_replaced_parts: params.replaced_parts || [],
+      });
 
-      if (ticketError) throw ticketError;
-
-      // 2. Create warranty repair entry
-      const { data: warrantyRepair, error: repairError } = await supabase
-        .from("repairs")
-        .insert({
-          user_id: effectiveUserId,
-          device_model: "Garantie",
-          problem_description: `Retour garantie: ${params.return_reason}`,
-          is_warranty: true,
-          warranty_ticket_id: ticket.id,
-          total_cost: params.total_cost || 0,
-          labor_cost: params.labor_cost || 0,
-          parts_cost: params.parts_cost || 0,
-          amount_paid: params.amount_paid || 0,
-          status: "pending",
-        })
-        .select()
-        .single();
-
-      if (repairError) throw repairError;
-
-      // 3. Process replaced parts (deduct from stock, add to defective parts, log as expense/loss)
-      if (params.replaced_parts && params.replaced_parts.length > 0) {
-        let totalPartsCostForExpense = 0;
-        for (const part of params.replaced_parts) {
-          // Deduct from stock
-          const { data: product } = await supabase
-            .from("products")
-            .select("quantity, cost_price")
-            .eq("id", part.product_id)
-            .single();
-
-          if (product) {
-            await supabase
-              .from("products")
-              .update({ quantity: Math.max(0, product.quantity - part.quantity) })
-              .eq("id", part.product_id);
-            totalPartsCostForExpense += Number(product.cost_price || 0) * part.quantity;
-          }
-
-          // Add to defective parts
-          await supabase
-            .from("defective_parts")
-            .insert({
-              user_id: effectiveUserId,
-              warranty_ticket_id: ticket.id,
-              product_id: part.product_id,
-              product_name: part.product_name,
-              quantity: part.quantity,
-              supplier_id: part.supplier_id || null,
-            });
-        }
-
-        // Log total parts cost as a loss/expense
-        if (totalPartsCostForExpense > 0) {
-          await supabase
-            .from("expenses")
-            .insert({
-              user_id: effectiveUserId,
-              category: "Perte garantie",
-              description: `Pièces garantie - Ticket #${ticket.id.slice(0, 8)}`,
-              amount: totalPartsCostForExpense,
-              expense_date: new Date().toISOString().split("T")[0],
-            });
-        }
-      }
-
-      return ticket;
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["warranty-tickets"] });
       queryClient.invalidateQueries({ queryKey: ["defective-parts"] });
       queryClient.invalidateQueries({ queryKey: ["repairs"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       toast.success("Ticket de garantie créé avec succès");
     },
@@ -245,6 +192,26 @@ export function useCreateWarrantyTicket() {
       console.error("Error creating warranty ticket:", error);
       toast.error("Erreur lors de la création du ticket de garantie");
     },
+  });
+}
+
+export function useUpdateWarrantyTicketStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, status, action_taken }: { id: string; status: string; action_taken?: string }) => {
+      const { error } = await supabase
+        .from("warranty_tickets")
+        .update({ status, ...(action_taken ? { action_taken } : {}) })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warranty-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      toast.success("Ticket mis à jour");
+    },
+    onError: () => toast.error("Erreur lors de la mise à jour du ticket"),
   });
 }
 

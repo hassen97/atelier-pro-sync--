@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,17 +7,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Shield, Calendar, Wrench, DollarSign, Package } from "lucide-react";
-import { useSearchRepairForWarranty, useCreateWarrantyTicket } from "@/hooks/useWarranty";
+import { Search, Shield, Calendar, Wrench, DollarSign, Package, AlertTriangle, Minus } from "lucide-react";
+import { useSearchRepairForWarranty, useCreateWarrantyTicket, getWarrantyExpiry } from "@/hooks/useWarranty";
 import { useProducts } from "@/hooks/useProducts";
+import { useShopSettings } from "@/hooks/useShopSettings";
 import { useCurrency } from "@/hooks/useCurrency";
 
 interface WarrantyDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Repair pre-selected from the warranty checker (skips the search step). */
+  initialRepair?: any;
 }
 
-export function WarrantyDrawer({ open, onOpenChange }: WarrantyDrawerProps) {
+export function WarrantyDrawer({ open, onOpenChange, initialRepair }: WarrantyDrawerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRepair, setSelectedRepair] = useState<any>(null);
   const [returnReason, setReturnReason] = useState("supplier_defect");
@@ -31,7 +34,14 @@ export function WarrantyDrawer({ open, onOpenChange }: WarrantyDrawerProps) {
   const searchRepair = useSearchRepairForWarranty();
   const createWarranty = useCreateWarrantyTicket();
   const { data: products = [] } = useProducts();
+  const { settings } = useShopSettings();
   const { format } = useCurrency();
+  const warrantyDays = Number(settings?.warranty_days ?? 30);
+
+  // Prefill from the warranty checker when opened with a repair
+  useEffect(() => {
+    if (open && initialRepair) setSelectedRepair(initialRepair);
+  }, [open, initialRepair]);
 
   const handleSearch = () => {
     if (searchQuery.trim()) searchRepair.mutate(searchQuery);
@@ -72,6 +82,12 @@ export function WarrantyDrawer({ open, onOpenChange }: WarrantyDrawerProps) {
 
   const removePart = (productId: string) => {
     setSelectedParts(prev => prev.filter(p => p.product_id !== productId));
+  };
+
+  const setPartQty = (productId: string, qty: number) => {
+    setSelectedParts(prev => prev.map(p =>
+      p.product_id === productId ? { ...p, quantity: Math.max(1, Math.min(99, qty)) } : p
+    ));
   };
 
   return (
@@ -144,6 +160,23 @@ export function WarrantyDrawer({ open, onOpenChange }: WarrantyDrawerProps) {
                 </CardContent>
               </Card>
 
+              {/* Warranty verdict for the selected repair */}
+              {(() => {
+                const expiry = getWarrantyExpiry(selectedRepair, warrantyDays);
+                if (!expiry) return null;
+                return expiry.covered ? (
+                  <p className="text-xs p-2 rounded bg-success/10 text-success">
+                    ✓ Réparation sous garantie — expire le {expiry.expiry.toLocaleDateString("fr-FR")} ({expiry.daysLeft} j restants).
+                  </p>
+                ) : (
+                  <p className="text-xs p-2 rounded bg-warning/10 text-warning flex items-start gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    Garantie expirée depuis {Math.abs(expiry.daysLeft)} jour(s) (le {expiry.expiry.toLocaleDateString("fr-FR")}).
+                    Vous pouvez créer le ticket, mais envisagez une réparation payante.
+                  </p>
+                );
+              })()}
+
               <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">💡 Garantie: le coût des pièces sera enregistré comme perte, pas facturé au client.</p>
 
               <div className="grid grid-cols-2 gap-3">
@@ -193,9 +226,25 @@ export function WarrantyDrawer({ open, onOpenChange }: WarrantyDrawerProps) {
                 {selectedParts.length > 0 && (
                   <div className="space-y-1">
                     {selectedParts.map((part) => (
-                      <div key={part.product_id} className="flex items-center justify-between p-2 rounded bg-muted/50 text-sm">
-                        <span>{part.product_name} x{part.quantity}</span>
-                        <Button variant="ghost" size="sm" className="h-6 text-xs text-destructive" onClick={() => removePart(part.product_id)}>Retirer</Button>
+                      <div key={part.product_id} className="flex items-center justify-between gap-2 p-2 rounded bg-muted/50 text-sm">
+                        <span className="min-w-0 truncate flex-1">{part.product_name}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setPartQty(part.product_id, part.quantity - 1)} disabled={part.quantity <= 1}>
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={part.quantity}
+                            onChange={(e) => setPartQty(part.product_id, Number(e.target.value) || 1)}
+                            className="h-6 w-14 text-center text-xs"
+                          />
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setPartQty(part.product_id, part.quantity + 1)}>
+                            +
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs text-destructive" onClick={() => removePart(part.product_id)}>Retirer</Button>
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Package, Send, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { AlertTriangle, Package, Send, CheckCircle2, XCircle, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDefectiveParts } from "@/hooks/useWarranty";
 import { useUpdateDefectivePartRMA } from "@/hooks/useRMA";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrency } from "@/hooks/useCurrency";
+
+const PAGE_SIZE = 20;
 
 const statusLabels: Record<string, { label: string; className: string; icon: any }> = {
   pending: { label: "En attente", className: "bg-warning/10 text-warning border-warning/20", icon: Package },
@@ -23,6 +26,7 @@ export function SupplierRMAList() {
   const { data: parts = [], isLoading } = useDefectiveParts();
   const updateRMA = useUpdateDefectivePartRMA();
   const { format } = useCurrency();
+  const [page, setPage] = useState(1);
 
   if (isLoading) return <Skeleton className="h-40" />;
 
@@ -48,6 +52,9 @@ export function SupplierRMAList() {
     });
   };
 
+  const totalPages = Math.max(1, Math.ceil((parts as any[]).length / PAGE_SIZE));
+  const paginatedParts = (parts as any[]).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -57,11 +64,11 @@ export function SupplierRMAList() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        {(parts as any[]).map((part: any) => {
+        {paginatedParts.map((part: any) => {
           const status = statusLabels[part.status] || statusLabels.pending;
           return (
-            <div key={part.id} className="flex items-center justify-between p-3 rounded-lg border">
-              <div className="min-w-0 flex-1">
+            <div key={part.id} className="flex flex-wrap items-center gap-3 p-3 rounded-lg border">
+              <div className="min-w-0 flex-1 basis-52">
                 <p className="text-sm font-medium truncate">{part.product_name}</p>
                 <p className="text-xs text-muted-foreground">
                   Qté: {part.quantity} • {part.supplier?.name || "Fournisseur inconnu"}
@@ -74,7 +81,8 @@ export function SupplierRMAList() {
                   <p className="text-xs font-medium text-success mt-0.5">Remboursé: {format(Number(part.refund_amount))}</p>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 ml-auto">
+                <Badge variant="secondary" className={`hidden sm:inline-flex ${status.className}`}>{status.label}</Badge>
                 <Select
                   value={part.status}
                   onValueChange={(value) => handleStatusChange(part, value)}
@@ -94,6 +102,20 @@ export function SupplierRMAList() {
             </div>
           );
         })}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-sm text-muted-foreground">{(parts as any[]).length} pièces • Page {page} / {totalPages}</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

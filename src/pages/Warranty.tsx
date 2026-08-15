@@ -3,16 +3,18 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, Plus, Clock, CheckCircle2, XCircle, Undo2, Package, TrendingDown, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
-import { useWarrantyTickets, useDefectiveParts } from "@/hooks/useWarranty";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Shield, Plus, Clock, CheckCircle2, XCircle, Undo2, Package, TrendingDown, AlertTriangle, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useWarrantyTickets, useDefectiveParts, useUpdateWarrantyTicketStatus } from "@/hooks/useWarranty";
 import { useProductReturns } from "@/hooks/useProductReturns";
 import { ProductReturnDrawer } from "@/components/returns/ProductReturnDrawer";
 import { WarrantyDrawer } from "@/components/returns/WarrantyDrawer";
 import { SupplierRMAList } from "@/components/returns/SupplierRMAList";
 import { LossReport } from "@/components/returns/LossReport";
-import { QuickScanReturn } from "@/components/returns/QuickScanReturn";
+import { WarrantyChecker } from "@/components/returns/WarrantyChecker";
 import { useCurrency } from "@/hooks/useCurrency";
 import { StatCard } from "@/components/ui/stat-card";
 
@@ -72,13 +74,32 @@ export default function Warranty() {
   const { data: tickets = [], isLoading: ticketsLoading } = useWarrantyTickets();
   const { data: parts = [], isLoading: partsLoading } = useDefectiveParts();
   const { data: returns = [], isLoading: returnsLoading } = useProductReturns();
+  const updateTicketStatus = useUpdateWarrantyTicketStatus();
   const [returnDrawerOpen, setReturnDrawerOpen] = useState(false);
   const [warrantyDrawerOpen, setWarrantyDrawerOpen] = useState(false);
+  const [prefilledRepair, setPrefilledRepair] = useState<any>(null);
   const { format } = useCurrency();
+
+  // Tabs + ticket filters
+  const [activeTab, setActiveTab] = useState("returns");
+  const [ticketStatusFilter, setTicketStatusFilter] = useState("all");
+  const [ticketSearch, setTicketSearch] = useState("");
 
   // Pagination state
   const [returnsPage, setReturnsPage] = useState(1);
   const [warrantyPage, setWarrantyPage] = useState(1);
+
+  // Open the warranty drawer pre-filled from the checker
+  const handleCreateTicketFromRepair = (repair: any) => {
+    setPrefilledRepair(repair);
+    setActiveTab("warranty");
+    setWarrantyDrawerOpen(true);
+  };
+
+  const handleWarrantyDrawerClose = (open: boolean) => {
+    setWarrantyDrawerOpen(open);
+    if (!open) setPrefilledRepair(null);
+  };
 
   const isLoading = ticketsLoading || partsLoading || returnsLoading;
 
@@ -95,16 +116,32 @@ export default function Warranty() {
       .reduce((s: number, r: any) => s + Number(r.refund_amount || 0), 0);
   const pendingRMA = (parts as any[]).filter((p: any) => p.status === "pending" || p.status === "sent").length;
 
-  // Paginated slices
+  // Filtered + paginated slices
+  const filteredTickets = (tickets as any[]).filter((t: any) => {
+    if (ticketStatusFilter !== "all" && t.status !== ticketStatusFilter) return false;
+    if (ticketSearch.trim()) {
+      const q = ticketSearch.trim().toLowerCase();
+      const hay = [
+        t.original_repair?.device_model,
+        t.original_repair?.customer?.name,
+        t.original_repair?.customer?.phone,
+        t.return_reason,
+        t.action_taken,
+      ].filter(Boolean).join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
   const paginatedReturns = (returns as any[]).slice((returnsPage - 1) * PAGE_SIZE, returnsPage * PAGE_SIZE);
-  const paginatedTickets = (tickets as any[]).slice((warrantyPage - 1) * PAGE_SIZE, warrantyPage * PAGE_SIZE);
+  const paginatedTickets = filteredTickets.slice((warrantyPage - 1) * PAGE_SIZE, warrantyPage * PAGE_SIZE);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="Retours & RMA" description="Gestion des retours produits, garanties SAV et RMA fournisseur" />
 
-      {/* Quick Scan */}
-      <QuickScanReturn />
+      {/* Warranty checker — instant covered/expired verdict */}
+      <WarrantyChecker onCreateTicket={handleCreateTicketFromRepair} />
 
       {/* Stats */}
       {isLoading ? (
@@ -120,9 +157,9 @@ export default function Warranty() {
         </div>
       )}
 
-      {/* Tabs */}
-      <Tabs defaultValue="returns" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+      {/* Tabs — 2 columns on mobile so long labels never truncate */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
           <TabsTrigger value="returns">Retours Produits</TabsTrigger>
           <TabsTrigger value="warranty">Garantie SAV</TabsTrigger>
           <TabsTrigger value="rma">RMA Fournisseur</TabsTrigger>
@@ -189,8 +226,30 @@ export default function Warranty() {
 
         {/* Tab 2: Warranty */}
         <TabsContent value="warranty" className="space-y-4">
-          <div className="flex justify-end">
-            <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setWarrantyDrawerOpen(true)}>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+            <div className="flex flex-1 gap-2 min-w-0">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filtrer: appareil, client..."
+                  value={ticketSearch}
+                  onChange={(e) => { setTicketSearch(e.target.value); setWarrantyPage(1); }}
+                  className="pl-9 h-9"
+                />
+              </div>
+              <Select value={ticketStatusFilter} onValueChange={(v) => { setTicketStatusFilter(v); setWarrantyPage(1); }}>
+                <SelectTrigger className="w-[140px] h-9 shrink-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="pending">En attente</SelectItem>
+                  <SelectItem value="resolved">Résolu</SelectItem>
+                  <SelectItem value="cancelled">Annulé</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white shrink-0" onClick={() => setWarrantyDrawerOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />Nouveau ticket
             </Button>
           </div>
@@ -206,10 +265,12 @@ export default function Warranty() {
                 <div className="space-y-3">
                   {[...Array(5)].map((_, i) => <SkeletonCard key={i} />)}
                 </div>
-              ) : (tickets as any[]).length === 0 ? (
+              ) : filteredTickets.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
                   <Shield className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Aucun ticket de garantie</p>
+                  <p className="text-sm">
+                    {(tickets as any[]).length === 0 ? "Aucun ticket de garantie" : "Aucun ticket ne correspond aux filtres"}
+                  </p>
                 </div>
               ) : (
                 <>
@@ -219,33 +280,55 @@ export default function Warranty() {
                       const StatusIcon = status.icon;
                       const repair = ticket.original_repair;
                       return (
-                        <div key={ticket.id} className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`flex items-center justify-center w-9 h-9 rounded-lg ${status.className}`}>
-                              <StatusIcon className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {repair?.device_model || "Réparation"} — {repair?.customer?.name || "Client anonyme"}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {reasonLabels[ticket.return_reason] || ticket.return_reason}
-                                {ticket.action_taken && ` • ${ticket.action_taken}`}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(ticket.created_at).toLocaleDateString("fr-FR")}
-                              </p>
-                            </div>
+                        <div key={ticket.id} className="flex flex-wrap items-center gap-3 p-4 rounded-lg border hover:bg-muted/50 transition-colors">
+                          <div className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 ${status.className}`}>
+                            <StatusIcon className="w-4 h-4" />
                           </div>
-                          <div className="flex items-center gap-3 shrink-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">
+                              {repair?.device_model || "Réparation"} — {repair?.customer?.name || "Client anonyme"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {reasonLabels[ticket.return_reason] || ticket.return_reason}
+                              {ticket.action_taken && ` • ${ticket.action_taken}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(ticket.created_at).toLocaleDateString("fr-FR")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-auto">
                             <Badge variant="secondary" className={status.className}>{status.label}</Badge>
                             <span className="text-sm font-medium font-mono-numbers">{format(Number(ticket.total_cost) || 0)}</span>
+                            {ticket.status === "pending" && (
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-success"
+                                  title="Marquer résolu"
+                                  disabled={updateTicketStatus.isPending}
+                                  onClick={() => updateTicketStatus.mutate({ id: ticket.id, status: "resolved" })}
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-destructive"
+                                  title="Annuler le ticket"
+                                  disabled={updateTicketStatus.isPending}
+                                  onClick={() => updateTicketStatus.mutate({ id: ticket.id, status: "cancelled" })}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                  <PaginationControls page={warrantyPage} total={(tickets as any[]).length} onPageChange={setWarrantyPage} />
+                  <PaginationControls page={warrantyPage} total={filteredTickets.length} onPageChange={setWarrantyPage} />
                 </>
               )}
             </CardContent>
@@ -264,7 +347,7 @@ export default function Warranty() {
       </Tabs>
 
       <ProductReturnDrawer open={returnDrawerOpen} onOpenChange={setReturnDrawerOpen} />
-      <WarrantyDrawer open={warrantyDrawerOpen} onOpenChange={setWarrantyDrawerOpen} />
+      <WarrantyDrawer open={warrantyDrawerOpen} onOpenChange={handleWarrantyDrawerClose} initialRepair={prefilledRepair} />
     </div>
   );
 }
