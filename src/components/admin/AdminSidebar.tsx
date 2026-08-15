@@ -145,13 +145,21 @@ export function AdminSidebar({ active, onNavigate, onClose, collapsed = false, o
     });
   };
 
-  const openCategory = (cat: Category) => {
-    setExpanded((prev) => (prev[cat.id] ? prev : { ...prev, [cat.id]: true }));
+  const handleCategoryClick = (cat: Category) => {
+    // Rail mode: no sub-items visible, clicking a category navigates.
     if (collapsed) {
       onNavigate(cat.landing ?? cat.items[0].id);
       onClose?.();
       return;
     }
+    const isOpen = expanded[cat.id];
+    if (isOpen) {
+      // Clicking an open category collapses it.
+      setExpanded((prev) => ({ ...prev, [cat.id]: false }));
+      return;
+    }
+    // Clicking a closed category expands it (and opens its landing page, if any).
+    setExpanded((prev) => ({ ...prev, [cat.id]: true }));
     if (cat.landing) {
       onNavigate(cat.landing);
       onClose?.();
@@ -237,7 +245,7 @@ export function AdminSidebar({ active, onNavigate, onClose, collapsed = false, o
 
             const header = (
               <button
-                onClick={() => openCategory(cat)}
+                onClick={() => handleCategoryClick(cat)}
                 className={cn(
                   "w-full flex items-center gap-2.5 rounded-lg text-xs font-semibold transition-colors duration-150 relative",
                   collapsed ? "px-0 py-2.5 justify-center" : "px-2.5 py-2",
