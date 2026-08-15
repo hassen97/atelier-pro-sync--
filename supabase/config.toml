@@ -35,8 +35,6 @@ project_id = "rgikflkocotkljbajzrb"
     verify_jwt = false
   [functions.process-email-queue]
     verify_jwt = true
-  [functions.restore-live-db]
-    verify_jwt = false
   [functions.send-notification-email]
     verify_jwt = false
   [functions.send-onboarding-reminder]

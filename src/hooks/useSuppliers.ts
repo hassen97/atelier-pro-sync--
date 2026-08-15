@@ -36,7 +36,7 @@ export interface SupplierPurchase {
   created_at: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const db = supabase as any;
 
 export function useSuppliers() {

@@ -138,7 +138,7 @@ self.addEventListener("push", (event) => {
       badge,
       tag: tag || "repairpro-notification",
       data: { url },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       vibrate: [200, 100, 200],
     } as any),
   );

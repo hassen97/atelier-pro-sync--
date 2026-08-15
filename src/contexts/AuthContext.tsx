@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { usePresence } from "@/hooks/usePresence";
@@ -102,7 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const signupMutex = useState({ inProgress: false })[0];
+  // A real stable mutable ref (the useState hack had fragile semantics).
+  const signupMutex = useRef({ inProgress: false });
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -141,10 +142,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     // Mutex: prevent concurrent signup calls
-    if (signupMutex.inProgress) {
+    if (signupMutex.current.inProgress) {
       return { error: new Error("Inscription en cours, veuillez patienter.") };
     }
-    signupMutex.inProgress = true;
+    signupMutex.current.inProgress = true;
 
     try {
       // Primary: Supabase JS client
@@ -185,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { error: null };
     } finally {
-      signupMutex.inProgress = false;
+      signupMutex.current.inProgress = false;
     }
   };
 

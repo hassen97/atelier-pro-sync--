@@ -242,7 +242,8 @@ export function useConversations() {
       );
     },
     enabled: !!user,
-    refetchInterval: 30000,
+    // Halved: this query fans out per-conversation; realtime migration is a follow-up.
+    refetchInterval: 60_000,
   });
 }
 
@@ -410,6 +411,6 @@ export function useUnreadMessageCount() {
       return count ?? 0;
     },
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: 60_000,
   });
 }

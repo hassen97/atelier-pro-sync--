@@ -35,7 +35,7 @@ export class RouteErrorBoundary extends Component<
 
   componentDidCatch(error: unknown) {
     // Preserve the stack for debugging.
-    // eslint-disable-next-line no-console
+     
     console.error("[RouteErrorBoundary]", error);
   }
 

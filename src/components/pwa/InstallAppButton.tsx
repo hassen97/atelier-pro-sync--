@@ -24,7 +24,7 @@ export function InstallAppButton({
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       // iOS Safari
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (window.navigator as any).standalone === true;
     setIsInstalled(standalone);
 

@@ -147,7 +147,7 @@ export function registerServiceWorker() {
     navigator.serviceWorker
       .register("/sw.js", { scope: "/" })
       .then((reg) => {
-        // eslint-disable-next-line no-console
+         
         console.log("[PWA] Service Worker registered", APP_VERSION, reg.scope);
 
         // A worker already waiting from a previous visit = update ready.
@@ -179,7 +179,7 @@ export function registerServiceWorker() {
         });
       })
       .catch((err) => {
-        // eslint-disable-next-line no-console
+         
         console.warn("[PWA] Service Worker registration failed", err);
       });
   });

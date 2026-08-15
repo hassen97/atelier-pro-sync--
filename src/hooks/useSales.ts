@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { applyLoyaltyEarn, applyLoyaltyRedeem } from "@/hooks/useLoyalty";
+import { queryKeys, invalidateDomains } from "@/lib/queryKeys";
 
 export type Sale = Tables<"sales">;
 export type SaleInsert = TablesInsert<"sales">;
@@ -17,6 +18,7 @@ interface CreateSaleParams {
   total_amount: number;
   amount_paid: number;
   notes?: string;
+  session_id?: string | null;
   items: {
     product_id: string;
     quantity: number;
@@ -36,42 +38,16 @@ export interface CreateSaleResult {
   loyalty_balance_after: number | null;
 }
 
-export function useSales() {
-  const effectiveUserId = useEffectiveUserId();
-
-  return useQuery({
-    queryKey: ["sales", effectiveUserId],
-    queryFn: async () => {
-      if (!effectiveUserId) return [];
-      
-      const { data, error } = await supabase
-        .from("sales")
-        .select(`
-          *,
-          customer:customers(id, name),
-          sale_items(id, product_id, quantity, unit_price)
-        `)
-        .eq("user_id", effectiveUserId)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!effectiveUserId,
-  });
-}
-
 /**
- * Unpaid sales only (amount_paid < total_amount), batched to bypass the
- * 1000-row API limit — the narrow query behind the CustomerDebts page.
- * Unlike `useSales`, this never loads the full (potentially large) sales
- * history nor the nested `sale_items`.
+ * Unpaid sales only — backed by the `unpaid_sales` security_invoker view, so
+ * the balance filter happens server-side. We no longer download the full
+ * (paid + unpaid) sales history to filter it in JS.
  */
 export function useAllUnpaidSales() {
   const effectiveUserId = useEffectiveUserId();
 
   return useQuery({
-    queryKey: ["sales-unpaid-all", effectiveUserId],
+    queryKey: [...queryKeys.salesUnpaid, effectiveUserId],
     queryFn: async () => {
       if (!effectiveUserId) return [];
 
@@ -82,13 +58,13 @@ export function useAllUnpaidSales() {
 
       while (hasMore) {
         const { data, error } = await supabase
-          .from("sales")
+          .from("unpaid_sales" as any)
           .select(
-            `id, customer_id, total_amount, amount_paid, payment_method, created_at,
+            `id, customer_id, total_amount, amount_paid, remaining_balance,
+             payment_method, created_at,
              customer:customers(id, name, phone)`
           )
           .eq("user_id", effectiveUserId)
-          .gt("total_amount", 0)
           .order("created_at", { ascending: false })
           .range(from, from + PAGE - 1);
 
@@ -98,8 +74,7 @@ export function useAllUnpaidSales() {
         if (data.length < PAGE) { hasMore = false; } else { from += PAGE; }
       }
 
-      // Filter client-side to keep only sales with a remaining balance.
-      return allData.filter((s) => Number(s.total_amount) - Number(s.amount_paid) > 0.001);
+      return allData;
     },
     enabled: !!effectiveUserId,
     staleTime: 60 * 1000, // 1 min cache for debt page
@@ -122,50 +97,25 @@ export function useCreateSale() {
     }: CreateSaleParams): Promise<CreateSaleResult> => {
       if (!effectiveUserId) throw new Error("Non authentifié");
 
-      // Create the sale
-      const { data: sale, error: saleError } = await supabase
-        .from("sales")
-        .insert({
-          ...saleData,
-          user_id: effectiveUserId,
-        })
-        .select()
-        .single();
+      // ONE atomic server-side call: sale + items + row-locked stock decrement.
+      // Replaces ~5+2N sequential requests and the read-then-write oversell race.
+      const { data, error } = await supabase.rpc("create_sale" as any, {
+        _shop_id: effectiveUserId,
+        _items: items,
+        _customer_id: saleData.customer_id ?? null,
+        _payment_method: saleData.payment_method,
+        _total_amount: saleData.total_amount,
+        _amount_paid: saleData.amount_paid,
+        _notes: saleData.notes ?? null,
+        _session_id: saleData.session_id ?? null,
+      });
+      if (error) throw error;
 
-      if (saleError) throw saleError;
-
-      // Create sale items
-      const saleItems = items.map((item) => ({
-        sale_id: sale.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("sale_items")
-        .insert(saleItems);
-
-      if (itemsError) throw itemsError;
-
-      // Update product quantities
-      for (const item of items) {
-        const { data: product } = await supabase
-          .from("products")
-          .select("quantity")
-          .eq("id", item.product_id)
-          .single();
-        
-        if (product) {
-          await supabase
-            .from("products")
-            .update({ 
-              quantity: product.quantity - item.quantity,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", item.product_id);
-        }
-      }
+      const sale = {
+        id: (data as any)?.sale_id,
+        ...saleData,
+        user_id: effectiveUserId,
+      } as Sale;
 
       // Loyalty: redemption (deducts points first)
       let points_used = 0;
@@ -209,26 +159,28 @@ export function useCreateSale() {
       }
 
       return {
-        sale: sale as Sale,
+        sale,
         points_earned,
         points_used,
         loyalty_balance_after: balance_after,
       };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sales"] });
-      queryClient.invalidateQueries({ queryKey: ["sales-unpaid-all"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["products-all"] });
-      queryClient.invalidateQueries({ queryKey: ["products-low-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
-      queryClient.invalidateQueries({ queryKey: ["inventory-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["profit"] });
-      queryClient.invalidateQueries({ queryKey: ["session-totals"] });
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
-      queryClient.invalidateQueries({ queryKey: ["customers-all"] });
-      queryClient.invalidateQueries({ queryKey: ["loyalty-transactions"] });
+      invalidateDomains(queryClient, [
+        queryKeys.sales,
+        queryKeys.salesUnpaid,
+        queryKeys.products,
+        queryKeys.productsAll,
+        queryKeys.productsLowStock,
+        queryKeys.lowStockAlerts,
+        queryKeys.inventoryStats,
+        queryKeys.dashboardStats,
+        queryKeys.profit,
+        queryKeys.sessionTotals,
+        queryKeys.customers,
+        queryKeys.customersAll,
+        queryKeys.loyaltyTransactions,
+      ]);
       toast.success("Vente enregistrée avec succès");
     },
     onError: (error) => {
@@ -254,10 +206,12 @@ export function useUpdateSale() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sales"] });
-      queryClient.invalidateQueries({ queryKey: ["sales-unpaid-all"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["profit"] });
+      invalidateDomains(queryClient, [
+        queryKeys.sales,
+        queryKeys.salesUnpaid,
+        queryKeys.dashboardStats,
+        queryKeys.profit,
+      ]);
     },
     onError: (error) => {
       console.error("Error updating sale:", error);

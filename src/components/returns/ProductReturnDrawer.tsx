@@ -107,7 +107,7 @@ export function ProductReturnDrawer({ open, onOpenChange }: ProductReturnDrawerP
         if (draft.stockAvailable !== undefined) setStockAvailable(draft.stockAvailable);
         if (draft.refundCash !== undefined) setRefundCash(draft.refundCash);
       }
-    } catch {}
+    } catch { /* ignore unparsable draft */ }
   }, [open]);
 
   return (

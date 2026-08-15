@@ -21,6 +21,9 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Project is non-strict TS by design (tsconfig strict: false); `any` is
+      // pervasive in generated/edge code. Keep lint catching real bugs, not style.
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
 );

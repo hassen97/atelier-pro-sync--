@@ -274,7 +274,7 @@ export default function Inventory() {
       const PAGE = 1000;
       let from = 0;
       const all: Array<{ name: string; sku: string | null; quantity: number; cost_price: number; sell_price: number; category_id: string | null }> = [];
-      // eslint-disable-next-line no-constant-condition
+       
       while (true) {
         const { data, error } = await supabase
           .from("products")

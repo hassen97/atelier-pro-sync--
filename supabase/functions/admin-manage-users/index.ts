@@ -854,7 +854,7 @@ serve(async (req) => {
         if (!body.userId || !body.targetUserId) return jsonResp({ error: "userId (source) and targetUserId (target) required" }, 400);
         const src = body.userId;
         const tgt = body.targetUserId;
-        let cloned = { products: 0, customers: 0, categories: 0 };
+        const cloned = { products: 0, customers: 0, categories: 0 };
 
         // Clone categories
         const { data: cats } = await adminClient.from("categories").select("*").eq("user_id", src);

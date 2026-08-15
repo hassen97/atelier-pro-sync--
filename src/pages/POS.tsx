@@ -25,7 +25,7 @@ import { useInventoryAccess } from "@/hooks/useInventoryAccess";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { LoyaltyRedeemCard } from "@/components/pos/LoyaltyRedeemCard";
 import { CloseRegisterDialog } from "@/components/pos/CloseRegisterDialog";
-import { useCanCloseRegister } from "@/hooks/useRegisterSession";
+import { useCanCloseRegister, useOpenSession } from "@/hooks/useRegisterSession";
 import { toast } from "sonner";
 import { Settings2 } from "lucide-react";
 import {
@@ -83,6 +83,7 @@ export default function POS() {
   const { data: repairsResult = {data:[], count:0}, isLoading: repairsLoading } = useRepairs();
   const rawRepairs = repairsResult.data;
   const createSale = useCreateSale();
+  const { data: openSession } = useOpenSession();
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const updateRepairStatus = useUpdateRepairStatus();
@@ -160,7 +161,7 @@ export default function POS() {
     });
     merged.sort(sortMerged);
     return applyOrder(merged.map(({ order, created_at, ...rest }) => rest), mainOrderOverride);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [mainCatRows, prefMap, mainOrderOverride]);
 
   // Names of main categories that have an actual product (for "Tout" fallback list)
@@ -184,7 +185,7 @@ export default function POS() {
       });
     merged.sort(sortMerged);
     return applyOrder(merged.map(({ order, created_at, ...rest }) => rest), subOrderOverride);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [subCatRows, prefMap, selectedMain, subOrderOverride]);
 
   const handleMainDragEnd = (event: DragEndEvent) => {
@@ -245,7 +246,7 @@ export default function POS() {
       gain.gain.value = 0.15;
       osc.start();
       osc.stop(ctx.currentTime + 0.1);
-    } catch {}
+    } catch { /* audio unavailable — non-critical */ }
   }, []);
 
   const flashGreen = useCallback(() => {
@@ -393,6 +394,7 @@ export default function POS() {
         payment_method: "cash",
         total_amount: Math.max(0, productTotal - (repairItems.length === 0 ? loyaltyDiscount : 0)),
         amount_paid: productPaid,
+        session_id: openSession?.id ?? null,
         items: productItems.map((item) => ({ product_id: item.id, quantity: item.quantity, unit_price: item.price })),
         loyalty_enabled: settings.loyalty_enabled && !!selectedCustomerId,
         loyalty_earn_rate: settings.loyalty_earn_rate,
@@ -469,6 +471,7 @@ export default function POS() {
         payment_method: pendingPaymentMethod,
         total_amount: productTotal,
         amount_paid: Math.min(productPaid, productTotal),
+        session_id: openSession?.id ?? null,
         items: productItems.map((item) => ({ product_id: item.id, quantity: item.quantity, unit_price: item.price })),
         loyalty_enabled: settings.loyalty_enabled && !!selectedCustomerId,
         loyalty_earn_rate: settings.loyalty_earn_rate,

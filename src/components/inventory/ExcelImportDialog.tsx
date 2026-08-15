@@ -74,7 +74,7 @@ const COLUMN_ALIASES: Record<string, string> = {
 function toNumber(val: unknown): number {
   if (typeof val === "number") return isNaN(val) ? 0 : val;
   if (typeof val === "string") {
-    const n = parseFloat(val.replace(/[^\d.,\-]/g, "").replace(",", "."));
+    const n = parseFloat(val.replace(/[^\d.,-]/g, "").replace(",", "."));
     return isNaN(n) ? 0 : n;
   }
   return 0;

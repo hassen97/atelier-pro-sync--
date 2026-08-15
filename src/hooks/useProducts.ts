@@ -95,7 +95,9 @@ export function useAllProducts() {
       return all as (Omit<any, 'barcodes'> & { barcodes: string[] })[];
     },
     enabled: !!effectiveUserId,
-    staleTime: 30 * 1000,
+    // Mutations invalidate ["products-all"], so a longer TTL is safe and stops
+    // the full catalog re-download on every POS visit.
+    staleTime: 2 * 60 * 1000,
   });
 }
 

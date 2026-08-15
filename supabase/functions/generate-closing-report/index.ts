@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     const callerId = userData.user.id;
 
     const body = await req.json().catch(() => ({}));
-    let shopId: string = body?.shop_id || callerId;
+    const shopId: string = body?.shop_id || callerId;
 
     // ---- Authorization: caller must own the shop, be an active team member, or platform admin ----
     if (shopId !== callerId) {

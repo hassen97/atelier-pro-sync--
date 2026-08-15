@@ -73,7 +73,7 @@ export default function Auth() {
           setRememberMe(true);
         }
       }
-    } catch {}
+    } catch { /* ignore corrupt remember-me payload */ }
   }, []);
 
   // Cooldown timer
