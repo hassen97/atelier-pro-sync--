@@ -15,6 +15,8 @@ POS / inventory / repairs SaaS for phone-repair shops (Tunisia). React 18 SPA + 
 - `src/pages/` — route pages, all lazy-loaded via `lazyWithRetry` (stale-chunk reload guard).
 - `src/hooks/` — one TanStack Query hook per domain (`useProducts`, `useRepairs`, ...). All data flows through these + the shared `supabase` client.
 - `src/components/<domain>/` — feature components; `src/components/ui/` — shadcn components.
+- Admin shell: `src/components/admin/AdminSidebar.tsx` exports the `AdminView` union (single source of truth — `AdminDashboard.tsx` imports it). Sidebar = nested categories with sub-items + a live "Sécurité" badge fed by `useSignupAttempts`.
+- Security center: `AdminSecurityView` (landing) + `AdminSignupEventsView` + `AdminSignupAttemptsView`, all backed by `src/hooks/useAdminSecurity.ts` (attempts, events+realtime, notify toggles, purge).
 - `src/integrations/supabase/types.ts` — **generated** (`supabase gen types`); never edit by hand. Use `Tables` / `TablesInsert` / `TablesUpdate` helper types.
 - `supabase/migrations/*.sql` — chronological schema history. `supabase/functions/*` — Deno edge functions.
 
@@ -50,6 +52,7 @@ POS / inventory / repairs SaaS for phone-repair shops (Tunisia). React 18 SPA + 
 
 - Deno. Some functions import JSX email templates from `_shared/email-templates/*.tsx`; only `auth-email-hook` and `process-email-queue` have their own `deno.json`.
 - `supabase/config.toml` lists every function in the dir (reconciled 2026-08-15 — the bogus `mcp` entry was removed); `verify_jwt = false` is the convention since functions self-guard with `auth.uid()`/role checks. Secrets are per-function env vars (e.g. `HCAPTCHA_SECRET_KEY`), set in the dashboard.
+- `signup_attempts` is write-only (deny-all RLS) except a new platform-admin SELECT policy + `purge_signup_attempts(keep_hours)` SECURITY DEFINER RPC (`20260815000000_...`). The Security center depends on that migration being applied.
 
 ## Tests
 

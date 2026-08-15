@@ -3,7 +3,7 @@ import { Menu, Search, Bell, ChevronLeft, ChevronRight, Megaphone } from "lucide
 import { QuickChangelogDialog } from "@/components/admin/QuickChangelogDialog";
 import { useAdminData } from "@/hooks/useAdmin";
 import { useAuth } from "@/contexts/AuthContext";
-import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
 import { AdminOverview } from "@/components/admin/AdminOverview";
 import { AdminShopsView } from "@/components/admin/AdminShopsView";
 import { AdminAnnouncementsView } from "@/components/admin/AdminAnnouncementsView";
@@ -26,16 +26,12 @@ import { AdminServiceRequestsView } from "@/components/admin/AdminServiceRequest
 import { AdminSystemHealthView } from "@/components/admin/AdminSystemHealthView";
 import { AdminGrowthEngineView } from "@/components/admin/AdminGrowthEngineView";
 import { AdminEmailTemplatesView } from "@/components/admin/AdminEmailTemplatesView";
+import { AdminSecurityView } from "@/components/admin/AdminSecurityView";
+import { AdminSignupEventsView } from "@/components/admin/AdminSignupEventsView";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAdminSignupNotifier } from "@/hooks/useAdminSignupNotifier";
 import { cn } from "@/lib/utils";
-
-type AdminView =
-  | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
-  | "settings" | "employees" | "plans" | "promo_codes" | "gateways" | "feature_flags"
-  | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
-  | "services_catalog" | "services_requests" | "system_health" | "growth_engine" | "email_templates";
 
 const viewLabels: Record<AdminView, string> = {
   overview:        "Dashboard",
@@ -50,7 +46,7 @@ const viewLabels: Record<AdminView, string> = {
   announcements:   "Annonces",
   feedback:        "Feedback",
   community:       "Communaute",
-  signup_attempts: "Tentatives de connexion",
+  signup_attempts: "Tentatives & IPs",
   settings:        "Parametres",
   feature_flags:   "Feature Flags",
   reports:         "Rapports & Export",
@@ -59,6 +55,8 @@ const viewLabels: Record<AdminView, string> = {
   system_health:     "Santé Système",
   growth_engine:     "Growth Engine",
   email_templates:   "Modèles d'e-mails",
+  security:          "Centre de Sécurité",
+  signup_events:     "Événements d'inscription",
 };
 
 const AdminDashboard = () => {
@@ -244,9 +242,11 @@ const AdminDashboard = () => {
             {activeView === "reports"          && <AdminReportsView />}
             {activeView === "services_catalog"  && <AdminServicesView />}
             {activeView === "services_requests" && <AdminServiceRequestsView />}
-            {activeView === "system_health"     && <AdminSystemHealthView />}
+{activeView === "system_health"     && <AdminSystemHealthView />}
             {activeView === "growth_engine"     && <AdminGrowthEngineView />}
             {activeView === "email_templates"   && <AdminEmailTemplatesView />}
+            {activeView === "security"          && <AdminSecurityView onNavigate={handleNavigate} />}
+            {activeView === "signup_events"     && <AdminSignupEventsView />}
           </div>
         </main>
       </div>

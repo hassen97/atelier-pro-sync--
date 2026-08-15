@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search, Store, Users, Wrench, X, Megaphone } from "lucide-react";
+import { Search, Store, Users, Wrench, X, Megaphone, Shield, Fingerprint } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAdminData } from "@/hooks/useAdmin";
 
@@ -13,6 +13,9 @@ interface AdminCommandPaletteProps {
 const quickCommands = [
   { label: "Publier un changelog", icon: Megaphone, view: "__changelog__", hint: "Annoncer une mise à jour à toutes les boutiques" },
   { label: "Dashboard", icon: Store, view: "overview", hint: "Vue globale" },
+  { label: "Centre de Sécurité", icon: Shield, view: "security", hint: "IPs suspectes, tentatives, alertes" },
+  { label: "Tentatives & IPs", icon: Fingerprint, view: "signup_attempts", hint: "Forer les tentatives d'inscription" },
+  { label: "Événements d'inscription", icon: Megaphone, view: "signup_events", hint: "Nouvelles boutiques en temps réel" },
   { label: "Boutiques", icon: Store, view: "shops", hint: "Gérer les boutiques" },
   { label: "Employés", icon: Users, view: "employees", hint: "Gérer les employés" },
   { label: "Réparations", icon: Wrench, view: "shops", hint: "Voir les réparations" },

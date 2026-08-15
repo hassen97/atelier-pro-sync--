@@ -1,18 +1,23 @@
+import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, Store, Megaphone, MessageSquare, LogOut, KeyRound,
-  Settings, Users, CreditCard, Tags, ClipboardList, Shield,
-  ChevronLeft, ChevronRight, Users2, BarChart3, ListChecks, Flag, Cloud, Inbox, HeartPulse, Rocket, Ticket, Mail,
+  LayoutDashboard, Store, Users, BarChart3, Tags, Ticket, ClipboardList, CreditCard,
+  Rocket, Cloud, Inbox, Megaphone, MessageSquare, Users2, ListChecks, KeyRound,
+  Shield, ShieldAlert, Fingerprint, Globe2, HeartPulse, Flag, Mail, Settings,
+  LogOut, ChevronLeft, ChevronRight, ChevronDown, Search, Zap,
 } from "lucide-react";
 import { usePendingServiceRequestCount } from "@/hooks/useAdminServiceRequests";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSignupAttempts, groupAttemptsByIp } from "@/hooks/useAdminSecurity";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-type AdminView =
+export type AdminView =
   | "overview" | "shops" | "announcements" | "feedback" | "reset_requests"
   | "settings" | "employees" | "plans" | "promo_codes" | "gateways" | "feature_flags"
   | "waitlist" | "signup_attempts" | "orders" | "community" | "reports"
-  | "services_catalog" | "services_requests" | "system_health" | "growth_engine" | "email_templates";
+  | "services_catalog" | "services_requests" | "system_health" | "growth_engine"
+  | "email_templates" | "security" | "signup_events";
 
 interface AdminSidebarProps {
   active: AdminView;
@@ -22,28 +27,43 @@ interface AdminSidebarProps {
   onToggleCollapse?: () => void;
 }
 
-type NavItem = {
+type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+
+interface SubItem {
   id: AdminView;
   label: string;
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  icon: IconType;
   badge?: string;
   showPendingDot?: boolean;
-};
+}
 
-const navSections: { label: string; items: NavItem[] }[] = [
+interface Category {
+  id: string;
+  label: string;
+  icon: IconType;
+  landing?: AdminView;
+  items: SubItem[];
+}
+
+const singleItem: SubItem = { id: "overview", label: "Dashboard", icon: LayoutDashboard };
+
+const categories: Category[] = [
   {
+    id: "platform",
     label: "Plateforme",
+    icon: Store,
     items: [
-      { id: "overview",  label: "Dashboard",  icon: LayoutDashboard },
       { id: "shops",     label: "Boutiques",  icon: Store },
       { id: "employees", label: "Employés",   icon: Users },
       { id: "reports",   label: "Rapports",   icon: BarChart3, badge: "Nouveau" },
     ],
   },
   {
-    label: "Commercial",
+    id: "growth",
+    label: "Croissance",
+    icon: Rocket,
     items: [
-      { id: "plans",         label: "Tarifs & Plans", icon: Tags },
+      { id: "plans",         label: "Plans & Tarifs", icon: Tags },
       { id: "promo_codes",   label: "Codes promo",    icon: Ticket },
       { id: "orders",        label: "Commandes",      icon: ClipboardList },
       { id: "gateways",      label: "Paiements",      icon: CreditCard },
@@ -51,30 +71,46 @@ const navSections: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
-    label: "Services & Outils",
+    id: "services",
+    label: "Services",
+    icon: Cloud,
     items: [
       { id: "services_catalog",  label: "Catalogue services", icon: Cloud },
       { id: "services_requests", label: "Demandes entrantes", icon: Inbox, showPendingDot: true },
     ],
   },
   {
-    label: "Opérations",
+    id: "engagement",
+    label: "Engagement",
+    icon: Megaphone,
     items: [
-      { id: "waitlist",       label: "Liste d'attente", icon: ListChecks },
-      { id: "reset_requests", label: "Demandes",        icon: KeyRound },
       { id: "announcements",  label: "Annonces",        icon: Megaphone },
       { id: "feedback",       label: "Feedback",        icon: MessageSquare },
       { id: "community",      label: "Communauté",      icon: Users2 },
+      { id: "waitlist",       label: "Liste d'attente", icon: ListChecks },
+      { id: "reset_requests", label: "Demandes",        icon: KeyRound },
     ],
   },
   {
-    label: "Système",
+    id: "security",
+    label: "Sécurité",
+    icon: Shield,
+    landing: "security",
     items: [
-      { id: "system_health",   label: "Santé Système",  icon: HeartPulse, badge: "Nouveau" },
-      { id: "signup_attempts", label: "Tentatives",     icon: Shield },
-      { id: "feature_flags",   label: "Feature Flags",  icon: Flag },
+      { id: "security",         label: "Centre de Sécurité", icon: ShieldAlert },
+      { id: "signup_attempts",  label: "Tentatives & IPs",   icon: Fingerprint },
+      { id: "signup_events",    label: "Événements",         icon: Globe2 },
+      { id: "system_health",    label: "Santé Système",      icon: HeartPulse, badge: "Nouveau" },
+    ],
+  },
+  {
+    id: "system",
+    label: "Système",
+    icon: Settings,
+    items: [
+      { id: "feature_flags",   label: "Feature Flags",   icon: Flag },
       { id: "email_templates", label: "Modèles d'e-mails", icon: Mail },
-      { id: "settings",        label: "Paramètres",     icon: Settings },
+      { id: "settings",        label: "Paramètres",      icon: Settings },
     ],
   },
 ];
@@ -82,10 +118,44 @@ const navSections: { label: string; items: NavItem[] }[] = [
 export function AdminSidebar({ active, onNavigate, onClose, collapsed = false, onToggleCollapse }: AdminSidebarProps) {
   const { user, signOut } = useAuth();
   const { data: pendingCount = 0 } = usePendingServiceRequestCount();
+  const { data: attempts } = useSignupAttempts();
+
+  const suspiciousIps = useMemo(
+    () => groupAttemptsByIp(attempts ?? []).filter((g) => g.count >= 3).length,
+    [attempts]
+  );
+
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const c of categories) {
+      init[c.id] = c.items.some((i) => i.id === active);
+    }
+    return init;
+  });
 
   const handleNavigate = (view: AdminView) => {
     onNavigate(view);
     onClose?.();
+    // Keep the active category open.
+    setExpanded((prev) => {
+      const cat = categories.find((c) => c.items.some((i) => i.id === view));
+      if (!cat) return prev;
+      return { ...prev, [cat.id]: true };
+    });
+  };
+
+  const openCategory = (cat: Category) => {
+    setExpanded((prev) => (prev[cat.id] ? prev : { ...prev, [cat.id]: true }));
+    if (collapsed) {
+      onNavigate(cat.landing ?? cat.items[0].id);
+      onClose?.();
+      return;
+    }
+    if (cat.landing) {
+      onNavigate(cat.landing);
+      onClose?.();
+    }
   };
 
   const displayName =
@@ -95,18 +165,21 @@ export function AdminSidebar({ active, onNavigate, onClose, collapsed = false, o
     "Admin";
   const initial = displayName.charAt(0).toUpperCase();
 
+  const matchesQuery = (item: SubItem) =>
+    !query.trim() || item.label.toLowerCase().includes(query.trim().toLowerCase());
+
   return (
     <TooltipProvider delayDuration={0}>
       <div
         className="flex flex-col h-full"
-        style={{ width: collapsed ? 64 : 256, transition: "width 200ms ease" }}
+        style={{ width: collapsed ? 64 : 264, transition: "width 200ms ease" }}
       >
         {/* Header */}
         <div className={cn("flex items-center border-b border-white/10 shrink-0", collapsed ? "p-3 justify-center" : "p-4 justify-between")}>
           {!collapsed ? (
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00D4FF] to-[#0066FF] flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(0,212,255,0.3)]">
-                <span className="text-white font-bold text-sm">⚡</span>
+                <Zap className="h-4 w-4 text-white" />
               </div>
               <div className="min-w-0">
                 <h1 className="font-bold text-white text-xs tracking-wide truncate">Centre de Commande</h1>
@@ -115,7 +188,7 @@ export function AdminSidebar({ active, onNavigate, onClose, collapsed = false, o
             </div>
           ) : (
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00D4FF] to-[#0066FF] flex items-center justify-center">
-              <span className="text-white font-bold text-sm">⚡</span>
+              <Zap className="h-4 w-4 text-white" />
             </div>
           )}
           {onToggleCollapse && !onClose && (
@@ -128,72 +201,145 @@ export function AdminSidebar({ active, onNavigate, onClose, collapsed = false, o
           )}
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 py-3 space-y-4 overflow-y-auto overflow-x-hidden px-2">
-          {navSections.map((section) => (
-            <div key={section.label}>
-              {!collapsed && (
-                <p className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold px-2 mb-1.5">
-                  {section.label}
-                </p>
-              )}
-              <div className="space-y-0.5">
-                {section.items.map((item) => {
-                  const isActive = active === item.id;
-                  const Icon = item.icon;
-                  const showDot = item.showPendingDot && pendingCount > 0;
-                  const btn = (
-                    <button
-                      key={item.id}
-                      onClick={() => handleNavigate(item.id)}
-                      className={cn(
-                        "w-full flex items-center gap-2.5 rounded-lg text-sm font-medium transition-colors duration-150 relative",
-                        collapsed ? "px-0 py-2 justify-center" : "px-2.5 py-2",
-                        isActive
-                          ? "bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/20"
-                          : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent",
-                      )}
-                    >
-                      <span className="relative shrink-0">
-                        <Icon style={{ width: collapsed ? 18 : 16, height: collapsed ? 18 : 16 }} />
-                        {showDot && (
-                          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-1 ring-[#080E1A]" />
-                        )}
-                      </span>
-                      {!collapsed && (
-                        <>
-                          <span className="truncate overflow-hidden whitespace-nowrap flex-1 text-left">
-                            {item.label}
-                          </span>
-                          {showDot && (
-                            <span className="text-[10px] font-bold rounded-full px-1.5 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30">
-                              {pendingCount}
-                            </span>
-                          )}
-                          {item.badge && !showDot && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-[#00D4FF]/15 text-[#00D4FF]">
-                              {item.badge}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </button>
-                  );
-                  if (collapsed) {
-                    return (
-                      <Tooltip key={item.id}>
-                        <TooltipTrigger asChild>{btn}</TooltipTrigger>
-                        <TooltipContent side="right" className="bg-[#0F172A] border-white/10 text-white text-xs">
-                          {item.label}{item.badge ? ` · ${item.badge}` : ""}
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  }
-                  return btn;
-                })}
-              </div>
+        {/* Search */}
+        {!collapsed && (
+          <div className="px-3 pt-3 shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-600" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filtrer la navigation..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-[#00D4FF]/30 focus:bg-[#00D4FF]/[0.03] transition-colors"
+              />
             </div>
-          ))}
+          </div>
+        )}
+
+        {/* Nav */}
+        <nav className="flex-1 py-3 space-y-1 overflow-y-auto overflow-x-hidden px-2">
+          {/* Dashboard (single) */}
+          <SingleNavItem
+            item={singleItem}
+            active={active}
+            collapsed={collapsed}
+            onClick={() => handleNavigate(singleItem.id)}
+          />
+
+          <div className={cn("h-px bg-white/5 my-2", collapsed && "mx-1")} />
+
+          {/* Categories */}
+          {categories.map((cat) => {
+            const isOpen = (expanded[cat.id] || !!query.trim()) && !collapsed;
+            const showItems = isOpen;
+            const anyChildActive = cat.items.some((i) => i.id === active);
+            const catHasSecurity = cat.id === "security" && suspiciousIps > 0;
+
+            const header = (
+              <button
+                onClick={() => openCategory(cat)}
+                className={cn(
+                  "w-full flex items-center gap-2.5 rounded-lg text-xs font-semibold transition-colors duration-150 relative",
+                  collapsed ? "px-0 py-2.5 justify-center" : "px-2.5 py-2",
+                  anyChildActive
+                    ? "text-[#00D4FF] bg-[#00D4FF]/[0.06]"
+                    : "text-slate-400 hover:text-white hover:bg-white/5"
+                )}
+              >
+                <span className="relative shrink-0">
+                  <cat.icon style={{ width: collapsed ? 18 : 15, height: collapsed ? 18 : 15 }} />
+                  {catHasSecurity && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#080E1A]" />
+                  )}
+                </span>
+                {!collapsed && (
+                  <>
+                    <span className="truncate overflow-hidden whitespace-nowrap flex-1 text-left">{cat.label}</span>
+                    {catHasSecurity && (
+                      <span className="text-[10px] font-bold rounded-full px-1.5 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30">
+                        {suspiciousIps}
+                      </span>
+                    )}
+                    <ChevronDown
+                      className={cn("h-3.5 w-3.5 text-slate-600 transition-transform duration-200", isOpen && "rotate-180")}
+                    />
+                  </>
+                )}
+              </button>
+            );
+
+            return (
+              <div key={cat.id}>
+                {collapsed ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>{header}</TooltipTrigger>
+                    <TooltipContent side="right" className="bg-[#0F172A] border-white/10 text-white text-xs">
+                      {cat.label}{catHasSecurity ? ` · ${suspiciousIps} IP suspecte(s)` : ""}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  header
+                )}
+
+                <AnimatePresence initial={false}>
+                  {showItems && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="ml-4 pl-2 border-l border-white/[0.06] space-y-0.5 mt-0.5">
+                        {cat.items.filter(matchesQuery).map((item) => {
+                          const isActive = active === item.id;
+                          const Icon = item.icon;
+                          const showDot = item.showPendingDot && pendingCount > 0;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => handleNavigate(item.id)}
+                              className={cn(
+                                "w-full flex items-center gap-2.5 rounded-lg text-[13px] font-medium transition-colors duration-150 relative",
+                                "px-2.5 py-1.5",
+                                isActive
+                                  ? "bg-gradient-to-r from-[#00D4FF]/15 to-transparent text-[#00D4FF] border border-[#00D4FF]/20"
+                                  : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+                              )}
+                            >
+                              <span className="relative shrink-0">
+                                <Icon className="h-3.5 w-3.5" style={{ width: 15, height: 15 }} />
+                                {showDot && (
+                                  <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-[#080E1A]" />
+                                )}
+                              </span>
+                              <span className="truncate overflow-hidden whitespace-nowrap flex-1 text-left">{item.label}</span>
+                              {showDot && (
+                                <span className="text-[10px] font-bold rounded-full px-1.5 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30">
+                                  {pendingCount}
+                                </span>
+                              )}
+                              {item.badge && !showDot && (
+                                <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-[#00D4FF]/15 text-[#00D4FF]">
+                                  {item.badge}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+
+          {!collapsed && query && (
+            <p className="text-[10px] text-slate-600 px-2 pt-2">
+              Résultats filtrés par « {query} »
+            </p>
+          )}
         </nav>
 
         {/* Profile card */}
@@ -241,4 +387,36 @@ export function AdminSidebar({ active, onNavigate, onClose, collapsed = false, o
       </div>
     </TooltipProvider>
   );
+}
+
+/* ── Single (non-expandable) nav item ─────────────────────────────── */
+function SingleNavItem({ item, active, collapsed, onClick }: { item: SubItem; active: AdminView; collapsed: boolean; onClick: () => void }) {
+  const isActive = active === item.id;
+  const Icon = item.icon;
+  const btn = (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-2.5 rounded-lg text-sm font-medium transition-colors duration-150",
+        collapsed ? "px-0 py-2 justify-center" : "px-2.5 py-2",
+        isActive
+          ? "bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/20"
+          : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+      )}
+    >
+      <Icon style={{ width: collapsed ? 18 : 16, height: collapsed ? 18 : 16 }} className="shrink-0" />
+      {!collapsed && <span className="truncate overflow-hidden whitespace-nowrap flex-1 text-left">{item.label}</span>}
+    </button>
+  );
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{btn}</TooltipTrigger>
+        <TooltipContent side="right" className="bg-[#0F172A] border-white/10 text-white text-xs">
+          {item.label}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  return btn;
 }
