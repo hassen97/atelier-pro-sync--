@@ -114,7 +114,7 @@ export function useSearchRepairForWarranty() {
         .select(`
           *,
           customer:customers(id, name, phone, email),
-          repair_parts(id, product_id, quantity, unit_price)
+          repair_parts(id, product_id, quantity, unit_price, product:products(id, name, cost_price))
         `)
         .eq("user_id", effectiveUserId)
         .or(filters.join(","))
@@ -130,7 +130,7 @@ export function useSearchRepairForWarranty() {
         .select(`
           *,
           customer:customers!inner(id, name, phone, email),
-          repair_parts(id, product_id, quantity, unit_price)
+          repair_parts(id, product_id, quantity, unit_price, product:products(id, name, cost_price))
         `)
         .eq("user_id", effectiveUserId)
         .ilike("customer.phone", `%${safe}%`)

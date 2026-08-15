@@ -347,7 +347,12 @@ export default function Warranty() {
       </Tabs>
 
       <ProductReturnDrawer open={returnDrawerOpen} onOpenChange={setReturnDrawerOpen} />
-      <WarrantyDrawer open={warrantyDrawerOpen} onOpenChange={handleWarrantyDrawerClose} initialRepair={prefilledRepair} />
+      <WarrantyDrawer
+        open={warrantyDrawerOpen}
+        onOpenChange={handleWarrantyDrawerClose}
+        initialRepair={prefilledRepair}
+        onCreated={() => setActiveTab("warranty")}
+      />
     </div>
   );
 }
