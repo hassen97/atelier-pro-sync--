@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="55%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="chip" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Decorative grid dots -->
+  <g fill="#64748b" opacity="0.18">
+    <circle cx="60" cy="60" r="3"/><circle cx="120" cy="60" r="3"/><circle cx="180" cy="60" r="3"/><circle cx="240" cy="60" r="3"/>
+    <circle cx="60" cy="120" r="3"/><circle cx="120" cy="120" r="3"/><circle cx="180" cy="120" r="3"/>
+    <circle cx="1020" cy="560" r="3"/><circle cx="1080" cy="560" r="3"/><circle cx="1140" cy="560" r="3"/>
+    <circle cx="1080" cy="500" r="3"/><circle cx="1140" cy="500" r="3"/>
+  </g>
+
+  <!-- Glowing bolt badge -->
+  <g filter="url(#glow)">
+    <circle cx="1010" cy="170" r="86" fill="url(#accent)" opacity="0.9"/>
+  </g>
+  <path d="M1032 108 L962 190 L1002 190 L988 232 L1058 150 L1018 150 Z" fill="#ffffff"/>
+
+  <!-- Speed lines -->
+  <g stroke="url(#accent)" stroke-width="6" stroke-linecap="round" opacity="0.7">
+    <line x1="760" y1="140" x2="880" y2="140"/>
+    <line x1="800" y1="170" x2="900" y2="170"/>
+    <line x1="770" y1="200" x2="870" y2="200"/>
+  </g>
+
+  <!-- Header -->
+  <rect x="80" y="66" width="220" height="44" rx="22" fill="url(#accent)"/>
+  <text x="190" y="95" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700">🚀 MISE À JOUR</text>
+
+  <text x="80" y="170" fill="#ffffff" font-size="64" font-weight="800">RepairPro</text>
+  <text x="80" y="215" fill="#a5b4fc" font-size="30" font-weight="600">Août 2026 — La vitesse avant tout ⚡</text>
+
+  <!-- Feature chips -->
+  <g font-size="24" font-weight="600">
+    <rect x="80" y="260" width="330" height="66" rx="16" fill="url(#chip)" stroke="#6366f1" stroke-width="2"/>
+    <text x="104" y="302" fill="#ffffff">⚡ Encaissement instantané</text>
+
+    <rect x="430" y="260" width="330" height="66" rx="16" fill="url(#chip)" stroke="#6366f1" stroke-width="2"/>
+    <text x="454" y="302" fill="#ffffff">📊 Statistiques corrigées</text>
+
+    <rect x="780" y="260" width="340" height="66" rx="16" fill="url(#chip)" stroke="#6366f1" stroke-width="2"/>
+    <text x="804" y="302" fill="#ffffff">💰 Dettes clients accélérées</text>
+
+    <rect x="80" y="346" width="330" height="66" rx="16" fill="url(#chip)" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="104" y="388" fill="#ffffff">🧾 Sessions de caisse fiables</text>
+
+    <rect x="430" y="346" width="330" height="66" rx="16" fill="url(#chip)" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="454" y="388" fill="#ffffff">🔒 Sécurité renforcée</text>
+
+    <rect x="780" y="346" width="340" height="66" rx="16" fill="url(#chip)" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="804" y="388" fill="#ffffff">🛡 Anti double-vente</text>
+  </g>
+
+  <!-- Divider -->
+  <rect x="80" y="452" width="1040" height="3" rx="1.5" fill="url(#accent)" opacity="0.6"/>
+
+  <!-- Footer -->
+  <text x="80" y="520" fill="#ffffff" font-size="34" font-weight="700">Plus rapide. Plus fiable. Prêt pour votre boutique. 📱</text>
+  <text x="80" y="568" fill="#94a3b8" font-size="24">#RepairPro #GestionDeBoutique #RéparationMobile</text>
+
+  <!-- Corner accent -->
+  <path d="M0 630 L0 560 Q70 560 70 630 Z" fill="url(#accent)" opacity="0.5"/>
+</svg>
