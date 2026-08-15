@@ -2698,6 +2698,7 @@ export type Database = {
         }
         Returns: number
       }
+      purge_signup_attempts: { Args: { keep_hours?: number }; Returns: number }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {

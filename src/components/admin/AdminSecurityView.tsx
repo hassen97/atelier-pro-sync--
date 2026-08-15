@@ -95,10 +95,13 @@ export function AdminSecurityView({ onNavigate }: AdminSecurityViewProps) {
     setPurgeOpen(true);
     try {
       await s.purge.mutateAsync(24);
+    } catch {
+      // error already surfaced by the mutation's onError toast
     } finally {
       setPurgeOpen(false);
     }
   };
+
 
   return (
     <div className="space-y-5 animate-fade-in">

@@ -54,7 +54,7 @@ export function AdminSignupAttemptsView() {
             variant="outline"
             size="sm"
             className="border-white/10 text-slate-300 hover:bg-white/5"
-            onClick={() => purge.mutateAsync(24)}
+            onClick={() => purge.mutate(24)}
             disabled={purge.isPending}
           >
             <Trash2 className="h-3.5 w-3.5 mr-1.5" />
