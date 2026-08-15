@@ -191,15 +191,23 @@ export function usePurgeSignupAttempts() {
     mutationFn: async (keepHours: number = 24) => {
       const { data, error } = await supabase.rpc("purge_signup_attempts" as any, { keep_hours: keepHours });
       if (error) throw error;
-      return (data ?? 0) as number;
+      return { removed: (data ?? 0) as number, keepHours };
     },
-    onSuccess: (removed) => {
+    onSuccess: ({ removed, keepHours }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-security-attempts"] });
-      toast.success(`${removed} tentative${removed > 1 ? "s" : ""} supprimée${removed > 1 ? "s" : ""} (avant ${"24h"})`);
+      toast.success(
+        `${removed} tentative${removed > 1 ? "s" : ""} supprimée${removed > 1 ? "s" : ""} (plus de ${keepHours}h)`
+      );
     },
-    onError: (err: any) => toast.error(err?.message ?? "Erreur lors du nettoyage"),
+    onError: (err: any) =>
+      toast.error(
+        err?.message === "forbidden"
+          ? "Accès refusé : réservé aux administrateurs de la plateforme"
+          : err?.message ?? err?.details ?? "Erreur lors du nettoyage"
+      ),
   });
 }
+
 
 /* ── Mark all signup events as seen ── */
 export function useMarkEventsSeen() {
