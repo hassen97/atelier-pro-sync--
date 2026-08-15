@@ -1,3 +1,7 @@
+# AGENTS.md
+
+This file provides guidance to Qoder (qoder.com) when working with code in this repository.
+
 # RepairPro (atelier-pro-sync)
 
 POS / inventory / repairs SaaS for phone-repair shops (Tunisia). React 18 SPA + Supabase (Postgres + Deno edge functions), built via Lovable. Pushing to `main` syncs back to Lovable.
@@ -7,7 +11,7 @@ POS / inventory / repairs SaaS for phone-repair shops (Tunisia). React 18 SPA + 
 - `npm run dev` — dev server on port **8080** (not 5173). Bun also works (`bun.lock` is tracked alongside `package-lock.json`).
 - `npm run build` — prod build; `npm run build:dev` — dev-mode build.
 - `npm run lint` — ESLint (`@typescript-eslint/no-unused-vars` is off).
-- `npm test` — Vitest (jsdom); `npm run test:watch`.
+- `npm test` — Vitest (jsdom); `npm run test:watch`. Single file: `npx vitest run src/test/example.test.ts`; single test by name: `npx vitest run -t "<name pattern>"`.
 - No typecheck script exists. TS is non-strict (`strict: false`, `noImplicitAny: false`). Use `npx tsc -b` to typecheck.
 
 ## Architecture
