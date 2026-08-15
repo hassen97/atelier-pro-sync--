@@ -355,7 +355,6 @@
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
   border: 1px solid rgba(255, 255, 255, 0.12);
   transform: translate(-50%, -50%) translateZ(240px);
-  backdrop-filter: blur(2px);
   animation-delay: 0.65s;
 }
 .rp-l-glass::before {
@@ -371,9 +370,11 @@
 .rp-label-screen { top: 30%; right: -130px; }
 .rp-label-glass { top: 10px; left: -160px; }
 
+/* Entrance uses the independent `translate` property so it composites with the
+   positioning transform — margin animation would thrash layout every frame. */
 @keyframes rp-layer-in {
-  from { opacity: 0; margin-top: -40px; }
-  to { opacity: 1; margin-top: 0; }
+  from { opacity: 0; translate: 0 -40px; }
+  to { opacity: 1; translate: 0 0; }
 }
 
 /* ── Oscilloscope ── */
@@ -400,13 +401,17 @@
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 6px rgba(255, 107, 44, 0.6));
   stroke-dasharray: 2000;
   stroke-dashoffset: 2000;
   animation: rp-sweep 4s linear infinite;
 }
-.rp-scope-path-bg { fill: none; stroke: rgba(255, 107, 44, 0.1); stroke-width: 1; }
+.rp-scope-path-bg { fill: none; stroke: rgba(255, 107, 44, 0.16); stroke-width: 3; }
 @keyframes rp-sweep { to { stroke-dashoffset: 0; } }
+
+/* Off-screen pause: toggled via IntersectionObserver (usePausedOffscreen) so
+   infinite animations cost nothing while scrolled away. */
+.rp-paused .rp-scope-path,
+.rp-paused .rp-bars div { animation-play-state: paused; }
 
 /* ── Section heads ── */
 .rp-section-head { max-width: 680px; margin-bottom: 80px; }
@@ -775,6 +780,33 @@
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
+  /* Mobile perf: fixed backgrounds force a full repaint per scroll frame and
+     the dense 16px grid multiplies rasterization cost — keep only the major
+     80px lines attached to the document flow. */
+  .rp-landing {
+    background-attachment: scroll;
+    background-image:
+      linear-gradient(var(--rp-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--rp-grid) 1px, transparent 1px);
+    background-size: 80px 80px;
+  }
+
+  /* backdrop-filter is the heaviest effect on mobile GPUs — replace with
+     solid/semi-solid fills (visually near-identical on dark backgrounds). */
+  .rp-nav { backdrop-filter: none; background: rgba(20, 17, 16, 0.94); }
+  .rp-mobile-menu { backdrop-filter: none; background: #17140f; }
+  .rp-tool { backdrop-filter: none; background: var(--rp-bg-soft); }
+  .rp-visit { backdrop-filter: none; background: var(--rp-bg-soft); }
+
+  /* Cheaper paint for the 3D scene: tighter shadows, no hover parallax anyway. */
+  .rp-layer {
+    width: 180px;
+    height: 360px;
+    box-shadow:
+      0 16px 40px -16px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  }
+
   .rp-hero-grid { grid-template-columns: 1fr; }
   .rp-scene { height: 480px; }
   .rp-blueprint, .rp-visits, .rp-plans { grid-template-columns: 1fr; }
@@ -784,7 +816,6 @@
   .rp-telemetry { grid-template-columns: 1fr 1fr; }
   .rp-footer-grid { grid-template-columns: 1fr 1fr; }
   .rp-nav-links .rp-link, .rp-nav-links .rp-desktop-only { display: none; }
-  .rp-layer { width: 180px; height: 360px; }
   .rp-label-frame, .rp-label-battery, .rp-label-board, .rp-label-screen, .rp-label-glass { display: none; }
   .rp-section { padding: 72px 0; }
 }

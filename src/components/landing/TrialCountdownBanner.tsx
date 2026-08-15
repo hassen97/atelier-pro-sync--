@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Gift, Clock, ArrowRight } from "lucide-react";
 
 const OFFER_KEY = "rp_trial_offer_start";
@@ -52,13 +51,9 @@ export function TrialCountdownBanner() {
   const s = totalSec % 60;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="relative z-30 mx-auto max-w-5xl px-4 pt-24 sm:pt-28"
-    >
-      <div className="rounded-2xl border border-emerald-400/25 bg-gradient-to-r from-emerald-500/10 via-emerald-400/5 to-transparent backdrop-blur-sm p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+    /* Plain div + CSS fade — keeps framer-motion out of the landing bundle */
+    <div className="animate-fade-in relative z-30 mx-auto max-w-5xl px-4 pt-24 sm:pt-28">
+      <div className="rounded-2xl border border-emerald-400/25 bg-gradient-to-r from-emerald-500/10 via-emerald-400/5 to-transparent p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="w-11 h-11 shrink-0 rounded-xl bg-emerald-500/15 flex items-center justify-center">
             <Gift className="h-5 w-5 text-emerald-400" />
@@ -88,6 +83,6 @@ export function TrialCountdownBanner() {
           </Link>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

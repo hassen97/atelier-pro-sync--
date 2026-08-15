@@ -1,6 +1,10 @@
+import { usePausedOffscreen } from "@/components/landing/usePausedOffscreen";
+
 const BARS = [40, 60, 50, 80, 70, 90, 75, 85];
 
 export function TelemetryStrip() {
+  const { ref, paused } = usePausedOffscreen<HTMLDivElement>();
+
   return (
     <section className="rp-section" style={{ paddingTop: 0 }}>
       <div className="rp-container">
@@ -8,7 +12,7 @@ export function TelemetryStrip() {
           <span className="rp-eyebrow">Télémétrie · en direct</span>
           <h2>L'atelier ne dort jamais.</h2>
         </div>
-        <div className="rp-telemetry">
+        <div ref={ref} className={`rp-telemetry${paused ? " rp-paused" : ""}`}>
           <div className="rp-metric">
             <div className="rp-metric-k">Ventes/jour</div>
             <div className="rp-metric-v">142</div>
