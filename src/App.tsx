@@ -11,6 +11,7 @@ import { ShopSettingsProvider } from "@/contexts/ShopSettingsContext";
 import { BrandThemeProvider } from "@/contexts/BrandThemeContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AuthUpdateGate } from "@/components/auth/AuthUpdateGate";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 
@@ -138,7 +139,9 @@ const App = () => (
                 {/* Admin route - separate layout */}
                 <Route path="/admin" element={
                   <ProtectedRoute>
-                    <AdminDashboard />
+                    <AuthUpdateGate>
+                      <AdminDashboard />
+                    </AuthUpdateGate>
                   </ProtectedRoute>
                 } />
 
@@ -148,13 +151,15 @@ const App = () => (
                 {/* Protected routes */}
                 <Route element={
                   <ProtectedRoute>
-                    <ShopSettingsProvider>
-                      <BrandThemeProvider>
-                        <NotificationsProvider>
-                          <MainLayout />
-                        </NotificationsProvider>
-                      </BrandThemeProvider>
-                    </ShopSettingsProvider>
+                    <AuthUpdateGate>
+                      <ShopSettingsProvider>
+                        <BrandThemeProvider>
+                          <NotificationsProvider>
+                            <MainLayout />
+                          </NotificationsProvider>
+                        </BrandThemeProvider>
+                      </ShopSettingsProvider>
+                    </AuthUpdateGate>
                   </ProtectedRoute>
                 }>
                   <Route path="/dashboard" element={<Dashboard />} />
