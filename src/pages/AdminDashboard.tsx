@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { Menu, Search, Bell, ChevronLeft, ChevronRight, Megaphone } from "lucide-react";
+import { Menu, Search, ChevronLeft, ChevronRight, Megaphone } from "lucide-react";
 import { QuickChangelogDialog } from "@/components/admin/QuickChangelogDialog";
 import { useAdminData } from "@/hooks/useAdmin";
-import { useAuth } from "@/contexts/AuthContext";
 import { AdminSidebar, type AdminView } from "@/components/admin/AdminSidebar";
 import { AdminOverview } from "@/components/admin/AdminOverview";
 import { AdminShopsView } from "@/components/admin/AdminShopsView";
@@ -28,6 +27,7 @@ import { AdminGrowthEngineView } from "@/components/admin/AdminGrowthEngineView"
 import { AdminEmailTemplatesView } from "@/components/admin/AdminEmailTemplatesView";
 import { AdminSecurityView } from "@/components/admin/AdminSecurityView";
 import { AdminSignupEventsView } from "@/components/admin/AdminSignupEventsView";
+import { AdminNotificationsBell, AdminUserMenu } from "@/components/admin/AdminHeaderWidgets";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAdminSignupNotifier } from "@/hooks/useAdminSignupNotifier";
@@ -61,14 +61,7 @@ const viewLabels: Record<AdminView, string> = {
 
 const AdminDashboard = () => {
   const { data: adminData } = useAdminData();
-  const { user } = useAuth();
   const activeShopsCount = adminData?.stats?.active_now_count ?? adminData?.stats?.total_owners ?? 0;
-  const userInitial = (
-    (user?.user_metadata?.full_name as string) ||
-    (user?.user_metadata?.username as string) ||
-    user?.email ||
-    "A"
-  ).charAt(0).toUpperCase();
   const [activeView, setActiveView] = useState<AdminView>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -119,10 +112,7 @@ const AdminDashboard = () => {
             <button onClick={() => setCmdOpen(true)} className="p-2 rounded-lg hover:bg-white/10 transition-colors">
               <Search className="h-4 w-4 text-slate-400" />
             </button>
-            <button className="relative p-2 rounded-lg hover:bg-white/10 transition-colors">
-              <Bell className="h-4 w-4 text-slate-400" />
-              <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-red-500" />
-            </button>
+            <AdminNotificationsBell className="w-8 h-8 border-0 bg-transparent" />
           </div>
         </header>
       )}
@@ -209,16 +199,11 @@ const AdminDashboard = () => {
                 Changelog
               </button>
 
-              {/* Notifications bell */}
-              <button className="relative w-9 h-9 rounded-lg border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] flex items-center justify-center transition-all">
-                <Bell className="h-4 w-4 text-slate-400" />
-                <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-red-500 border-[1.5px] border-[#0B1120]" />
-              </button>
+              {/* Notifications bell (live admin_signup_events feed) */}
+              <AdminNotificationsBell />
 
-              {/* Admin avatar */}
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00D4FF] to-[#6366F1] flex items-center justify-center text-xs font-bold cursor-pointer hover:shadow-[0_0_12px_rgba(0,212,255,0.3)] transition-shadow">
-                {userInitial}
-              </div>
+              {/* Admin user menu (identity + logout) */}
+              <AdminUserMenu />
             </div>
           )}
 

@@ -390,7 +390,7 @@ export function AdminShopsView() {
         }}>
           <Download className="h-4 w-4 mr-2" /> Sauvegarder (JSON)
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { window.location.href = `/?impersonate=${owner.user_id}&mode=readonly`; }}>
+        <DropdownMenuItem onClick={() => { window.location.href = `/dashboard?impersonate=${owner.user_id}&mode=readonly`; }}>
           <LogIn className="h-4 w-4 mr-2" /> Accéder à la boutique
         </DropdownMenuItem>
         <DropdownMenuSeparator />
