@@ -176,15 +176,19 @@ export function useNotifications(shopId: string | null) {
   }, []);
 
   const addNotification = useCallback((notification: Omit<Notification, "id" | "createdAt">) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: crypto.randomUUID(),
-      createdAt: Date.now(),
-    };
-    setNotifState((prev) => ({
-      ...prev,
-      items: [newNotification, ...prev.items].slice(0, 50), // Keep max 50 notifications
-    }));
+    setNotifState((prev) => {
+      if (!prev.shopId) return prev; // never accumulate items for an unknown shop
+      const newNotification: Notification = {
+        ...notification,
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        shopId: prev.shopId,
+      };
+      return {
+        ...prev,
+        items: [newNotification, ...prev.items].slice(0, 50), // Keep max 50 notifications
+      };
+    });
   }, []);
 
   const removeNotification = useCallback((id: string) => {
@@ -195,8 +199,13 @@ export function useNotifications(shopId: string | null) {
     setNotifState((prev) => ({ ...prev, items: [] }));
   }, []);
 
-  const notifications = notifState.items;
+  // Render guard: only items of the shop currently in scope.
+  const notifications =
+    shopId && notifState.shopId === shopId
+      ? notifState.items.filter((n) => !n.shopId || n.shopId === shopId)
+      : [];
   const unreadCount = notifications.filter((n) => !n.read).length;
+
 
   return {
     notifications,
