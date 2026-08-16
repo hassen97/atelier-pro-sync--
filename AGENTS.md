@@ -41,6 +41,7 @@ POS / inventory / repairs SaaS for phone-repair shops (Tunisia). React 18 SPA + 
 - Server-side pagination with `.range()`; `useAllProducts` batches 1000 rows to bypass Supabase's default 1000-row limit.
 - Invalidate by prefix keys: `["products"]`, `["low-stock-alerts"]`, `["session-totals"]`, `["dashboard-stats"]`, `["repairs"]`. Query keys embed `effectiveUserId`.
 - `useSales()` (`src/hooks/useSales.ts`) is legacy — it fetches the whole sales history + nested items unbounded. Live pages use the narrow `useAllUnpaidSales()` (batched, unpaid-only) behind `CustomerDebts`; invalidations: `["sales-unpaid-all"]`, `["repairs-unpaid-all"]`. Prefer paginated/aggregate hooks for perf-sensitive queries.
+- **Subscription writes are server-side only.** Clients never write `shop_subscriptions` (RLS denies since migration `20260816120000_lockdown_shop_subscriptions_trial_grants`): owners SELECT their own rows, platform admins keep an ALL policy (order approval, God Mode set/adjust). Welcome trials are granted exclusively by the `grant-trial` edge function (`supabase/functions/grant-trial/`): one per user (append-only `trial_claims` log, service-role only), fresh accounts < 24h, 3 claims per IP per 7 days, cheapest active Pro plan, 7 days, `status='trialing'` with `trial_ends_at`. Do NOT reintroduce client-side trial grants or self-write policies.
 
 ## PWA / build gotchas
 

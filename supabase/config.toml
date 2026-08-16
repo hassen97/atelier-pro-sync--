@@ -23,6 +23,8 @@ project_id = "rgikflkocotkljbajzrb"
     verify_jwt = false
   [functions.generate-closing-report]
     verify_jwt = false
+  [functions.grant-trial]
+    verify_jwt = false
   [functions.math-challenge]
     verify_jwt = false
   [functions.notify-admin-signup]

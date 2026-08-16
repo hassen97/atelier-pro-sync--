@@ -464,45 +464,24 @@ export default function Auth() {
         console.error("[Auth] promo capture error:", promoErr);
       }
 
-      // First-visit 7-day trial: grant while the just-created session is active.
-      try {
-        const startRaw = localStorage.getItem("rp_trial_offer_start");
-        const start = startRaw ? Number(startRaw) : NaN;
-        const stillLive = Number.isFinite(start) && Date.now() - start < 24 * 60 * 60 * 1000;
-        if (trialOffer && stillLive) {
-          const { data: { user: tu } } = await supabase.auth.getUser();
-          if (tu) {
-            // Pick the cheapest Pro plan (excluding Entreprise) for the trial
-            const { data: proPlan } = await supabase
-              .from("subscription_plans")
-              .select("id")
-              .ilike("name", "%Pro%")
-              .not("name", "ilike", "%Entreprise%")
-              .order("price", { ascending: true })
-              .limit(1)
-              .maybeSingle();
-            if (proPlan?.id) {
-              const now = new Date();
-              const trialEnd = new Date(now);
-              trialEnd.setDate(trialEnd.getDate() + 7);
-              await supabase
-                .from("shop_subscriptions")
-                .update({ status: "canceled" })
-                .eq("user_id", tu.id);
-              await supabase.from("shop_subscriptions").insert({
-                user_id: tu.id,
-                plan_id: proPlan.id,
-                status: "trialing",
-                started_at: now.toISOString(),
-                expires_at: trialEnd.toISOString(),
-                trial_ends_at: trialEnd.toISOString(),
-              });
-              localStorage.removeItem("rp_trial_offer_start");
-            }
+      // First-visit 7-day trial: eligibility is decided SERVER-side by the
+      // grant-trial edge function (fresh account, one claim per user, per-IP
+      // fraud cap). The landing countdown / `?trial=7` flag is only a UX
+      // signal — the client never writes shop_subscriptions itself.
+      if (trialOffer) {
+        try {
+          const { data: trialRes, error: trialErr } = await supabase.functions.invoke("grant-trial", { body: {} });
+          if (trialErr) {
+            console.error("[Auth] grant-trial invocation error:", trialErr);
+          } else if (trialRes && !(trialRes as any).granted) {
+            console.warn("[Auth] trial not granted:", (trialRes as any).reason);
           }
+        } catch (trialErr) {
+          console.error("[Auth] trial grant error:", trialErr);
+        } finally {
+          // Consume the offer window either way
+          localStorage.removeItem("rp_trial_offer_start");
         }
-      } catch (trialErr) {
-        console.error("[Auth] trial grant error:", trialErr);
       }
 
 

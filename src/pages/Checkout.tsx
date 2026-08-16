@@ -3,6 +3,7 @@ import { useSearchParams, Link, useNavigate, Navigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePublicPlans } from "@/hooks/useSubscriptionPlans";
 import { useEnabledGateways, useCreateOrder } from "@/hooks/useCheckout";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,10 +11,9 @@ import { Input } from "@/components/ui/input";
 import { validatePromoCode } from "@/hooks/usePromoCodes";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ensureSession, withSessionRetry } from "@/lib/authWrite";
 import {
-  ArrowLeft, Check, Upload, Loader2, Smartphone, CreditCard,
-  Landmark, Globe, Bitcoin, Image, ChevronRight, Clock, Zap, Camera, Ticket, X
+  ArrowLeft, ArrowRight, Check, Upload, Loader2, Smartphone, CreditCard,
+  Landmark, Globe, Bitcoin, Image, ChevronRight, Zap, Camera, Ticket, X
 } from "lucide-react";
 import { ProofPickerSheet } from "@/components/ui/ProofPickerSheet";
 
@@ -36,9 +36,9 @@ export default function Checkout() {
   const { user } = useAuth();
   const { data: plans } = usePublicPlans();
   const { data: gateways, isLoading: gatewaysLoading } = useEnabledGateways();
+  const { data: subscription } = useSubscription();
   const createOrder = useCreateOrder();
   const queryClient = useQueryClient();
-  const [startingTrial, setStartingTrial] = useState(false);
 
   const [selectedGateway, setSelectedGateway] = useState<string | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -130,61 +130,16 @@ export default function Checkout() {
   }, [user]);
 
 
-  const handleStartTrial = async () => {
-    if (!user) return;
-    setStartingTrial(true);
-    try {
-      // Find cheapest plan as the trial plan (or first active plan)
-      const trialPlan = plans?.sort((a, b) => a.price - b.price)?.[0];
-      if (!trialPlan) {
-        toast.error("Aucun plan disponible");
-        return;
-      }
-
-      const now = new Date();
-      const trialEnd = new Date(now);
-      trialEnd.setDate(trialEnd.getDate() + 3);
-
-      // Guarantee the auth token is attached so RLS `auth.uid()` is populated.
-      const uid = await ensureSession();
-
-      // Deactivate any existing subscriptions
-      await supabase
-        .from("shop_subscriptions")
-        .update({ status: "canceled" })
-        .eq("user_id", uid);
-
-      await withSessionRetry(async () => {
-        const { error } = await supabase
-          .from("shop_subscriptions")
-          .insert({
-            user_id: uid,
-            plan_id: trialPlan.id,
-            status: "trialing",
-            started_at: now.toISOString(),
-            expires_at: trialEnd.toISOString(),
-          });
-        if (error) throw error;
-      });
-
-
-      // Invalidate caches that gate routing & subscription state, otherwise
-      // ProtectedRoute would re-read its stale "no subscription" snapshot
-      // and bounce the user back to /checkout.
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["onboarding-status", user.id] }),
-        queryClient.invalidateQueries({ queryKey: ["my-subscription", user.id] }),
-        queryClient.invalidateQueries({ queryKey: ["my-subscription-orders", user.id] }),
-      ]);
-
-      toast.success("Essai de 3 jours activé ! Bienvenue 🎉");
-      navigate("/dashboard", { replace: true });
-    } catch (err: any) {
-      toast.error(err.message || "Erreur lors de l'activation de l'essai");
-    } finally {
-      setStartingTrial(false);
-    }
-  };
+  // A live (non-expired) trial means there is nothing to buy here — show the
+  // "continue with your trial" card instead of any trial-starting affordance.
+  // Trials are granted server-side only (grant-trial edge function).
+  const activeTrial =
+    subscription &&
+    subscription.status === "trialing" &&
+    subscription.expires_at &&
+    new Date(subscription.expires_at).getTime() > Date.now()
+      ? subscription
+      : null;
 
   if (!user) {
     return <Navigate to={`/auth?redirect=${encodeURIComponent(`/checkout?plan=${planId}`)}`} replace />;
@@ -242,26 +197,33 @@ export default function Checkout() {
             ))}
           </div>
 
-          {/* Trial button */}
-          {(isOnboarding || !isExpired) && (
+          {/* Active trial: nothing to start here — trials are granted
+              server-side at signup. Just route back to the dashboard. */}
+          {activeTrial ? (
             <div className="text-center border-t border-white/10 pt-8">
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={handleStartTrial}
-                disabled={startingTrial}
-                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-              >
-                {startingTrial ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Activation...</>
-                ) : (
-                  <><Clock className="h-4 w-4 mr-2" />Démarrer l'essai de 3 jours</>
-                )}
-              </Button>
-              <p className="text-xs mt-2" style={{ color: "hsl(240 5% 55%)" }}>
-                Aucun paiement requis. Accès complet pendant 3 jours.
-              </p>
+              <div className="inline-flex flex-col items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-6 py-5">
+                <div className="flex items-center gap-2 font-semibold" style={{ color: "hsl(142 71% 55%)" }}>
+                  <Zap className="h-4 w-4" />
+                  Essai {activeTrial.plan?.name ?? "Pro"} déjà actif
+                </div>
+                <p className="text-xs" style={{ color: "hsl(240 5% 55%)" }}>
+                  Votre essai gratuit est en cours jusqu'au{" "}
+                  {new Date(activeTrial.expires_at!).toLocaleDateString("fr-FR")}. Aucun paiement requis.
+                </p>
+                <Button size="lg" onClick={() => navigate("/dashboard", { replace: true })}>
+                  Continuer vers mon tableau de bord
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
             </div>
+          ) : (
+            (isOnboarding || !isExpired) && (
+              <div className="text-center border-t border-white/10 pt-8">
+                <p className="text-xs" style={{ color: "hsl(240 5% 55%)" }}>
+                  L'essai gratuit de 7 jours est accordé automatiquement aux nouveaux comptes lors de l'inscription.
+                </p>
+              </div>
+            )
           )}
 
           {!isOnboarding && !isExpired && (

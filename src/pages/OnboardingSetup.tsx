@@ -125,8 +125,26 @@ export default function OnboardingSetup() {
       }
 
       toast.success("Configuration terminée ! Bienvenue sur RepairPro 🎉");
-      // Navigate to plan selection
-      navigate("/checkout?onboarding=true", { replace: true });
+
+      // Smart routing: users with a live subscription/trial (e.g. the 7-day
+      // welcome trial granted at signup) go straight to the dashboard — only
+      // users without any subscription hit the plan picker.
+      let dest = "/checkout?onboarding=true";
+      try {
+        const { data: sub } = await supabase
+          .from("shop_subscriptions")
+          .select("status, expires_at")
+          .eq("user_id", uid)
+          .in("status", ["active", "trialing"])
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const live = sub && (!sub.expires_at || new Date(sub.expires_at).getTime() > Date.now());
+        if (live) dest = "/dashboard";
+      } catch (subErr) {
+        console.error("[Onboarding] subscription check failed (non-blocking):", subErr);
+      }
+      navigate(dest, { replace: true });
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de la sauvegarde");
     } finally {

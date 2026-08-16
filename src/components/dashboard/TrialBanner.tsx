@@ -46,7 +46,7 @@ export function TrialBanner() {
         <div className="flex items-center gap-2 text-sm">
           <Clock className="h-4 w-4 text-amber-500" />
           <span className="text-amber-700 dark:text-amber-300 font-medium">
-            Essai gratuit : <span className="font-bold">{timeLeft}</span> restants
+            Essai {subscription.plan?.name ? `${subscription.plan.name} ` : ""}: <span className="font-bold">{timeLeft}</span> restants
           </span>
         </div>
         <Button
@@ -56,7 +56,7 @@ export function TrialBanner() {
           className="h-7 text-xs border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
         >
           <Zap className="h-3 w-3 mr-1" />
-          Passer en Pro
+          Choisir un plan
         </Button>
       </div>
     </div>
