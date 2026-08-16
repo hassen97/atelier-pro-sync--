@@ -102,6 +102,7 @@ export function useAdminData() {
     enabled: !!user,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
+    refetchInterval: 60_000,
     retry: 1,
   });
 }
@@ -120,6 +121,7 @@ export function useAdminRevenue() {
     enabled: !!user,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
+    refetchInterval: 60_000,
     retry: 1,
   });
 }
@@ -138,6 +140,7 @@ export function useAdminActivity() {
     enabled: !!user,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
+    refetchInterval: 60_000,
     retry: 1,
   });
 }

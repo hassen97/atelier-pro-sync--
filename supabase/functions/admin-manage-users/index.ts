@@ -60,6 +60,30 @@ function jsonResp(data: unknown, status = 200) {
   });
 }
 
+// PostgREST caps every select at 1000 rows (db-max-rows). Platform-wide
+// aggregates (repairs, sales) exceed that, so batch with .range() to fetch
+// every row — otherwise counts/revenue are silently truncated.
+async function fetchAllRows(
+  client: ReturnType<typeof createClient>,
+  table: string,
+  select: string,
+): Promise<any[]> {
+  const pageSize = 1000;
+  const rows: any[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await client
+      .from(table)
+      .select(select)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+    from += pageSize;
+  }
+  return rows;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -199,7 +223,13 @@ serve(async (req) => {
         // exclude them from the owners list even if a stray super_admin role lingers.
         const { data: activeMembers } = await adminClient.from("team_members").select("member_user_id").eq("status", "active");
         const activeMemberSet = new Set((activeMembers || []).map((m: any) => m.member_user_id));
-        const { data: repairCounts } = await adminClient.from("repairs").select("user_id");
+        // Batched: repairs exceed PostgREST's 1000-row cap platform-wide.
+        let repairCounts: any[] = [];
+        try {
+          repairCounts = await fetchAllRows(adminClient, "repairs", "user_id");
+        } catch (e) {
+          console.error("[admin-list] repairs fetch failed:", e);
+        }
         // onboarding_completed lives on shop_settings, not profiles.
         const { data: shopSettings } = await adminClient.from("shop_settings").select("user_id, shop_name, country, currency, onboarding_completed");
 
@@ -209,7 +239,7 @@ serve(async (req) => {
           teamCountMap.set(t.owner_id, (teamCountMap.get(t.owner_id) || 0) + 1);
         });
         const repairCountMap = new Map<string, number>();
-        (repairCounts || []).forEach((r: any) => {
+        repairCounts.forEach((r: any) => {
           repairCountMap.set(r.user_id, (repairCountMap.get(r.user_id) || 0) + 1);
         });
         const shopMap = new Map((shopSettings || []).map((s: any) => [s.user_id, { shop_name: s.shop_name, country: s.country, currency: s.currency, onboarding_completed: s.onboarding_completed }]));
@@ -236,7 +266,7 @@ serve(async (req) => {
           stats: {
             total_owners: owners.length,
             total_employees: (teamCounts || []).length,
-            total_repairs: (repairCounts || []).length,
+            total_repairs: repairCounts.length,
             active_now_count: activeNowCount,
           },
         });
@@ -297,13 +327,14 @@ serve(async (req) => {
 
       // ─── GET REVENUE ───
       if (action === "get-revenue") {
-        const { data: sales } = await adminClient.from("sales").select("user_id, total_amount");
+        // Batched: a plain select would cap at 1000 rows and undercount revenue.
+        const sales = await fetchAllRows(adminClient, "sales", "user_id, total_amount");
         let totalRevenue = 0;
-        (sales || []).forEach((s: any) => { totalRevenue += Number(s.total_amount || 0); });
+        sales.forEach((s: any) => { totalRevenue += Number(s.total_amount || 0); });
 
-        const { data: repairs } = await adminClient.from("repairs").select("user_id, total_cost");
+        const repairs = await fetchAllRows(adminClient, "repairs", "user_id, total_cost");
         let totalRepairRevenue = 0;
-        (repairs || []).forEach((r: any) => { totalRepairRevenue += Number(r.total_cost || 0); });
+        repairs.forEach((r: any) => { totalRepairRevenue += Number(r.total_cost || 0); });
 
         return jsonResp({
           total_revenue: totalRevenue + totalRepairRevenue,

@@ -36,6 +36,8 @@ export function useWaitlistCount() {
       if (error) throw error;
       return data as { total: number; recent_7d: number };
     },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
   });
 }
 

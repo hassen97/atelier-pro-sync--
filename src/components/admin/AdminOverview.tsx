@@ -128,9 +128,6 @@ function StatCard({ title, value, icon: Icon, color, subtitle, sparkline, pulse 
 }
 
 /* ── Main Overview ──────────────────────────────────────────────────── */
-const repairSparkline = [12, 18, 14, 22, 19, 26, 24];
-const mrrSparkline = [0, 0, 0, 0, 0, 0, 0];
-
 export function AdminOverview() {
   const { data } = useAdminData();
   const { data: revenue } = useAdminRevenue();
@@ -148,7 +145,7 @@ export function AdminOverview() {
         <StatCard title="Boutiques" value={data?.stats.total_owners || 0} icon={Store} color="cyan" />
         <StatCard title="En Ligne" value={data?.stats.active_now_count || 0} icon={Wifi} color="green" pulse />
         <StatCard title="Employés" value={data?.stats.total_employees || 0} icon={Users} color="purple" />
-        <StatCard title="Réparations" value={data?.stats.total_repairs || 0} icon={Wrench} color="amber" sparkline={repairSparkline} />
+        <StatCard title="Réparations" value={data?.stats.total_repairs || 0} icon={Wrench} color="amber" />
         <StatCard
           title="Waitlist"
           value={waitlistData?.total || 0}
@@ -161,7 +158,6 @@ export function AdminOverview() {
           value={totalRevenue > 0 ? `${(totalRevenue / 1000).toFixed(1)}K` : "— DT"}
           icon={DollarSign}
           color="green"
-          sparkline={mrrSparkline}
         />
       </div>
 
