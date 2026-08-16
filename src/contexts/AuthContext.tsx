@@ -230,8 +230,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Shared devices: never keep one shop's notifications for the next user.
+    clearAllNotificationStorage();
     await supabase.auth.signOut();
   };
+
 
   const updatePassword = async (newPassword: string) => {
     try {
