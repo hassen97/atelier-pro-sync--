@@ -130,14 +130,13 @@ export default function Checkout() {
   }, [user]);
 
 
-  // A live (non-expired) trial means there is nothing to buy here — show the
-  // "continue with your trial" card instead of any trial-starting affordance.
-  // Trials are granted server-side only (grant-trial edge function).
-  const activeTrial =
+  // A live subscription (trialing or active, not expired) means there is
+  // nothing to buy here — show the "continue" card instead of any purchase
+  // affordance. Trials are granted server-side only (grant-trial edge fn).
+  const isTrial = subscription?.status === "trialing";
+  const liveSubscription =
     subscription &&
-    subscription.status === "trialing" &&
-    subscription.expires_at &&
-    new Date(subscription.expires_at).getTime() > Date.now()
+    (!subscription.expires_at || new Date(subscription.expires_at).getTime() > Date.now())
       ? subscription
       : null;
 
@@ -197,18 +196,26 @@ export default function Checkout() {
             ))}
           </div>
 
-          {/* Active trial: nothing to start here — trials are granted
-              server-side at signup. Just route back to the dashboard. */}
-          {activeTrial ? (
+          {/* Live subscription (trial or paid): nothing to start/buy here.
+              Trials are granted server-side at signup. Route to the dashboard. */}
+          {liveSubscription ? (
             <div className="text-center border-t border-white/10 pt-8">
               <div className="inline-flex flex-col items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-6 py-5">
                 <div className="flex items-center gap-2 font-semibold" style={{ color: "hsl(142 71% 55%)" }}>
                   <Zap className="h-4 w-4" />
-                  Essai {activeTrial.plan?.name ?? "Pro"} déjà actif
+                  {isTrial
+                    ? `Essai ${liveSubscription.plan?.name ?? "Pro"} déjà actif`
+                    : `Plan ${liveSubscription.plan?.name ?? "actif"} actif`}
                 </div>
                 <p className="text-xs" style={{ color: "hsl(240 5% 55%)" }}>
-                  Votre essai gratuit est en cours jusqu'au{" "}
-                  {new Date(activeTrial.expires_at!).toLocaleDateString("fr-FR")}. Aucun paiement requis.
+                  {liveSubscription.expires_at ? (
+                    <>
+                      {isTrial ? "Votre essai gratuit est en cours" : "Votre abonnement est en cours"} jusqu'au{" "}
+                      {new Date(liveSubscription.expires_at).toLocaleDateString("fr-FR")}. Aucun paiement requis.
+                    </>
+                  ) : (
+                    "Abonnement sans limite de durée. Aucun paiement requis."
+                  )}
                 </p>
                 <Button size="lg" onClick={() => navigate("/dashboard", { replace: true })}>
                   Continuer vers mon tableau de bord
