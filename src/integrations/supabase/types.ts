@@ -752,6 +752,13 @@ export type Database = {
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "invoices_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "unpaid_sales"
+            referencedColumns: ["id"]
+          },
         ]
       }
       loyalty_transactions: {
@@ -1080,6 +1087,13 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_returns_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "unpaid_sales"
             referencedColumns: ["id"]
           },
           {
@@ -1718,6 +1732,13 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "unpaid_sales"
             referencedColumns: ["id"]
           },
         ]
@@ -2456,6 +2477,27 @@ export type Database = {
         }
         Relationships: []
       }
+      trial_claims: {
+        Row: {
+          created_at: string
+          id: string
+          ip_address: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_category_preferences: {
         Row: {
           bg_color: string | null
@@ -2601,12 +2643,79 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      unpaid_sales: {
+        Row: {
+          amount_paid: number | null
+          created_at: string | null
+          customer_id: string | null
+          id: string | null
+          payment_method: string | null
+          remaining_balance: number | null
+          total_amount: number | null
+          user_id: string | null
+        }
+        Insert: {
+          amount_paid?: number | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string | null
+          payment_method?: string | null
+          remaining_balance?: never
+          total_amount?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          amount_paid?: number | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string | null
+          payment_method?: string | null
+          remaining_balance?: never
+          total_amount?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       close_register_session: {
         Args: { _closed_by_name?: string; _report?: Json; _shop_id: string }
         Returns: string
+      }
+      create_sale: {
+        Args: {
+          _amount_paid?: number
+          _customer_id?: string
+          _items: Json
+          _notes?: string
+          _payment_method?: string
+          _session_id?: string
+          _shop_id: string
+          _total_amount?: number
+        }
+        Returns: Json
+      }
+      create_warranty_ticket: {
+        Args: {
+          p_action_taken?: string
+          p_amount_paid?: number
+          p_labor_cost?: number
+          p_notes?: string
+          p_original_repair_id: string
+          p_parts_cost?: number
+          p_replaced_parts?: Json
+          p_return_reason: string
+          p_total_cost?: number
+        }
+        Returns: Json
       }
       dashboard_stats: { Args: { _shop_id: string }; Returns: Json }
       delete_email: {
@@ -2706,6 +2815,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      statistics_report: {
+        Args: { _end: string; _shop_id: string; _start: string }
+        Returns: Json
       }
       validate_promo_code: { Args: { _code: string }; Returns: Json }
     }
