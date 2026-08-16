@@ -8,6 +8,8 @@ export interface Notification {
   time: string;
   read: boolean;
   createdAt: number;
+  /** Shop (owner) id this notification belongs to — used as a second guard. */
+  shopId?: string;
 }
 
 // Keys are scoped per shop so notifications of one shop never leak into
@@ -19,8 +21,41 @@ const NOTIFIED_REPAIRS_KEY = "notified_completed_repairs";
 // Legacy global keys held merged notifications from every shop that ever
 // used this browser profile — purge them once on upgrade.
 const LEGACY_KEYS = [STORAGE_KEY, NOTIFIED_PRODUCTS_KEY, NOTIFIED_REPAIRS_KEY];
+const PREFIXES = [STORAGE_KEY, NOTIFIED_PRODUCTS_KEY, NOTIFIED_REPAIRS_KEY];
 
 const scopedKey = (prefix: string, shopId: string) => `${prefix}:${shopId}`;
+
+/** Remove every notification blob that does not belong to `shopId`. */
+function purgeForeignShopKeys(shopId: string) {
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      const prefix = PREFIXES.find((p) => key === p || key.startsWith(`${p}:`));
+      if (!prefix) continue;
+      if (key !== scopedKey(prefix, shopId)) toRemove.push(key);
+    }
+    toRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+    console.error("Error purging foreign notification keys:", e);
+  }
+}
+
+/** Clear all notification storage (used on sign-out / shared devices). */
+export function clearAllNotificationStorage() {
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (PREFIXES.some((p) => key === p || key.startsWith(`${p}:`))) toRemove.push(key);
+    }
+    toRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+    console.error("Error clearing notification storage:", e);
+  }
+}
 
 interface ShopScopedList {
   shopId: string | null;
@@ -56,10 +91,19 @@ export function useNotifications(shopId: string | null) {
       return;
     }
 
+    // Drop any blob belonging to another shop before reading ours.
+    purgeForeignShopKeys(shopId);
+
     let items: Notification[] = [];
     try {
       const stored = localStorage.getItem(scopedKey(STORAGE_KEY, shopId));
-      if (stored) items = JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Second guard: never render an item stamped with another shop.
+        items = Array.isArray(parsed)
+          ? parsed.filter((n: Notification) => !n?.shopId || n.shopId === shopId)
+          : [];
+      }
     } catch (e) {
       console.error("Error parsing notifications:", e);
       items = [];
@@ -78,6 +122,7 @@ export function useNotifications(shopId: string | null) {
     setProductsState({ shopId, ids: readIds(scopedKey(NOTIFIED_PRODUCTS_KEY, shopId)) });
     setRepairsState({ shopId, ids: readIds(scopedKey(NOTIFIED_REPAIRS_KEY, shopId)) });
   }, [shopId]);
+
 
   // Persist — always under the shop the state belongs to
   useEffect(() => {
