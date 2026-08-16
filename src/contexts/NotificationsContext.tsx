@@ -19,6 +19,11 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const effectiveUserId = useEffectiveUserId();
+  // Until team membership resolves, `effectiveUserId` may still be the member's
+  // own id instead of the owner's — don't generate anything in that window.
+  const { isLoading: teamInfoLoading } = useMyTeamInfo();
+  const shopId = teamInfoLoading ? null : effectiveUserId;
+
   const {
     notifications,
     unreadCount,
