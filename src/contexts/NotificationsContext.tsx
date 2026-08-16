@@ -3,7 +3,7 @@ import { useNotifications, type Notification as AppNotification } from "@/hooks/
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 import { useAllProducts } from "@/hooks/useProducts";
 import { useRepairs } from "@/hooks/useRepairs";
-import { useEffectiveUserId } from "@/hooks/useTeam";
+import { useEffectiveUserId, useMyTeamInfo } from "@/hooks/useTeam";
 
 interface NotificationsContextType {
   notifications: AppNotification[];
@@ -19,6 +19,11 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const effectiveUserId = useEffectiveUserId();
+  // Until team membership resolves, `effectiveUserId` may still be the member's
+  // own id instead of the owner's — don't generate anything in that window.
+  const { isLoading: teamInfoLoading } = useMyTeamInfo();
+  const shopId = teamInfoLoading ? null : effectiveUserId;
+
   const {
     notifications,
     unreadCount,
@@ -33,7 +38,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     hasNotifiedProduct,
     addNotifiedRepair,
     hasNotifiedRepair,
-  } = useNotifications(effectiveUserId);
+  } = useNotifications(shopId);
   
   const { settings: notifSettings } = useNotificationSettings();
   const productsQuery = useAllProducts();
@@ -45,8 +50,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // placeholderData to avoid flashes, so during an account switch or
   // impersonation change they briefly serve the previous shop's rows, which
   // used to generate notifications for the wrong shop.
-  const productsReady = !!effectiveUserId && !!products && !productsQuery.isPlaceholderData;
-  const repairsReady = !!effectiveUserId && !!repairs && !repairsQuery.isPlaceholderData;
+  const productsReady = !!shopId && !!products && !productsQuery.isPlaceholderData;
+  const repairsReady = !!shopId && !!repairs && !repairsQuery.isPlaceholderData;
+
 
   // Helper to send browser notification
   const sendBrowserNotification = useCallback((title: string, body: string) => {

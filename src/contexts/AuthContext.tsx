@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode } fro
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { usePresence } from "@/hooks/usePresence";
+import { clearAllNotificationStorage } from "@/hooks/useNotifications";
+
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -230,8 +232,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Shared devices: never keep one shop's notifications for the next user.
+    clearAllNotificationStorage();
     await supabase.auth.signOut();
   };
+
 
   const updatePassword = async (newPassword: string) => {
     try {
