@@ -38,7 +38,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     hasNotifiedProduct,
     addNotifiedRepair,
     hasNotifiedRepair,
-  } = useNotifications(effectiveUserId);
+  } = useNotifications(shopId);
   
   const { settings: notifSettings } = useNotificationSettings();
   const productsQuery = useAllProducts();
@@ -50,8 +50,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // placeholderData to avoid flashes, so during an account switch or
   // impersonation change they briefly serve the previous shop's rows, which
   // used to generate notifications for the wrong shop.
-  const productsReady = !!effectiveUserId && !!products && !productsQuery.isPlaceholderData;
-  const repairsReady = !!effectiveUserId && !!repairs && !repairsQuery.isPlaceholderData;
+  const productsReady = !!shopId && !!products && !productsQuery.isPlaceholderData;
+  const repairsReady = !!shopId && !!repairs && !repairsQuery.isPlaceholderData;
+
 
   // Helper to send browser notification
   const sendBrowserNotification = useCallback((title: string, body: string) => {
