@@ -3,7 +3,7 @@ import { useNotifications, type Notification as AppNotification } from "@/hooks/
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 import { useAllProducts } from "@/hooks/useProducts";
 import { useRepairs } from "@/hooks/useRepairs";
-import { useEffectiveUserId } from "@/hooks/useTeam";
+import { useEffectiveUserId, useMyTeamInfo } from "@/hooks/useTeam";
 
 interface NotificationsContextType {
   notifications: AppNotification[];
