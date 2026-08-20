@@ -44,6 +44,7 @@ export default function Checkout() {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [trialStarting, setTrialStarting] = useState(false);
 
   // Promo code state
   const [promoInput, setPromoInput] = useState("");
@@ -140,6 +141,44 @@ export default function Checkout() {
       ? subscription
       : null;
 
+  // Start the welcome trial from the plan picker. Covers users who signed up
+  // without the landing-page offer (Auth.tsx only auto-grants with that flag).
+  // Eligibility is decided 100% server-side by the grant-trial edge function —
+  // the client never writes shop_subscriptions itself.
+  const startTrial = async () => {
+    if (!user) return;
+    setTrialStarting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("grant-trial", { body: {} });
+      if (error) throw error;
+      const res = data as { granted: boolean; reason?: string };
+      if (res?.granted) {
+        toast.success("Votre essai gratuit de 7 jours est activé !");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["my-subscription", user.id] }),
+          queryClient.invalidateQueries({ queryKey: ["onboarding-status", user.id] }),
+        ]);
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+      // Denied: refresh the subscription in case one exists but the local
+      // cache is stale, then explain why the trial can't start.
+      queryClient.invalidateQueries({ queryKey: ["my-subscription", user.id] });
+      const denialMessages: Record<string, string> = {
+        already_claimed: "L'essai gratuit a déjà été réclamé pour ce compte.",
+        already_has_subscription: "Vous avez déjà un abonnement actif.",
+        not_fresh: "L'essai gratuit est réservé aux comptes créés depuis moins de 24 h.",
+        ip_limit: "Trop d'essais démarrés depuis cette connexion. Choisissez une formule.",
+        no_trial_plan: "Le plan d'essai est indisponible pour le moment. Choisissez une formule.",
+      };
+      toast.error(denialMessages[res?.reason ?? ""] || "Impossible de démarrer l'essai. Choisissez une formule.");
+    } catch {
+      toast.error("Impossible de démarrer l'essai pour le moment. Réessayez ou choisissez une formule.");
+    } finally {
+      setTrialStarting(false);
+    }
+  };
+
   if (!user) {
     return <Navigate to={`/auth?redirect=${encodeURIComponent(`/checkout?plan=${planId}`)}`} replace />;
   }
@@ -226,9 +265,27 @@ export default function Checkout() {
           ) : (
             (isOnboarding || !isExpired) && (
               <div className="text-center border-t border-white/10 pt-8">
-                <p className="text-xs" style={{ color: "hsl(240 5% 55%)" }}>
-                  L'essai gratuit de 7 jours est accordé automatiquement aux nouveaux comptes lors de l'inscription.
-                </p>
+                <div className="inline-flex flex-col items-center gap-3">
+                  <Button
+                    size="lg"
+                    onClick={startTrial}
+                    disabled={trialStarting}
+                    style={{
+                      background: "linear-gradient(135deg, hsl(142 71% 38%), hsl(142 71% 28%))",
+                      color: "white",
+                    }}
+                  >
+                    {trialStarting ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4 mr-2" />
+                    )}
+                    Démarrer mon essai gratuit de 7 jours
+                  </Button>
+                  <p className="text-xs" style={{ color: "hsl(240 5% 55%)" }}>
+                    Aucun paiement requis — accès complet pendant 7 jours.
+                  </p>
+                </div>
               </div>
             )
           )}
