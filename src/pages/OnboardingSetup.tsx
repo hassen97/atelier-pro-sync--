@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Store, Phone, Mail, MapPin, Upload, ArrowRight, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ const STEPS = [
 export default function OnboardingSetup() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -102,6 +104,12 @@ export default function OnboardingSetup() {
           );
         if (error) throw error;
       });
+
+      // Force the ProtectedRoute funnel guard to drop its cached
+      // "onboarding not completed" verdict (staleTime 30s). Without this, a
+      // fast submit navigates to /checkout while the guard still holds the
+      // stale status and bounces the user right back to /onboarding/setup.
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
 
       // Upload logo AFTER the shop is saved, and make it non-blocking so a
       // storage hiccup can never strand the user at the final step.
