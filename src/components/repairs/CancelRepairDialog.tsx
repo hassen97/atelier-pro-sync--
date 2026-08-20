@@ -27,12 +27,12 @@ export function CancelRepairDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Annuler cette réparation ?</AlertDialogTitle>
+          <AlertDialogTitle>Supprimer cette réparation ?</AlertDialogTitle>
           <AlertDialogDescription>
             {repair && (
               <>
-                Êtes-vous sûr de vouloir annuler la réparation{" "}
-                <strong>{repair.id}</strong> pour{" "}
+                Êtes-vous sûr de vouloir supprimer la réparation{" "}
+                <strong>{repair.ticket_label || repair.id}</strong> pour{" "}
                 <strong>{repair.customer}</strong> ?
                 <br />
                 <br />
@@ -52,7 +52,7 @@ export function CancelRepairDialog({
             onClick={onConfirm}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            Oui, annuler
+            Oui, supprimer
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

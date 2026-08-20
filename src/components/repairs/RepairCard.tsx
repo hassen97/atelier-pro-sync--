@@ -1,4 +1,4 @@
-import { Phone, Wrench as WrenchIcon, Calendar, MoreHorizontal, Shield, Tag } from "lucide-react";
+import { Phone, Wrench as WrenchIcon, Calendar, MoreHorizontal, Shield, Tag, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,9 @@ export function RepairCard({ repair, onViewDetails, onEdit, onPrint, onCancel, o
               <DropdownMenuItem disabled={repair.status === "delivered"} onClick={() => onStatusChange(repair, "delivered")}>→ Livré</DropdownMenuItem>
               <DropdownMenuItem disabled={repair.status === "rejected"} className="text-destructive" onClick={() => onStatusChange(repair, "rejected")}>→ Rejeté</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={() => onCancel(repair)}>Annuler</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={() => onCancel(repair)}>
+                <Trash2 className="h-4 w-4 mr-2" />Supprimer
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

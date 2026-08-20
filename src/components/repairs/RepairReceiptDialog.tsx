@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import type { Repair } from "./RepairCard";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
-import { generateThermalReceipt, generatePhoneLabel } from "@/lib/receiptPdf";
+import { printRepairReceipt, printRepairLabel } from "@/lib/repairPrint";
 import { supabase } from "@/integrations/supabase/client";
 import { useInventoryAccess } from "@/hooks/useInventoryAccess";
-import { getShopInitials, formatTicketNumberPadded, formatTicketNumber } from "@/lib/utils";
+import { getShopInitials, formatTicketNumber } from "@/lib/utils";
 
 interface RepairReceiptDialogProps {
   repair: Repair | null;
@@ -45,53 +45,14 @@ export function RepairReceiptDialog({ repair, open, onOpenChange }: RepairReceip
     if (!repair) return;
     setPrinting(true);
     try {
-      const remaining = repair.total - repair.paid;
-      let items: { name: string; qty: number; unitPrice: number; total: number }[] = [];
-
-      // Employees see only total (simple mode) — parts/labor costs are confidential
-      const effectiveMode = isEmployee ? "simple" : receiptMode;
-
-      if (effectiveMode === "detailed") {
-        items = repair.parts.map((p) => ({ name: p.name, qty: 1, unitPrice: p.cost, total: p.cost }));
-        items.push({ name: "Main d'œuvre", qty: 1, unitPrice: repair.labor, total: repair.labor });
-      }
-
-      const token = repair.tracking_token || repair.id;
-      const domain = publicDomain || window.location.origin;
-      const trackingUrl = `${domain}/r/${token}`;
-
-      const initials = getShopInitials(settings.shop_name);
-      const ticketNum = (repair as any).ticket_number ?? null;
-      const ticketLabel = formatTicketNumberPadded(initials, ticketNum);
-
-      await generateThermalReceipt(
-        {
-          type: "repair",
-          id: repair.id,
-          ticketNumber: ticketNum,
-          ticketLabel: ticketLabel || null,
-          date: new Date(repair.depositDate).toLocaleDateString("fr-TN"),
-          time: new Date().toLocaleTimeString("fr-TN", { hour: "2-digit", minute: "2-digit" }),
-          customer: { name: repair.customer, phone: repair.phone },
-          device: repair.device,
-          imei: repair.imei,
-          problem: receiptMode === "simple" ? repair.issue : undefined,
-          items,
-          subtotal: repair.total,
-          taxEnabled: settings.tax_enabled,
-          total: repair.total,
-          paid: repair.paid,
-          remaining,
-          trackingUrl,
-          receivedBy: (repair as any).received_by || undefined,
-          repairedBy: (repair as any).repaired_by || undefined,
-          deviceCondition: (repair as any).device_condition || undefined,
-          category: (repair as any).category || null,
-        },
+      await printRepairReceipt(repair, {
         settings,
-        format,
-        printerWidth
-      );
+        formatCurrency: format,
+        isEmployee,
+        receiptMode,
+        printerWidth,
+        publicDomain,
+      });
     } finally {
       setPrinting(false);
     }
@@ -101,26 +62,7 @@ export function RepairReceiptDialog({ repair, open, onOpenChange }: RepairReceip
     if (!repair) return;
     setPrinting(true);
     try {
-      const initials = getShopInitials(settings.shop_name);
-      const ticketNum = (repair as any).ticket_number ?? null;
-      const ticketLabel = formatTicketNumberPadded(initials, ticketNum);
-      await generatePhoneLabel(
-        {
-          ticketNumber: ticketNum,
-          ticketLabel: ticketLabel || null,
-          customer: repair.customer,
-          phone: repair.phone,
-          device: repair.device,
-          category: (repair as any).category || null,
-          problem: repair.issue,
-          depositDate: new Date(repair.depositDate).toLocaleDateString("fr-TN"),
-          receivedBy: (repair as any).received_by || undefined,
-          repairedBy: (repair as any).repaired_by || undefined,
-          unlockCode: (repair as any).device_unlock_code || undefined,
-        },
-        settings.shop_name,
-        printerWidth
-      );
+      await printRepairLabel(repair, { settings, formatCurrency: format, printerWidth });
     } finally {
       setPrinting(false);
     }

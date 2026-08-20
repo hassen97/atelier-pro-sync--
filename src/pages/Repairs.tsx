@@ -31,8 +31,12 @@ import {
   REPAIRS_PAGE_SIZE,
 } from "@/hooks/useRepairs";
 import { useAllCustomers, useUpdateCustomer } from "@/hooks/useCustomers";
+import { useCategories } from "@/hooks/useCategories";
 import { useEffectiveUserId } from "@/hooks/useTeam";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { useInventoryAccess } from "@/hooks/useInventoryAccess";
+import { useCurrency } from "@/hooks/useCurrency";
+import { printRepairReceiptAndLabel, type PrintableRepair } from "@/lib/repairPrint";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
@@ -139,6 +143,9 @@ export default function Repairs() {
 
 
   const { data: customers = [] } = useAllCustomers();
+  const { data: repairCategories = [] } = useCategories("repair");
+  const { isEmployee } = useInventoryAccess();
+  const { format: formatCurrency } = useCurrency();
   const effectiveUserId = useEffectiveUserId();
   const createRepair = useCreateRepair();
   const updateRepair = useUpdateRepair();
@@ -260,9 +267,10 @@ export default function Repairs() {
   };
 
   const handleViewDetails = (repair: ReturnType<typeof transformRepair>) => {
-    toast.info(`Affichage des détails`, {
-      description: `Client: ${repair.customer} - ${repair.device}`,
-    });
+    // The edit dialog doubles as the full details view (all fields, costs,
+    // condition, unlock code) instead of a dead-end toast.
+    setEditingRepair(repair._original);
+    setRepairDialogOpen(true);
   };
 
   const handleEdit = (repair: ReturnType<typeof transformRepair>) => {
@@ -463,7 +471,7 @@ export default function Repairs() {
     repaired_by?: string;
     device_condition?: string;
     device_unlock_code?: string;
-  }, selectedParts: SelectedPart[] = []) => {
+  }, selectedParts: SelectedPart[] = [], keepOpen?: boolean) => {
     const repairData = {
       customer_id: data.customer_id || null,
       category_id: data.category_id || null,
@@ -485,13 +493,14 @@ export default function Repairs() {
     };
 
     let repairId: string;
+    let createdRow: any = null;
 
     if (editingRepair) {
       await updateRepair.mutateAsync({ id: editingRepair.id, ...repairData });
       repairId = editingRepair.id;
     } else {
-      const created = await createRepair.mutateAsync(repairData);
-      repairId = created.id;
+      createdRow = await createRepair.mutateAsync(repairData);
+      repairId = createdRow.id;
     }
 
     // Insert repair_parts and deduct stock
@@ -536,8 +545,52 @@ export default function Repairs() {
       queryClient.invalidateQueries({ queryKey: ["low-stock-alerts"] });
     }
 
-    setRepairDialogOpen(false);
-    setEditingRepair(null);
+    // Rush-hour auto-print: "Enregistrer + Nouveau" fires BOTH print jobs
+    // (customer receipt + phone label) immediately after creation.
+    if (keepOpen && createdRow) {
+      const matchedCustomer = data.customer_id
+        ? customers.find((c) => c.id === data.customer_id)
+        : undefined;
+      const printable: PrintableRepair = {
+        id: repairId,
+        ticket_number: createdRow.ticket_number ?? null,
+        tracking_token: createdRow.tracking_token ?? null,
+        customer: matchedCustomer?.name || "Client anonyme",
+        phone: matchedCustomer?.phone || undefined,
+        device: data.device_model,
+        imei: data.imei || undefined,
+        issue: data.problem_description,
+        parts: selectedParts.map((p) => ({ name: p.product_name, cost: p.unit_price * p.quantity })),
+        labor: data.labor_cost,
+        total: data.total_cost,
+        paid: data.amount_paid,
+        depositDate: createdRow.deposit_date || new Date().toISOString(),
+        received_by: data.received_by,
+        category: repairCategories.find((c) => c.id === data.category_id)?.name || null,
+        device_condition: data.device_condition,
+        device_unlock_code: data.device_unlock_code,
+      };
+      // Fire-and-forget: printing must never slow down the next intake
+      printRepairReceiptAndLabel(printable, {
+        settings,
+        formatCurrency,
+        isEmployee,
+        receiptMode: settings.receipt_mode || "detailed",
+      })
+        .then(() => toast.success("Reçu + étiquette envoyés à l'impression"))
+        .catch(() =>
+          toast.error("Impression impossible", {
+            description: "Utilisez « Imprimer fiche » sur la carte de la réparation.",
+          })
+        );
+    }
+
+    // "Enregistrer + Nouveau" (rush hour): keep the dialog open on a blank
+    // form so the next customer can be taken in without reopening it.
+    if (!keepOpen) {
+      setRepairDialogOpen(false);
+      setEditingRepair(null);
+    }
   };
 
   if (isLoading) {

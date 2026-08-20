@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, UserPlus, X, Plus, Trash2, Package, CalendarIcon, ChevronDown } from "lucide-react";
+import { Loader2, UserPlus, X, Plus, Trash2, Package, CalendarIcon, ChevronDown, Printer } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -103,7 +103,7 @@ interface RepairDialogProps {
     device_condition?: string | null;
     device_unlock_code?: string | null;
   } | null;
-  onSubmit: (data: RepairFormValues, selectedParts: SelectedPart[]) => Promise<void>;
+  onSubmit: (data: RepairFormValues, selectedParts: SelectedPart[], keepOpen?: boolean) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -293,7 +293,7 @@ export function RepairDialog({
     form.setValue("device_model", "");
   };
 
-  const handleSubmit = async (data: RepairFormValues) => {
+  const runSubmit = async (data: RepairFormValues, keepOpen: boolean) => {
     const brandLabel = data.device_brand ? getBrandLabel(data.device_brand) : "";
     const fullDeviceModel = brandLabel 
       ? `${brandLabel} ${data.device_model}`.trim()
@@ -309,12 +309,16 @@ export function RepairDialog({
       ...data,
       device_model: fullDeviceModel,
       problem_description: problemFromCategory,
-    }, selectedParts);
+    }, selectedParts, keepOpen);
+    // Always reset to a blank intake sheet — either the dialog closes, or
+    // "Enregistrer et nouveau" keeps it open for the next customer.
     clearDraft();
     form.reset();
     setSelectedBrand("");
     setSelectedParts([]);
   };
+
+  const handleSubmit = (data: RepairFormValues) => runSubmit(data, false);
 
   // Auto-update parts_cost when selectedParts change
   const partsTotal = useMemo(() => 
@@ -540,7 +544,8 @@ export function RepairDialog({
               />
             </div>
 
-            {/* Repair Category */}
+            {/* Repair Category — tappable buttons instead of a dropdown,
+                one tap selects the problem during rush intake */}
             {categoryOptions.length > 0 && (
               <FormField
                 control={form.control}
@@ -549,14 +554,29 @@ export function RepairDialog({
                   <FormItem>
                     <FormLabel>Catégorie de réparation</FormLabel>
                     <FormControl>
-                      <Combobox
-                        options={categoryOptions}
-                        value={field.value || ""}
-                        onValueChange={field.onChange}
-                        placeholder="Sélectionner catégorie"
-                        searchPlaceholder="Rechercher catégorie..."
-                        emptyText="Aucune catégorie"
-                      />
+                      <div className="flex flex-wrap gap-2">
+                        {categoryOptions.map((cat) => {
+                          const active = field.value === cat.value;
+                          return (
+                            <Button
+                              key={cat.value}
+                              type="button"
+                              size="sm"
+                              variant={active ? "default" : "outline"}
+                              className={cn(
+                                "rounded-full",
+                                active && "shadow-sm"
+                              )}
+                              onClick={() =>
+                                // Tap again to deselect (category stays optional)
+                                field.onChange(active ? "" : cat.value)
+                              }
+                            >
+                              {cat.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -616,8 +636,9 @@ export function RepairDialog({
               />
             )}
 
-            {/* Replacement Parts from Inventory — hidden for employees */}
-            {!isEmployee && (
+            {/* Replacement Parts from Inventory — hidden for employees and
+                when there is nothing in stock to pick from */}
+            {!isEmployee && productOptions.length > 0 && (
             <div className="space-y-2">
               <FormLabel className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
@@ -987,7 +1008,7 @@ export function RepairDialog({
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-wrap gap-2 sm:gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -995,6 +1016,24 @@ export function RepairDialog({
               >
                 Annuler
               </Button>
+              {/* Rush-hour flow: save, print receipt + phone label, and
+                  immediately start the next intake */}
+              {!isEditing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading}
+                  title="Enregistre la réparation, imprime le reçu client + l'étiquette téléphone, puis ouvre une nouvelle fiche"
+                  onClick={() => form.handleSubmit((data) => runSubmit(data, true))()}
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Printer className="mr-2 h-4 w-4" />
+                  )}
+                  Enregistrer + Imprimer + Nouveau
+                </Button>
+              )}
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isEditing ? "Enregistrer" : "Créer la réparation"}
