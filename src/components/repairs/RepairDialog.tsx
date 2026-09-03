@@ -44,6 +44,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useAllProducts } from "@/hooks/useProducts";
 import { useInventoryAccess } from "@/hooks/useInventoryAccess";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface SelectedPart {
   product_id: string;
@@ -137,6 +138,15 @@ export function RepairDialog({
   const { data: repairCategories = [] } = useCategories("repair");
   const { data: products = [] } = useAllProducts();
   const { isEmployee } = useInventoryAccess();
+  const { user } = useAuth();
+
+  // Rush intake: pre-fill "Reçu par" with the logged-in person's name —
+  // it's the same name all day, no reason to type it on every repair.
+  const defaultReceivedBy: string =
+    user?.user_metadata?.full_name || user?.user_metadata?.username || "";
+  // Bumped after each "Enregistrer + Imprimer + Nouveau" to remount the
+  // client combobox so its search popover reopens with focus.
+  const [intakeSeq, setIntakeSeq] = useState(0);
 
   const categoryOptions = repairCategories.map((c) => ({ value: c.id, label: c.name }));
   
@@ -190,7 +200,7 @@ export function RepairDialog({
       notes: "",
       estimated_ready_date: "",
       technician_note: "",
-      received_by: "",
+      received_by: defaultReceivedBy,
       repaired_by: "",
       device_condition: "",
       device_unlock_code: "",
@@ -201,7 +211,7 @@ export function RepairDialog({
     customer_id: "", customer_name: "", customer_phone: "", category_id: "",
     device_brand: "", device_model: "", imei: "", problem_description: "",
     diagnosis: "", labor_cost: 0, parts_cost: 0, total_cost: 0, amount_paid: 0, notes: "",
-    estimated_ready_date: "", technician_note: "", received_by: "", repaired_by: "",
+    estimated_ready_date: "", technician_note: "", received_by: defaultReceivedBy, repaired_by: "",
     device_condition: "", device_unlock_code: "",
   };
 
@@ -278,7 +288,7 @@ export function RepairDialog({
         notes: "",
         estimated_ready_date: "",
         technician_note: "",
-        received_by: "",
+        received_by: defaultReceivedBy,
         repaired_by: "",
         device_condition: "",
         device_unlock_code: "",
@@ -316,6 +326,12 @@ export function RepairDialog({
     form.reset();
     setSelectedBrand("");
     setSelectedParts([]);
+    if (keepOpen) {
+      // Ready for the next customer: restore the auto "Reçu par" (reset may
+      // predate the loaded user) and reopen the client search with focus.
+      form.setValue("received_by", defaultReceivedBy);
+      setIntakeSeq((n) => n + 1);
+    }
   };
 
   const handleSubmit = (data: RepairFormValues) => runSubmit(data, false);
@@ -407,6 +423,8 @@ export function RepairDialog({
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <CustomerCombobox
+                              key={`intake-${intakeSeq}`}
+                              autoOpen={open && !isEditing}
                               value={field.value || ""}
                               onValueChange={field.onChange}
                             />
@@ -593,11 +611,11 @@ export function RepairDialog({
                   size="sm"
                   className="w-full justify-between text-muted-foreground hover:text-foreground -ml-2"
                 >
-                  <span>+ Plus d'infos (IMEI)</span>
+                  <span>+ Plus d'infos (IMEI, pièces, date, code…)</span>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="pt-2">
+              <CollapsibleContent className="pt-2 space-y-4">
                 <FormField
                   control={form.control}
                   name="imei"
@@ -611,8 +629,9 @@ export function RepairDialog({
                     </FormItem>
                   )}
                 />
-              </CollapsibleContent>
-            </Collapsible>
+            {/* Everything below lives inside the accordion until the unlock
+                code field: IMEI, pièces, date, reçu par, code — the create
+                form stays a single screen for rush-hour intake. */}
 
             {/* Problem description removed: the selected category IS the problem. */}
 
@@ -773,77 +792,90 @@ export function RepairDialog({
               />
             )}
 
-            {/* Estimated ready date */}
+            {/* Estimated ready date — one-tap chips first (rush hour),
+                calendar popover only for custom dates */}
             <FormField
               control={form.control}
               name="estimated_ready_date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Date de disponibilité estimée</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "justify-start text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {field.value
-                            ? formatDate(new Date(field.value), "d MMMM yyyy", { locale: fr })
-                            : "Sélectionner une date (optionnel)"}
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <div className="flex flex-wrap gap-1 p-2 border-b">
-                        {[
-                          { label: "Aujourd'hui", days: 0 },
-                          { label: "Demain", days: 1 },
-                          { label: "48 h", days: 2 },
-                        ].map((preset) => (
+              render={({ field }) => {
+                const presetValue = (days: number) => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + days);
+                  return d.toISOString().split("T")[0];
+                };
+                const presets = [
+                  { label: "Aujourd'hui", days: 0 },
+                  { label: "Demain", days: 1 },
+                  { label: "48 h", days: 2 },
+                ];
+                const isPresetValue = presets.some((p) => presetValue(p.days) === field.value);
+                return (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Date de disponibilité estimée</FormLabel>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {presets.map((preset) => {
+                        const val = presetValue(preset.days);
+                        const active = field.value === val;
+                        return (
                           <Button
                             key={preset.label}
                             type="button"
-                            variant="outline"
                             size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => {
-                              const d = new Date();
-                              d.setDate(d.getDate() + preset.days);
-                              field.onChange(d.toISOString().split("T")[0]);
-                            }}
+                            variant={active ? "default" : "outline"}
+                            className="rounded-full"
+                            onClick={() => field.onChange(active ? "" : val)}
                           >
                             {preset.label}
                           </Button>
-                        ))}
-                        {field.value && (
+                        );
+                      })}
+                      <Popover>
+                        <PopoverTrigger asChild>
                           <Button
                             type="button"
-                            variant="ghost"
                             size="sm"
-                            className="h-7 text-xs text-muted-foreground"
-                            onClick={() => field.onChange("")}
+                            variant="outline"
+                            className={cn(
+                              "rounded-full",
+                              field.value && !isPresetValue && "border-primary text-primary"
+                            )}
+                            title="Choisir une autre date"
                           >
-                            Effacer
+                            <CalendarIcon className="h-4 w-4" />
+                            {field.value && !isPresetValue
+                              ? formatDate(new Date(field.value), "d MMM", { locale: fr })
+                              : null}
                           </Button>
-                        )}
-                      </div>
-                      <Calendar
-                        mode="single"
-                        selected={field.value ? new Date(field.value) : undefined}
-                        onSelect={(date) => field.onChange(date ? date.toISOString().split("T")[0] : "")}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <p className="text-xs text-muted-foreground">Visible par le client sur la page de suivi</p>
-                  <FormMessage />
-                </FormItem>
-              )}
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          {field.value && (
+                            <div className="flex justify-end p-2 border-b">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-muted-foreground"
+                                onClick={() => field.onChange("")}
+                              >
+                                Effacer
+                              </Button>
+                            </div>
+                          )}
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? new Date(field.value) : undefined}
+                            onSelect={(date) => field.onChange(date ? date.toISOString().split("T")[0] : "")}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Visible par le client sur la page de suivi</p>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             {/* Technician note - édition uniquement */}
@@ -899,7 +931,9 @@ export function RepairDialog({
               )}
             </div>
 
-            {/* Device condition at intake */}
+            {/* Device condition at intake — edit mode only: skipped during
+                rush intake, noted later when there's a dispute risk */}
+            {isEditing && (
             <FormField
               control={form.control}
               name="device_condition"
@@ -934,6 +968,7 @@ export function RepairDialog({
                 </FormItem>
               )}
             />
+            )}
 
             {/* Device unlock code (password / PIN / pattern) */}
             <FormField
@@ -956,6 +991,8 @@ export function RepairDialog({
                 </FormItem>
               )}
             />
+              </CollapsibleContent>
+            </Collapsible>
 
             <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
               <div className="grid grid-cols-2 gap-4">

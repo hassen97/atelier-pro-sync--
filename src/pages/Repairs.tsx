@@ -36,7 +36,7 @@ import { useEffectiveUserId } from "@/hooks/useTeam";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useInventoryAccess } from "@/hooks/useInventoryAccess";
 import { useCurrency } from "@/hooks/useCurrency";
-import { printRepairReceiptAndLabel, type PrintableRepair } from "@/lib/repairPrint";
+import { printRepairReceiptAndLabel, getSavedPrinterWidth, type PrintableRepair } from "@/lib/repairPrint";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
@@ -576,6 +576,7 @@ export default function Repairs() {
         formatCurrency,
         isEmployee,
         receiptMode: settings.receipt_mode || "detailed",
+        printerWidth: getSavedPrinterWidth(),
       })
         .then(() => toast.success("Reçu + étiquette envoyés à l'impression"))
         .catch(() =>

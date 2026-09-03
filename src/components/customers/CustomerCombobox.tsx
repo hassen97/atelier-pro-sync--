@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Check, ChevronsUpDown, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,9 @@ interface CustomerComboboxProps {
   onAddNew?: () => void;
   placeholder?: string;
   className?: string;
+  // Rush intake: open the search popover automatically (and focus its input)
+  // so the first keystroke goes straight to the client search.
+  autoOpen?: boolean;
 }
 
 export function CustomerCombobox({
@@ -31,10 +34,19 @@ export function CustomerCombobox({
   onAddNew,
   placeholder = "Rechercher client (nom ou tél)...",
   className,
+  autoOpen = false,
 }: CustomerComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
   const { data: customers = [] } = useAllCustomers();
+
+  useEffect(() => {
+    if (!autoOpen) return;
+    // Let the parent dialog finish mounting/animating before popping open
+    const t = setTimeout(() => setOpen(true), 100);
+    return () => clearTimeout(t);
+  }, [autoOpen]);
 
   const selectedCustomer = customers.find((c) => c.id === value);
 
@@ -70,9 +82,17 @@ export function CustomerCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        align="start"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          inputRef.current?.focus();
+        }}
+      >
         <Command shouldFilter={false}>
           <CommandInput
+            ref={inputRef}
             placeholder="Nom, téléphone ou email..."
             value={search}
             onValueChange={setSearch}

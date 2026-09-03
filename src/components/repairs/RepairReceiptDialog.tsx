@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import type { Repair } from "./RepairCard";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
-import { printRepairReceipt, printRepairLabel } from "@/lib/repairPrint";
+import { printRepairReceipt, printRepairLabel, getSavedPrinterWidth, savePrinterWidth } from "@/lib/repairPrint";
 import { supabase } from "@/integrations/supabase/client";
 import { useInventoryAccess } from "@/hooks/useInventoryAccess";
 import { getShopInitials, formatTicketNumber } from "@/lib/utils";
@@ -24,7 +24,12 @@ export function RepairReceiptDialog({ repair, open, onOpenChange }: RepairReceip
   const { format } = useCurrency();
   const { isEmployee } = useInventoryAccess();
   const [receiptMode, setReceiptMode] = useState<string>(settings.receipt_mode || "detailed");
-  const [printerWidth, setPrinterWidth] = useState<"80mm" | "58mm">("80mm");
+  const [printerWidth, setPrinterWidth] = useState<"80mm" | "58mm">(getSavedPrinterWidth());
+  const changePrinterWidth = (v: string) => {
+    const width = v as "80mm" | "58mm";
+    setPrinterWidth(width);
+    savePrinterWidth(width);
+  };
   const [publicDomain, setPublicDomain] = useState<string>("");
   const [printing, setPrinting] = useState(false);
 
@@ -120,7 +125,7 @@ export function RepairReceiptDialog({ repair, open, onOpenChange }: RepairReceip
             )}
             <div className="space-y-1">
               <Label className="text-xs">Format imprimante</Label>
-              <Select value={printerWidth} onValueChange={(v) => setPrinterWidth(v as "80mm" | "58mm")}>
+              <Select value={printerWidth} onValueChange={changePrinterWidth}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>

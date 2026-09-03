@@ -5,6 +5,27 @@ import type { ShopSettings } from "@/hooks/useShopSettings";
 
 export type PrinterWidth = "80mm" | "58mm";
 
+// Remember the shop's thermal printer width across sessions — re-selecting
+// 58mm on every single print is pure friction during rush hours.
+const PRINTER_WIDTH_STORAGE_KEY = "repairpro_printer_width";
+
+export function getSavedPrinterWidth(): PrinterWidth {
+  try {
+    const saved = localStorage.getItem(PRINTER_WIDTH_STORAGE_KEY);
+    return saved === "58mm" ? "58mm" : "80mm";
+  } catch {
+    return "80mm";
+  }
+}
+
+export function savePrinterWidth(width: PrinterWidth) {
+  try {
+    localStorage.setItem(PRINTER_WIDTH_STORAGE_KEY, width);
+  } catch {
+    /* noop */
+  }
+}
+
 // Everything the thermal receipt + phone label need, regardless of where the
 // repair object comes from (card list, freshly inserted DB row, ...).
 export interface PrintableRepair {
