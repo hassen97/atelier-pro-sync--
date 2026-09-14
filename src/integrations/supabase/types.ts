@@ -841,6 +841,27 @@ export type Database = {
           },
         ]
       }
+      password_reset_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          ip_address: string | null
+          username: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          username?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
       password_reset_requests: {
         Row: {
           created_at: string
