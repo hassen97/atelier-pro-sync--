@@ -109,8 +109,10 @@ export default function ResetPassword() {
               Demande de réinitialisation
             </CardTitle>
             <CardDescription>
-              Saisissez votre nom d'utilisateur ou numéro de téléphone
+              Saisissez votre nom d'utilisateur — nous vous enverrons un lien
+              sécurisé pour choisir un nouveau mot de passe
             </CardDescription>
+
           </CardHeader>
           <CardContent className="space-y-4">
             {success ? (
