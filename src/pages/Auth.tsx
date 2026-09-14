@@ -170,7 +170,10 @@ export default function Auth() {
       if (error) {
         const msg = error.message || "";
         if (msg === "Invalid login credentials") {
-          setError("Nom d'utilisateur ou mot de passe incorrect");
+          setError(
+            "Nom d'utilisateur ou mot de passe incorrect. Vérifiez que la touche Majuscule (Caps Lock) est désactivée et que le clavier est en bon mode de saisie. Si vous avez oublié votre mot de passe, utilisez « Mot de passe oublié ? »."
+          );
+
         } else if (msg.includes("banned") || msg.includes("User is banned")) {
           setError("Votre compte est en attente de validation par l'administrateur.");
         } else {
@@ -603,9 +606,20 @@ export default function Auth() {
           {error && (
             <Alert variant="destructive" className="mb-4 border-red-500/30 bg-red-500/10">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error}
+                {effectiveTab === "login" && (
+                  <Link
+                    to="/reset-password"
+                    className="block mt-2 font-medium underline underline-offset-2"
+                  >
+                    Réinitialiser mon mot de passe
+                  </Link>
+                )}
+              </AlertDescription>
             </Alert>
           )}
+
 
           {success && (
             <Alert className="mb-4 border-emerald-500/30 bg-emerald-500/10">

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wrench, ArrowLeft, Send, AtSign, CheckCircle, Phone, MessageCircle, Loader2 } from "lucide-react";
+import { Wrench, ArrowLeft, Send, AtSign, CheckCircle, Phone, MessageCircle, Loader2, Mail } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { SEO } from "@/components/seo/SEO";
@@ -12,6 +12,7 @@ import { SEO } from "@/components/seo/SEO";
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -35,15 +36,21 @@ export default function ResetPassword() {
     setError(null);
 
     const trimmedUsername = username.trim().toLowerCase();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedPhone = phone.trim();
 
-    if (!trimmedUsername && !trimmedPhone) {
-      setError("Veuillez saisir un nom d'utilisateur ou un numéro de téléphone");
+    if (!trimmedUsername) {
+      setError("Veuillez saisir votre nom d'utilisateur");
       return;
     }
 
-    if (trimmedUsername && trimmedUsername.length < 3) {
+    if (trimmedUsername.length < 3) {
       setError("Le nom d'utilisateur doit contenir au moins 3 caractères");
+      return;
+    }
+
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Veuillez saisir une adresse e-mail valide");
       return;
     }
 
@@ -53,18 +60,21 @@ export default function ResetPassword() {
       // we always show the same success message to prevent username enumeration.
       await supabase
         .from("password_reset_requests" as any)
-        .insert({ username: trimmedUsername || `phone:${trimmedPhone}`, phone: trimmedPhone || null } as any);
+        .insert({ username: trimmedUsername, phone: trimmedPhone || null } as any);
 
-      // Also send an automatic reset-link email if we can match the username.
-      if (trimmedUsername) {
-        supabase.functions
-          .invoke("send-password-reset", {
-            body: { username: trimmedUsername, redirect_origin: window.location.origin },
-          })
-          .catch(() => {
-            /* never leak whether an account exists */
-          });
-      }
+      // Send the automatic, single-use reset link.
+      await supabase.functions
+        .invoke("send-password-reset", {
+          body: {
+            username: trimmedUsername,
+            email: trimmedEmail || undefined,
+            phone: trimmedPhone || undefined,
+          },
+        })
+        .catch(() => {
+          /* never leak whether an account exists */
+        });
+
       setSuccess(true);
     } catch {
       // Silently swallow errors and still show success — we never want to
@@ -74,6 +84,7 @@ export default function ResetPassword() {
       setLoading(false);
     }
   };
+
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
@@ -98,8 +109,10 @@ export default function ResetPassword() {
               Demande de réinitialisation
             </CardTitle>
             <CardDescription>
-              Saisissez votre nom d'utilisateur ou numéro de téléphone
+              Saisissez votre nom d'utilisateur — nous vous enverrons un lien
+              sécurisé pour choisir un nouveau mot de passe
             </CardDescription>
+
           </CardHeader>
           <CardContent className="space-y-4">
             {success ? (
@@ -147,8 +160,30 @@ export default function ResetPassword() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="reset-email">Adresse e-mail</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="vous@exemple.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10"
+                      disabled={loading}
+                      autoComplete="email"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    L'e-mail enregistré sur votre compte. Si aucun e-mail n'est
+                    encore enregistré, saisissez le vôtre et ajoutez votre numéro
+                    de téléphone ci-dessous pour confirmer votre identité.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="reset-phone" className="text-muted-foreground text-sm">
-                    Ou votre numéro de téléphone (optionnel)
+                    Numéro de téléphone du compte
                   </Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -166,10 +201,13 @@ export default function ResetPassword() {
 
                 <Alert className="border-primary/30 bg-primary/5">
                   <AlertDescription className="text-sm">
-                    L'administrateur recevra votre demande et vous contactera via le numéro 
-                    de téléphone ou WhatsApp associé à votre compte.
+                    Le lien reçu est valable 1 heure et ne peut servir qu'une
+                    seule fois. Si nous ne parvenons pas à vous envoyer d'e-mail,
+                    l'administrateur reçoit votre demande et vous contacte par
+                    téléphone ou WhatsApp.
                   </AlertDescription>
                 </Alert>
+
 
                 <Button
                   type="submit"
