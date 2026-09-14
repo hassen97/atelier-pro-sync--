@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wrench, ArrowLeft, Send, AtSign, CheckCircle, Phone, MessageCircle, Loader2 } from "lucide-react";
+import { Wrench, ArrowLeft, Send, AtSign, CheckCircle, Phone, MessageCircle, Loader2, Mail } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { SEO } from "@/components/seo/SEO";
