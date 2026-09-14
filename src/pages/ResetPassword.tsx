@@ -160,8 +160,30 @@ export default function ResetPassword() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="reset-email">Adresse e-mail</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="vous@exemple.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10"
+                      disabled={loading}
+                      autoComplete="email"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    L'e-mail enregistré sur votre compte. Si aucun e-mail n'est
+                    encore enregistré, saisissez le vôtre et ajoutez votre numéro
+                    de téléphone ci-dessous pour confirmer votre identité.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="reset-phone" className="text-muted-foreground text-sm">
-                    Ou votre numéro de téléphone (optionnel)
+                    Numéro de téléphone du compte
                   </Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -179,10 +201,13 @@ export default function ResetPassword() {
 
                 <Alert className="border-primary/30 bg-primary/5">
                   <AlertDescription className="text-sm">
-                    L'administrateur recevra votre demande et vous contactera via le numéro 
-                    de téléphone ou WhatsApp associé à votre compte.
+                    Le lien reçu est valable 1 heure et ne peut servir qu'une
+                    seule fois. Si nous ne parvenons pas à vous envoyer d'e-mail,
+                    l'administrateur reçoit votre demande et vous contacte par
+                    téléphone ou WhatsApp.
                   </AlertDescription>
                 </Alert>
+
 
                 <Button
                   type="submit"
