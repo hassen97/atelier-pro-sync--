@@ -863,7 +863,20 @@ export default function Settings() {
           </div>
         </GlassCard>
 
+        {/* Recovery e-mail */}
+        <GlassCard>
+          <div className="p-5 sm:p-6">
+            <SectionHeading
+              icon={Mail}
+              title="Récupération de compte"
+              description="E-mail utilisé pour réinitialiser votre mot de passe"
+            />
+            <RecoveryEmailCard />
+          </div>
+        </GlassCard>
+
         {/* Password */}
+
         <GlassCard>
           <div className="p-5 sm:p-6">
             <SectionHeading icon={Key} title="Mon compte" description="Modifier votre mot de passe" />
