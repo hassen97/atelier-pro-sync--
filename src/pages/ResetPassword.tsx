@@ -12,6 +12,7 @@ import { SEO } from "@/components/seo/SEO";
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -35,15 +36,21 @@ export default function ResetPassword() {
     setError(null);
 
     const trimmedUsername = username.trim().toLowerCase();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedPhone = phone.trim();
 
-    if (!trimmedUsername && !trimmedPhone) {
-      setError("Veuillez saisir un nom d'utilisateur ou un numéro de téléphone");
+    if (!trimmedUsername) {
+      setError("Veuillez saisir votre nom d'utilisateur");
       return;
     }
 
-    if (trimmedUsername && trimmedUsername.length < 3) {
+    if (trimmedUsername.length < 3) {
       setError("Le nom d'utilisateur doit contenir au moins 3 caractères");
+      return;
+    }
+
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Veuillez saisir une adresse e-mail valide");
       return;
     }
 
@@ -53,18 +60,21 @@ export default function ResetPassword() {
       // we always show the same success message to prevent username enumeration.
       await supabase
         .from("password_reset_requests" as any)
-        .insert({ username: trimmedUsername || `phone:${trimmedPhone}`, phone: trimmedPhone || null } as any);
+        .insert({ username: trimmedUsername, phone: trimmedPhone || null } as any);
 
-      // Also send an automatic reset-link email if we can match the username.
-      if (trimmedUsername) {
-        supabase.functions
-          .invoke("send-password-reset", {
-            body: { username: trimmedUsername, redirect_origin: window.location.origin },
-          })
-          .catch(() => {
-            /* never leak whether an account exists */
-          });
-      }
+      // Send the automatic, single-use reset link.
+      await supabase.functions
+        .invoke("send-password-reset", {
+          body: {
+            username: trimmedUsername,
+            email: trimmedEmail || undefined,
+            phone: trimmedPhone || undefined,
+          },
+        })
+        .catch(() => {
+          /* never leak whether an account exists */
+        });
+
       setSuccess(true);
     } catch {
       // Silently swallow errors and still show success — we never want to
@@ -74,6 +84,7 @@ export default function ResetPassword() {
       setLoading(false);
     }
   };
+
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
