@@ -606,9 +606,20 @@ export default function Auth() {
           {error && (
             <Alert variant="destructive" className="mb-4 border-red-500/30 bg-red-500/10">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error}
+                {effectiveTab === "login" && (
+                  <Link
+                    to="/reset-password"
+                    className="block mt-2 font-medium underline underline-offset-2"
+                  >
+                    Réinitialiser mon mot de passe
+                  </Link>
+                )}
+              </AlertDescription>
             </Alert>
           )}
+
 
           {success && (
             <Alert className="mb-4 border-emerald-500/30 bg-emerald-500/10">
