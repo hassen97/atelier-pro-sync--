@@ -71,7 +71,7 @@ export default function ResetPassword() {
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <SEO title="Réinitialisation du mot de passe" description="Réinitialisez votre mot de passe RepairPro" />
+      <SEO title="Réinitialisation du mot de passe" description="Réinitialisez votre mot de passe RepairPro" path="/reset-password" />
       <div className="w-full max-w-md">
         <Card className="border-none shadow-2xl">
           <CardHeader className="space-y-3 pb-6">
