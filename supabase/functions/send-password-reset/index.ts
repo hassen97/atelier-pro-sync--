@@ -14,6 +14,7 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
 const MAX_PER_USERNAME_PER_HOUR = 3
 const MAX_PER_IP_PER_HOUR = 5
+const DEFAULT_ORIGIN = 'https://repairpro-tunisia.com'
 
 const digits = (v: string) => v.replace(/[^0-9]/g, '')
 
@@ -24,6 +25,47 @@ function phoneMatches(candidate: string, ...known: (string | null | undefined)[]
     const d = digits(String(k ?? ''))
     return d.length >= 6 && (d.endsWith(c) || c.endsWith(d))
   })
+}
+
+function isSafeOrigin(candidate: string, configuredDomain?: string | null): boolean {
+  if (!candidate || typeof candidate !== 'string') return false
+  try {
+    const url = new URL(candidate)
+    const host = url.hostname.toLowerCase()
+    
+    // Local development
+    if (host === 'localhost' || host === '127.0.0.1') return true
+    
+    // Lovable preview / staging domains
+    if (
+      host.endsWith('.lovable.app') ||
+      host.endsWith('.lovableproject.com') ||
+      host.endsWith('.lovable.dev') ||
+      host.endsWith('.gpt-eng.com') ||
+      host.endsWith('.gptengineer.run')
+    ) {
+      return true
+    }
+    
+    // Production brand domains
+    if (host === 'repairpro-tunisia.com' || host.endsWith('.repairpro-tunisia.com')) {
+      return true
+    }
+    
+    // Custom configured domain from platform_settings
+    if (configuredDomain) {
+      const configuredHost = new URL(
+        configuredDomain.startsWith('http') ? configuredDomain : `https://${configuredDomain}`
+      ).hostname.toLowerCase()
+      if (host === configuredHost || host.endsWith(`.${configuredHost}`)) {
+        return true
+      }
+    }
+    
+    return false
+  } catch {
+    return false
+  }
 }
 
 Deno.serve(async (req) => {
@@ -44,13 +86,19 @@ Deno.serve(async (req) => {
 
     const body = (await req.json().catch(() => ({}))) as {
       username?: string
+      identifier?: string
       email?: string
       phone?: string
+      origin?: string
+      redirectTo?: string
     }
-    const username = String(body.username ?? '').trim().toLowerCase()
+
+    const rawIdentifier = String(body.identifier || body.username || '').trim().toLowerCase()
     const providedEmail = String(body.email ?? '').trim().toLowerCase()
     const providedPhone = String(body.phone ?? '').trim()
-    if (!username) return ok()
+    if (!rawIdentifier && !providedEmail) return ok()
+
+    const searchIdentifier = rawIdentifier || providedEmail
 
     const ip =
       req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -65,7 +113,7 @@ Deno.serve(async (req) => {
       admin
         .from('password_reset_attempts')
         .select('id', { count: 'exact', head: true })
-        .eq('username', username)
+        .eq('username', searchIdentifier)
         .gte('created_at', oneHourAgo),
       admin
         .from('password_reset_attempts')
@@ -77,18 +125,24 @@ Deno.serve(async (req) => {
     if ((byUser.count ?? 0) >= MAX_PER_USERNAME_PER_HOUR) return ok()
     if ((byIp.count ?? 0) >= MAX_PER_IP_PER_HOUR) return ok()
 
-    await admin.from('password_reset_attempts').insert({ username, ip_address: ip })
+    await admin.from('password_reset_attempts').insert({ username: searchIdentifier, ip_address: ip })
 
     // Housekeeping: drop rows older than 24h (fire and forget).
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     admin.from('password_reset_attempts').delete().lt('created_at', oneDayAgo).then(() => {})
 
     // ── Resolve the account ───────────────────────────────────────────────
-    const { data: profile } = await admin
+    let profileQuery = admin
       .from('profiles')
-      .select('user_id, email, phone, whatsapp_phone')
-      .eq('username', username)
-      .maybeSingle()
+      .select('user_id, username, email, phone, whatsapp_phone')
+
+    if (searchIdentifier.includes('@')) {
+      profileQuery = profileQuery.or(`email.ilike.${searchIdentifier},username.ilike.${searchIdentifier}`)
+    } else {
+      profileQuery = profileQuery.ilike('username', searchIdentifier)
+    }
+
+    const { data: profile } = await profileQuery.maybeSingle()
 
     if (!profile?.user_id) return ok()
 
@@ -138,9 +192,28 @@ Deno.serve(async (req) => {
 
     if (!targetEmail) return ok()
 
-    // ── Recovery link on the canonical branded domain ─────────────────────
-    const origin = 'https://www.getheavencoin.com'
-    const redirectTo = `${origin}/update-password`
+    // ── Resolve redirect URL / origin safely ──────────────────────────────
+    const { data: settingRow } = await admin
+      .from('platform_settings')
+      .select('value')
+      .eq('key', 'public_site_domain')
+      .maybeSingle()
+    const configuredDomain = settingRow?.value?.trim() || ''
+
+    const requestOrigin =
+      body.origin ||
+      req.headers.get('origin') ||
+      (req.headers.get('referer') ? new URL(req.headers.get('referer')!).origin : null) ||
+      Deno.env.get('APP_URL')
+
+    let resolvedOrigin = DEFAULT_ORIGIN
+    if (requestOrigin && isSafeOrigin(requestOrigin, configuredDomain)) {
+      resolvedOrigin = requestOrigin.replace(/\/+$/, '')
+    } else if (configuredDomain && isSafeOrigin(configuredDomain, configuredDomain)) {
+      resolvedOrigin = (configuredDomain.startsWith('http') ? configuredDomain : `https://${configuredDomain}`).replace(/\/+$/, '')
+    }
+
+    const redirectTo = `${resolvedOrigin}/update-password`
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: 'recovery',

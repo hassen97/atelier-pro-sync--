@@ -39,13 +39,13 @@ export default function ResetPassword() {
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedPhone = phone.trim();
 
-    if (!trimmedUsername) {
-      setError("Veuillez saisir votre nom d'utilisateur");
+    if (!trimmedUsername && !trimmedEmail) {
+      setError("Veuillez saisir votre nom d'utilisateur ou votre adresse e-mail");
       return;
     }
 
-    if (trimmedUsername.length < 3) {
-      setError("Le nom d'utilisateur doit contenir au moins 3 caractères");
+    if (trimmedUsername && trimmedUsername.length < 3) {
+      setError("L'identifiant doit contenir au moins 3 caractères");
       return;
     }
 
@@ -58,22 +58,32 @@ export default function ResetPassword() {
     try {
       // Best-effort insert. Even if the username doesn't exist in our system,
       // we always show the same success message to prevent username enumeration.
-      await supabase
-        .from("password_reset_requests" as any)
-        .insert({ username: trimmedUsername, phone: trimmedPhone || null } as any);
+      try {
+        await supabase
+          .from("password_reset_requests" as any)
+          .insert({ 
+            username: trimmedUsername || trimmedEmail, 
+            phone: trimmedPhone || null 
+          } as any);
+      } catch {
+        // Silently ignore insert errors
+      }
 
       // Send the automatic, single-use reset link.
-      await supabase.functions
-        .invoke("send-password-reset", {
+      try {
+        await supabase.functions.invoke("send-password-reset", {
           body: {
-            username: trimmedUsername,
-            email: trimmedEmail || undefined,
+            username: trimmedUsername || undefined,
+            identifier: trimmedUsername || trimmedEmail,
+            email: trimmedEmail || (trimmedUsername.includes("@") ? trimmedUsername : undefined),
             phone: trimmedPhone || undefined,
+            origin: window.location.origin,
+            redirectTo: `${window.location.origin}/update-password`,
           },
-        })
-        .catch(() => {
-          /* never leak whether an account exists */
         });
+      } catch {
+        // Never leak whether an account exists
+      }
 
       setSuccess(true);
     } catch {
