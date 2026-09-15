@@ -63,6 +63,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import type { AppLanguage } from "@/i18n";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LogoOptimizerDialog } from "@/components/settings/LogoOptimizerDialog";
+import { RecoveryEmailCard } from "@/components/settings/RecoveryEmailCard";
 import { Sparkles } from "lucide-react";
 
 const TABS = [
