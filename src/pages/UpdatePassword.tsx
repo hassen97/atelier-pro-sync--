@@ -135,17 +135,31 @@ export default function UpdatePassword() {
     }
     setLoading(true);
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password });
-      if (updateError) {
-        setError(updateError.message);
-      } else {
-        setSuccess(true);
-        setTimeout(() => {
-          navigate("/auth", { replace: true });
-        }, 2500);
+      const token = sessionStorage.getItem('reset_token');
+      
+      if (!token) {
+        throw new Error("Token de vérification manquant");
       }
+
+      const { error: updateError } = await supabase.functions.invoke('update-password-with-token', {
+        body: { password },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (updateError) {
+        throw new Error(updateError.message || "Échec de la mise à jour");
+      }
+
+      sessionStorage.removeItem('reset_token');
+      setSuccess(true);
+      setTimeout(() => {
+        navigate("/auth", { replace: true });
+      }, 2500);
     } catch (err: any) {
-      setError(err?.message ?? "Une erreur est survenue lors de la mise à jour");
+      console.error("[UpdatePassword] Update error:", err);
+      setError(err.message || "Une erreur est survenue lors de la mise à jour du mot de passe");
     } finally {
       setLoading(false);
     }

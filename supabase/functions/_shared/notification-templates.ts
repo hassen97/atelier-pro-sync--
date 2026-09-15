@@ -184,12 +184,33 @@ function renderChangelog(t: EmailTemplateRow, v: TemplateVars): string {
   return shell({ accent, preheader: interpolate(t.preheader, v), logoBadge: '✨', content, footer: interpolate(t.footer, v) })
 }
 
+function renderResetCode(t: EmailTemplateRow, v: TemplateVars): string {
+  const accent = t.accent_color
+  const code = String(v.code ?? '').trim()
+  const codeDisplay = code
+    ? `<div style="text-align:center;margin:28px 0;">
+        <div style="display:inline-block;background:#f8fafc;border:2px dashed ${esc(accent)};border-radius:12px;padding:20px 32px;">
+          <div style="font-size:36px;font-weight:700;letter-spacing:8px;color:${esc(accent)};font-family:'Courier New',Courier,monospace;">${esc(code)}</div>
+        </div>
+      </div>`
+    : ''
+  const content = `
+    ${h1(interpolate(t.heading, v))}
+    ${p(interpolate(t.intro, v))}
+    ${codeDisplay}
+    ${p(interpolate(t.body, v))}`
+  return shell({ accent, preheader: interpolate(t.preheader, v), logoBadge: '🔐', content, footer: interpolate(t.footer, v) })
+}
+
 const RENDERERS: Record<string, (t: EmailTemplateRow, v: TemplateVars) => string> = {
+
   signup_admin: renderSignupAdmin,
   password_reset: renderPasswordReset,
+  reset_code: renderResetCode,
   subscription_expiry: renderSubscriptionExpiry,
   changelog: renderChangelog,
 }
+
 
 export function renderEmail(template: EmailTemplateRow, vars: TemplateVars = {}): { subject: string; html: string } {
   const renderer = RENDERERS[template.template_key]
@@ -216,6 +237,11 @@ export const SAMPLE_VARS: Record<string, TemplateVars> = {
   password_reset: {
     reset_url: 'https://www.getheavencoin.com/auth#recovery',
     expiry_hours: 1,
+  },
+  reset_code: {
+    code: '123456',
+    expiry_minutes: 10,
+    username: 'atelier_ahmed',
   },
   subscription_expiry: {
     shop_name: 'Atelier Ahmed',

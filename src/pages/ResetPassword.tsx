@@ -1,273 +1,136 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wrench, ArrowLeft, Send, AtSign, CheckCircle, Phone, MessageCircle, Loader2, Mail } from "lucide-react";
+import { KeyRound, ArrowLeft, Send, AtSign, Loader2, Mail, Lock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { SEO } from "@/components/seo/SEO";
+import { toast } from "sonner";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
+  const [step, setStep] = useState<'request' | 'verify'>('request');
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [adminWhatsapp, setAdminWhatsapp] = useState("");
 
-  // Load admin WhatsApp number
-  useEffect(() => {
-    supabase
-      .from("platform_settings" as any)
-      .select("value")
-      .eq("key", "admin_whatsapp")
-      .single()
-      .then(({ data }) => {
-        if (data && (data as any).value) setAdminWhatsapp((data as any).value);
-      });
-  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRequestCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
     const trimmedUsername = username.trim().toLowerCase();
     const trimmedEmail = email.trim().toLowerCase();
-    const trimmedPhone = phone.trim();
-
     if (!trimmedUsername && !trimmedEmail) {
       setError("Veuillez saisir votre nom d'utilisateur ou votre adresse e-mail");
       return;
     }
-
-    if (trimmedUsername && trimmedUsername.length < 3) {
-      setError("L'identifiant doit contenir au moins 3 caractères");
-      return;
-    }
-
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setError("Veuillez saisir une adresse e-mail valide");
-      return;
-    }
-
     setLoading(true);
     try {
-      // Best-effort insert. Even if the username doesn't exist in our system,
-      // we always show the same success message to prevent username enumeration.
-      try {
-        await supabase
-          .from("password_reset_requests" as any)
-          .insert({ 
-            username: trimmedUsername || trimmedEmail, 
-            phone: trimmedPhone || null 
-          } as any);
-      } catch {
-        // Silently ignore insert errors
-      }
-
-      // Send the automatic, single-use reset link.
-      try {
-        await supabase.functions.invoke("send-password-reset", {
-          body: {
-            username: trimmedUsername || undefined,
-            identifier: trimmedUsername || trimmedEmail,
-            email: trimmedEmail || (trimmedUsername.includes("@") ? trimmedUsername : undefined),
-            phone: trimmedPhone || undefined,
-          },
-        });
-      } catch {
-        // Never leak whether an account exists
-      }
-
-      setSuccess(true);
-    } catch {
-      // Silently swallow errors and still show success — we never want to
-      // leak whether an account exists via the reset flow.
-      setSuccess(true);
-    } finally {
-      setLoading(false);
-    }
+      await supabase.functions.invoke("request-reset-code", {
+        body: { username: trimmedUsername || undefined, identifier: trimmedUsername || trimmedEmail, email: trimmedEmail || undefined, phone: phone.trim() || undefined },
+      });
+      setStep('verify');
+      setResendCooldown(60);
+      const timer = setInterval(() => { setResendCooldown(prev => { if (prev <= 1) { clearInterval(timer); return 0; } return prev - 1; }); }, 1000);
+      toast.success("Code envoyé à votre adresse e-mail");
+    } catch { setStep('verify'); toast.success("Si ce compte existe, un code a été envoyé"); } finally { setLoading(false); }
   };
 
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!/^\d{6}$/.test(code.trim())) { setError("Le code doit contenir 6 chiffres"); return; }
+    setVerifying(true);
+    try {
+      const { data, error: verifyError } = await supabase.functions.invoke("verify-reset-code", { body: { identifier: username.trim().toLowerCase() || email.trim().toLowerCase(), code: code.trim() } });
+      if (verifyError || !data?.token) throw new Error(verifyError?.message || "Code invalide");
+      sessionStorage.setItem('reset_token', data.token);
+      navigate('/update-password');
+    } catch (err: any) { setError(err.message || "Code invalide ou expiré"); } finally { setVerifying(false); }
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0) return;
+    setError(null);
+    setCode("");
+    setResendCooldown(60);
+    const timer = setInterval(() => { setResendCooldown(prev => { if (prev <= 1) { clearInterval(timer); return 0; } return prev - 1; }); }, 1000);
+    try {
+      await supabase.functions.invoke("request-reset-code", { body: { identifier: username.trim().toLowerCase() || email.trim().toLowerCase(), email: email.trim().toLowerCase() || undefined, phone: phone.trim() || undefined } });
+      toast.success("Nouveau code envoyé");
+    } catch { toast.info("Un nouveau code a été envoyé si le compte existe"); }
+  };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
-      <SEO
-        title="Mot de passe oublié — RepairPro"
-        description="Réinitialisez votre mot de passe RepairPro en contactant l'équipe support."
-        path="/reset-password"
-      />
+    <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <SEO title="Réinitialisation du mot de passe" description="Réinitialisez votre mot de passe RepairPro" />
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-primary mb-4">
-            <Wrench className="h-8 w-8 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">Mot de passe oublié</h1>
-          <p className="text-muted-foreground mt-1">Récupération de compte</p>
-        </div>
-
-        <Card className="border-border/50 shadow-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5" />
-              Demande de réinitialisation
+        <Card className="border-none shadow-2xl">
+          <CardHeader className="space-y-3 pb-6">
+            <div className="mx-auto w-14 h-14 rounded-full bg-gradient-primary flex items-center justify-center shadow-lg">
+              <KeyRound className="h-7 w-7 text-white" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-center bg-gradient-primary bg-clip-text text-transparent">
+              {step === 'request' ? 'Mot de passe oublié' : 'Vérification'}
             </CardTitle>
-            <CardDescription>
-              Saisissez votre nom d'utilisateur — nous vous enverrons un lien
-              sécurisé pour choisir un nouveau mot de passe
+            <CardDescription className="text-center text-base">
+              {step === 'request' ? "Entrez votre identifiant pour recevoir un code de vérification" : "Entrez le code à 6 chiffres envoyé à votre e-mail"}
             </CardDescription>
-
           </CardHeader>
           <CardContent className="space-y-4">
-            {success ? (
-              <div className="space-y-4">
-                <Alert className="border-emerald-500/30 bg-emerald-500/10">
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
-                  <AlertDescription className="text-emerald-600 dark:text-emerald-400">
-                    Si un compte correspond aux informations fournies, un e-mail contenant
-                    un lien de réinitialisation vous a été envoyé. Vérifiez votre boîte de
-                    réception. L'administrateur peut également vous contacter par téléphone
-                    ou WhatsApp.
-                  </AlertDescription>
-                </Alert>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => navigate("/auth")}
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Retour à la connexion
-                </Button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
+            {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+            {step === 'request' ? (
+              <form onSubmit={handleRequestCode} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="reset-username">Nom d'utilisateur</Label>
+                  <Label htmlFor="username">Nom d'utilisateur</Label>
                   <div className="relative">
                     <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="reset-username"
-                      type="text"
-                      placeholder="votre_username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="pl-10"
-                      disabled={loading}
-                    />
+                    <Input id="username" type="text" placeholder="votre_nom_utilisateur" value={username} onChange={(e) => setUsername(e.target.value)} disabled={loading} className="pl-10" />
                   </div>
                 </div>
-
+                <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou</span></div></div>
                 <div className="space-y-2">
-                  <Label htmlFor="reset-email">Adresse e-mail</Label>
+                  <Label htmlFor="email">Adresse e-mail (facultatif)</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="reset-email"
-                      type="email"
-                      placeholder="vous@exemple.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      disabled={loading}
-                      autoComplete="email"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    L'e-mail enregistré sur votre compte. Si aucun e-mail n'est
-                    encore enregistré, saisissez le vôtre et ajoutez votre numéro
-                    de téléphone ci-dessous pour confirmer votre identité.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="reset-phone" className="text-muted-foreground text-sm">
-                    Numéro de téléphone du compte
-                  </Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="reset-phone"
-                      type="tel"
-                      placeholder="+216 XX XXX XXX"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="pl-10"
-                      disabled={loading}
-                    />
+                    <Input id="email" type="email" placeholder="vous@exemple.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} className="pl-10" />
                   </div>
                 </div>
-
-                <Alert className="border-primary/30 bg-primary/5">
-                  <AlertDescription className="text-sm">
-                    Le lien reçu est valable 1 heure et ne peut servir qu'une
-                    seule fois. Si nous ne parvenons pas à vous envoyer d'e-mail,
-                    l'administrateur reçoit votre demande et vous contacte par
-                    téléphone ou WhatsApp.
-                  </AlertDescription>
-                </Alert>
-
-
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-primary hover:opacity-90"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Envoi en cours...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Envoyer une demande de réinitialisation
-                    </>
-                  )}
+                <Button type="submit" className="w-full bg-gradient-primary hover:opacity-90" disabled={loading}>
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Envoi en cours...</> : <><Send className="mr-2 h-4 w-4" />Envoyer le code</>}
                 </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => navigate("/auth")}
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Retour à la connexion
+                <Button type="button" variant="outline" className="w-full" onClick={() => navigate("/auth")}><ArrowLeft className="h-4 w-4 mr-2" />Retour à la connexion</Button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyCode} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="code">Code de vérification</Label>
+                  <Input id="code" type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} disabled={verifying} className="text-center text-2xl tracking-widest font-mono" autoFocus />
+                  <p className="text-xs text-muted-foreground text-center">Le code expire dans 10 minutes</p>
+                </div>
+                <Button type="submit" className="w-full bg-gradient-primary hover:opacity-90" disabled={verifying || code.length !== 6}>
+                  {verifying ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Vérification...</> : <><Lock className="mr-2 h-4 w-4" />Vérifier le code</>}
+                </Button>
+                <Button type="button" variant="outline" className="w-full" onClick={handleResend} disabled={resendCooldown > 0}>
+                  {resendCooldown > 0 ? `Renvoyer dans ${resendCooldown}s` : <><Send className="h-4 w-4 mr-2" />Renvoyer le code</>}
+                </Button>
+                <Button type="button" variant="ghost" className="w-full" onClick={() => { setStep('request'); setCode(""); setError(null); }}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />Modifier l'identifiant
                 </Button>
               </form>
             )}
-
-            {/* Admin WhatsApp Contact */}
-            {adminWhatsapp && (
-              <div className="pt-2 border-t border-border/50">
-                <a
-                  href={`https://wa.me/${adminWhatsapp.replace(/[^0-9]/g, "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  Contacter l'admin via WhatsApp
-                </a>
-              </div>
-            )}
           </CardContent>
         </Card>
-
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          © 2024 RepairPro Tunisie. Tous droits réservés.
-        </p>
       </div>
     </main>
   );
 }
+
