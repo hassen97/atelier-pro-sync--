@@ -11,10 +11,14 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 //    stored (and used) when the phone number they provide matches the phone we
 //    already hold for that account. Otherwise nothing is sent.
 //  - Throttled per username (3/h) and per IP (5/h).
+//  - Password reset links always redirect to the configured production domain.
 
 const MAX_PER_USERNAME_PER_HOUR = 3
 const MAX_PER_IP_PER_HOUR = 5
-const DEFAULT_ORIGIN = 'https://repairpro-tunisia.com'
+
+// Production canonical domain - the only trusted origin for password reset links.
+// This must match the Supabase Auth Site URL configuration.
+const PRODUCTION_ORIGIN = 'https://www.getheavencoin.com'
 
 const digits = (v: string) => v.replace(/[^0-9]/g, '')
 
@@ -27,45 +31,34 @@ function phoneMatches(candidate: string, ...known: (string | null | undefined)[]
   })
 }
 
-function isSafeOrigin(candidate: string, configuredDomain?: string | null): boolean {
-  if (!candidate || typeof candidate !== 'string') return false
-  try {
-    const url = new URL(candidate)
-    const host = url.hostname.toLowerCase()
-    
-    // Local development
-    if (host === 'localhost' || host === '127.0.0.1') return true
-    
-    // Lovable preview / staging domains
-    if (
-      host.endsWith('.lovable.app') ||
-      host.endsWith('.lovableproject.com') ||
-      host.endsWith('.lovable.dev') ||
-      host.endsWith('.gpt-eng.com') ||
-      host.endsWith('.gptengineer.run')
-    ) {
-      return true
-    }
-    
-    // Production brand domains
-    if (host === 'repairpro-tunisia.com' || host.endsWith('.repairpro-tunisia.com')) {
-      return true
-    }
-    
-    // Custom configured domain from platform_settings
-    if (configuredDomain) {
-      const configuredHost = new URL(
-        configuredDomain.startsWith('http') ? configuredDomain : `https://${configuredDomain}`
-      ).hostname.toLowerCase()
-      if (host === configuredHost || host.endsWith(`.${configuredHost}`)) {
-        return true
+// Determine the trusted redirect origin for password reset.
+// Priority: configured public_site_domain (if HTTPS) > production origin
+async function resolveRedirectOrigin(admin: ReturnType<typeof createClient>): Promise<string> {
+  const { data: settingRow } = await admin
+    .from('platform_settings')
+    .select('value')
+    .eq('key', 'public_site_domain')
+    .maybeSingle()
+
+  const configuredDomain = settingRow?.value?.trim() || ''
+
+  if (configuredDomain) {
+    try {
+      const normalized = configuredDomain.startsWith('http')
+        ? configuredDomain
+        : `https://${configuredDomain}`
+      const url = new URL(normalized)
+      // Only accept HTTPS for production domains
+      if (url.protocol === 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+        return url.origin
       }
+    } catch {
+      // Invalid configured domain, fall through
     }
-    
-    return false
-  } catch {
-    return false
   }
+
+  // Default to production origin
+  return PRODUCTION_ORIGIN
 }
 
 Deno.serve(async (req) => {
@@ -89,8 +82,6 @@ Deno.serve(async (req) => {
       identifier?: string
       email?: string
       phone?: string
-      origin?: string
-      redirectTo?: string
     }
 
     const rawIdentifier = String(body.identifier || body.username || '').trim().toLowerCase()
@@ -132,17 +123,35 @@ Deno.serve(async (req) => {
     admin.from('password_reset_attempts').delete().lt('created_at', oneDayAgo).then(() => {})
 
     // ── Resolve the account ───────────────────────────────────────────────
-    let profileQuery = admin
-      .from('profiles')
-      .select('user_id, username, email, phone, whatsapp_phone')
+    // Look up by username OR e-mail. Use separate queries to avoid injection.
+    let profile: any = null
 
-    if (searchIdentifier.includes('@')) {
-      profileQuery = profileQuery.or(`email.ilike.${searchIdentifier},username.ilike.${searchIdentifier}`)
+    if (rawIdentifier && !rawIdentifier.includes('@')) {
+      // Username lookup
+      const { data: profiles } = await admin
+        .from('profiles')
+        .select('user_id,username,email,phone,whatsapp_phone')
+        .eq('username', searchIdentifier)
+        .limit(1)
+      profile = profiles?.[0]
     } else {
-      profileQuery = profileQuery.ilike('username', searchIdentifier)
+      // Email lookup - try email field first, then username field
+      const { data: byEmail } = await admin
+        .from('profiles')
+        .select('user_id,username,email,phone,whatsapp_phone')
+        .ilike('email', searchIdentifier)
+        .limit(1)
+      if (byEmail?.[0]) {
+        profile = byEmail[0]
+      } else {
+        const { data: byUsername } = await admin
+          .from('profiles')
+          .select('user_id,username,email,phone,whatsapp_phone')
+          .ilike('username', searchIdentifier)
+          .limit(1)
+        profile = byUsername?.[0]
+      }
     }
-
-    const { data: profile } = await profileQuery.maybeSingle()
 
     if (!profile?.user_id) return ok()
 
@@ -192,28 +201,9 @@ Deno.serve(async (req) => {
 
     if (!targetEmail) return ok()
 
-    // ── Resolve redirect URL / origin safely ──────────────────────────────
-    const { data: settingRow } = await admin
-      .from('platform_settings')
-      .select('value')
-      .eq('key', 'public_site_domain')
-      .maybeSingle()
-    const configuredDomain = settingRow?.value?.trim() || ''
-
-    const requestOrigin =
-      body.origin ||
-      req.headers.get('origin') ||
-      (req.headers.get('referer') ? new URL(req.headers.get('referer')!).origin : null) ||
-      Deno.env.get('APP_URL')
-
-    let resolvedOrigin = DEFAULT_ORIGIN
-    if (requestOrigin && isSafeOrigin(requestOrigin, configuredDomain)) {
-      resolvedOrigin = requestOrigin.replace(/\/+$/, '')
-    } else if (configuredDomain && isSafeOrigin(configuredDomain, configuredDomain)) {
-      resolvedOrigin = (configuredDomain.startsWith('http') ? configuredDomain : `https://${configuredDomain}`).replace(/\/+$/, '')
-    }
-
-    const redirectTo = `${resolvedOrigin}/update-password`
+    // ── Generate recovery link with trusted redirect ──────────────────────────
+    const redirectOrigin = await resolveRedirectOrigin(admin)
+    const redirectTo = `${redirectOrigin}/update-password`
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: 'recovery',

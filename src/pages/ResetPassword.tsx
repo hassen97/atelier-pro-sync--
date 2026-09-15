@@ -77,8 +77,6 @@ export default function ResetPassword() {
             identifier: trimmedUsername || trimmedEmail,
             email: trimmedEmail || (trimmedUsername.includes("@") ? trimmedUsername : undefined),
             phone: trimmedPhone || undefined,
-            origin: window.location.origin,
-            redirectTo: `${window.location.origin}/update-password`,
           },
         });
       } catch {
