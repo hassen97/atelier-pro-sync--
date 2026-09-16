@@ -1,136 +1,506 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  Phone,
+  RotateCcw,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { KeyRound, ArrowLeft, Send, AtSign, Loader2, Mail, Lock } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { SEO } from "@/components/seo/SEO";
+import { OtpInput } from "@/components/auth/OtpInput";
 import { toast } from "sonner";
+import repairProLogo from "@/assets/repairpro-logo.png";
+
+type Step = "request" | "code" | "password" | "done";
+
+const RESEND_COOLDOWN = 60;
+
+const STEP_META: Record<Step, { title: string; description: string }> = {
+  request: {
+    title: "Mot de passe oublié",
+    description: "Saisissez votre nom d'utilisateur, votre e-mail ou votre numéro de téléphone.",
+  },
+  code: {
+    title: "Code de vérification",
+    description: "Entrez le code à 6 chiffres envoyé à l'e-mail enregistré sur votre compte.",
+  },
+  password: {
+    title: "Nouveau mot de passe",
+    description: "Choisissez un mot de passe solide pour sécuriser votre atelier.",
+  },
+  done: {
+    title: "Mot de passe modifié",
+    description: "Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.",
+  },
+};
+
+const variants = {
+  enter: { opacity: 0, y: 12 },
+  center: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -12 },
+};
 
 export default function ResetPassword() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<'request' | 'verify'>('request');
-  const [username, setUsername] = useState("");
+
+  const [step, setStep] = useState<Step>("request");
+  const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
+  // The short-lived token issued by verify-reset-code. It is the ONLY way to
+  // reach the password step, and the server re-validates it on update.
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
-  const handleRequestCode = async (e: React.FormEvent) => {
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const startCooldown = () => {
+    setCooldown(RESEND_COOLDOWN);
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    timerRef.current = window.setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) window.clearInterval(timerRef.current);
+          timerRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const sendCode = async (silent = false) => {
+    const id = identifier.trim().toLowerCase();
+    const mail = email.trim().toLowerCase();
+    if (!id && !mail) {
+      toast.error("Saisissez votre nom d'utilisateur, votre e-mail ou votre téléphone.");
+      return false;
+    }
+    setSending(true);
+    try {
+      const { error } = await supabase.functions.invoke("request-reset-code", {
+        body: {
+          identifier: id || mail,
+          username: id && !id.includes("@") ? id : undefined,
+          email: mail || undefined,
+          phone: phone.trim() || undefined,
+        },
+      });
+      if (error) throw error;
+      startCooldown();
+      if (!silent) {
+        toast.success("Si ce compte existe, un code vient d'être envoyé par e-mail.");
+      } else {
+        toast.success("Nouveau code envoyé.");
+      }
+      return true;
+    } catch (err) {
+      console.error("[reset] request-reset-code failed", err);
+      toast.error("Impossible d'envoyer le code pour le moment. Réessayez dans un instant.");
+      return false;
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    const trimmedUsername = username.trim().toLowerCase();
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedUsername && !trimmedEmail) {
-      setError("Veuillez saisir votre nom d'utilisateur ou votre adresse e-mail");
+    const ok = await sendCode();
+    if (ok) {
+      setCode("");
+      setStep("code");
+    }
+  };
+
+  const handleVerify = async (submittedCode?: string) => {
+    const value = (submittedCode ?? code).trim();
+    if (!/^\d{6}$/.test(value)) {
+      toast.error("Le code doit contenir 6 chiffres.");
       return;
     }
-    setLoading(true);
-    try {
-      await supabase.functions.invoke("request-reset-code", {
-        body: { username: trimmedUsername || undefined, identifier: trimmedUsername || trimmedEmail, email: trimmedEmail || undefined, phone: phone.trim() || undefined },
-      });
-      setStep('verify');
-      setResendCooldown(60);
-      const timer = setInterval(() => { setResendCooldown(prev => { if (prev <= 1) { clearInterval(timer); return 0; } return prev - 1; }); }, 1000);
-      toast.success("Code envoyé à votre adresse e-mail");
-    } catch { setStep('verify'); toast.success("Si ce compte existe, un code a été envoyé"); } finally { setLoading(false); }
-  };
-
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (!/^\d{6}$/.test(code.trim())) { setError("Le code doit contenir 6 chiffres"); return; }
     setVerifying(true);
     try {
-      const { data, error: verifyError } = await supabase.functions.invoke("verify-reset-code", { body: { identifier: username.trim().toLowerCase() || email.trim().toLowerCase(), code: code.trim() } });
-      if (verifyError || !data?.token) throw new Error(verifyError?.message || "Code invalide");
-      sessionStorage.setItem('reset_token', data.token);
-      navigate('/update-password');
-    } catch (err: any) { setError(err.message || "Code invalide ou expiré"); } finally { setVerifying(false); }
+      const { data, error } = await supabase.functions.invoke("verify-reset-code", {
+        body: {
+          identifier: identifier.trim().toLowerCase() || email.trim().toLowerCase(),
+          code: value,
+        },
+      });
+      const token = (data as { token?: string } | null)?.token;
+      if (error || !token) {
+        const message =
+          (data as { error?: string } | null)?.error || "Code invalide ou expiré. Demandez un nouveau code.";
+        throw new Error(message);
+      }
+      setResetToken(token);
+      setPassword("");
+      setConfirm("");
+      setStep("password");
+      toast.success("Code vérifié. Choisissez votre nouveau mot de passe.");
+    } catch (err) {
+      console.error("[reset] verify-reset-code failed", err);
+      setCode("");
+      toast.error(err instanceof Error ? err.message : "Code invalide ou expiré.");
+    } finally {
+      setVerifying(false);
+    }
   };
 
-  const handleResend = async () => {
-    if (resendCooldown > 0) return;
-    setError(null);
-    setCode("");
-    setResendCooldown(60);
-    const timer = setInterval(() => { setResendCooldown(prev => { if (prev <= 1) { clearInterval(timer); return 0; } return prev - 1; }); }, 1000);
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetToken) {
+      toast.error("Session de vérification expirée. Recommencez la procédure.");
+      setStep("request");
+      return;
+    }
+    if (password.length < 6) {
+      toast.error("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+    if (password !== confirm) {
+      toast.error("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+    setSaving(true);
     try {
-      await supabase.functions.invoke("request-reset-code", { body: { identifier: username.trim().toLowerCase() || email.trim().toLowerCase(), email: email.trim().toLowerCase() || undefined, phone: phone.trim() || undefined } });
-      toast.success("Nouveau code envoyé");
-    } catch { toast.info("Un nouveau code a été envoyé si le compte existe"); }
+      const { data, error } = await supabase.functions.invoke("update-password-with-token", {
+        body: { password },
+        headers: { Authorization: `Bearer ${resetToken}` },
+      });
+      if (error || !(data as { ok?: boolean } | null)?.ok) {
+        const message =
+          (data as { error?: string } | null)?.error ||
+          "Impossible de mettre à jour le mot de passe. Demandez un nouveau code.";
+        throw new Error(message);
+      }
+      setResetToken(null);
+      setPassword("");
+      setConfirm("");
+      setStep("done");
+      toast.success("Mot de passe mis à jour.");
+    } catch (err) {
+      console.error("[reset] update-password-with-token failed", err);
+      toast.error(err instanceof Error ? err.message : "Une erreur est survenue.");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const meta = STEP_META[step];
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <SEO title="Réinitialisation du mot de passe" description="Réinitialisez votre mot de passe RepairPro" path="/reset-password" />
-      <div className="w-full max-w-md">
-        <Card className="border-none shadow-2xl">
-          <CardHeader className="space-y-3 pb-6">
-            <div className="mx-auto w-14 h-14 rounded-full bg-gradient-primary flex items-center justify-center shadow-lg">
-              <KeyRound className="h-7 w-7 text-white" />
-            </div>
-            <CardTitle className="text-2xl font-bold text-center bg-gradient-primary bg-clip-text text-transparent">
-              {step === 'request' ? 'Mot de passe oublié' : 'Vérification'}
-            </CardTitle>
-            <CardDescription className="text-center text-base">
-              {step === 'request' ? "Entrez votre identifiant pour recevoir un code de vérification" : "Entrez le code à 6 chiffres envoyé à votre e-mail"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-            {step === 'request' ? (
-              <form onSubmit={handleRequestCode} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Nom d'utilisateur</Label>
-                  <div className="relative">
-                    <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="username" type="text" placeholder="votre_nom_utilisateur" value={username} onChange={(e) => setUsername(e.target.value)} disabled={loading} className="pl-10" />
+    <main className="min-h-screen flex items-center justify-center relative overflow-hidden bg-zinc-950 p-4">
+      <SEO
+        title="Réinitialisation du mot de passe — RepairPro"
+        description="Réinitialisez le mot de passe de votre atelier RepairPro avec un code de vérification sécurisé."
+        path="/reset-password"
+      />
+      <div className="absolute inset-0 auth-grid-bg opacity-30" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-[hsla(217,91%,50%,0.07)] blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full bg-[hsla(217,91%,60%,0.04)] blur-[80px] pointer-events-none" />
+
+      <div className="relative z-10 w-full max-w-md">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center mb-3 auth-glow">
+            <img src={repairProLogo} alt="RepairPro" className="w-14 h-14 rounded-2xl" width={56} height={56} />
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">{meta.title}</h1>
+          <p className="text-zinc-500 mt-1 text-sm">{meta.description}</p>
+        </div>
+
+        {/* Step indicator */}
+        <div className="flex items-center justify-center gap-2 mb-5">
+          {(["request", "code", "password"] as Step[]).map((s, index) => {
+            const order: Step[] = ["request", "code", "password", "done"];
+            const currentIndex = order.indexOf(step);
+            const active = currentIndex >= index;
+            return (
+              <div
+                key={s}
+                className={`h-1.5 w-12 rounded-full transition-colors duration-300 ${
+                  active ? "bg-[hsla(217,91%,60%,0.8)]" : "bg-white/10"
+                }`}
+              />
+            );
+          })}
+        </div>
+
+        <div className="auth-card rounded-2xl p-6">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={step}
+              variants={variants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              {step === "request" && (
+                <form onSubmit={handleRequest} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="identifier" className="text-zinc-400 text-sm">
+                      Nom d'utilisateur, e-mail ou téléphone
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
+                      <Input
+                        id="identifier"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        placeholder="ahmed123, vous@exemple.com ou 20 123 456"
+                        disabled={sending}
+                        className="pl-10 auth-input"
+                        autoComplete="username"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-white/8 bg-white/[0.03] p-4 space-y-3">
+                    <p className="text-xs text-zinc-500 leading-relaxed">
+                      Aucun e-mail encore enregistré sur votre compte ? Saisissez le vôtre et confirmez votre
+                      identité avec le numéro de téléphone de la boutique.
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-zinc-400 text-sm">
+                        Adresse e-mail (facultatif)
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
+                        <Input
+                          id="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="vous@exemple.com"
+                          disabled={sending}
+                          className="pl-10 auth-input"
+                          autoComplete="email"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-zinc-400 text-sm">
+                        Téléphone (facultatif)
+                      </Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
+                        <Input
+                          id="phone"
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="20 123 456"
+                          disabled={sending}
+                          className="pl-10 auth-input"
+                          autoComplete="tel"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={sending}>
+                    {sending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Envoi du code...
+                      </>
+                    ) : (
+                      <>
+                        Recevoir mon code
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-zinc-400 hover:text-white"
+                    onClick={() => navigate("/auth")}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Retour à la connexion
+                  </Button>
+                </form>
+              )}
+
+              {step === "code" && (
+                <div className="space-y-5">
+                  <OtpInput
+                    value={code}
+                    onChange={setCode}
+                    onComplete={(value) => handleVerify(value)}
+                    disabled={verifying}
+                    autoFocus
+                  />
+                  <p className="text-center text-xs text-zinc-500">
+                    Le code expire dans 10 minutes. 5 tentatives maximum.
+                  </p>
+                  <Button
+                    type="button"
+                    className="w-full"
+                    disabled={verifying || code.length !== 6}
+                    onClick={() => handleVerify()}
+                  >
+                    {verifying ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Vérification...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Vérifier le code
+                      </>
+                    )}
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 border-white/10 bg-white/[0.03] text-zinc-300 hover:text-white"
+                      disabled={cooldown > 0 || sending}
+                      onClick={() => sendCode(true)}
+                    >
+                      {cooldown > 0 ? (
+                        `Renvoyer dans ${cooldown}s`
+                      ) : (
+                        <>
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Renvoyer
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="flex-1 text-zinc-400 hover:text-white"
+                      onClick={() => {
+                        setCode("");
+                        setStep("request");
+                      }}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Modifier
+                    </Button>
                   </div>
                 </div>
-                <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Ou</span></div></div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Adresse e-mail (facultatif)</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="email" type="email" placeholder="vous@exemple.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} className="pl-10" />
+              )}
+
+              {step === "password" && (
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password" className="text-zinc-400 text-sm">
+                      Nouveau mot de passe
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
+                      <Input
+                        id="new-password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        disabled={saving}
+                        className="pl-10 pr-10 auth-input"
+                        autoComplete="new-password"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                        aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password" className="text-zinc-400 text-sm">
+                      Confirmer le mot de passe
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
+                      <Input
+                        id="confirm-password"
+                        type={showPassword ? "text" : "password"}
+                        value={confirm}
+                        onChange={(e) => setConfirm(e.target.value)}
+                        placeholder="••••••••"
+                        disabled={saving}
+                        className="pl-10 auth-input"
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-500">Minimum 6 caractères. Évitez un mot de passe déjà utilisé.</p>
+                  <Button type="submit" className="w-full" disabled={saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Enregistrement...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Enregistrer le mot de passe
+                      </>
+                    )}
+                  </Button>
+                </form>
+              )}
+
+              {step === "done" && (
+                <div className="space-y-5 text-center">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <CheckCircle2 className="h-7 w-7 text-emerald-400" />
+                  </div>
+                  <p className="text-sm text-zinc-400">
+                    Votre mot de passe a été mis à jour. Connectez-vous avec vos nouveaux identifiants.
+                  </p>
+                  <Button className="w-full" onClick={() => navigate("/auth")}>
+                    Aller à la connexion
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
                 </div>
-                <Button type="submit" className="w-full bg-gradient-primary hover:opacity-90" disabled={loading}>
-                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Envoi en cours...</> : <><Send className="mr-2 h-4 w-4" />Envoyer le code</>}
-                </Button>
-                <Button type="button" variant="outline" className="w-full" onClick={() => navigate("/auth")}><ArrowLeft className="h-4 w-4 mr-2" />Retour à la connexion</Button>
-              </form>
-            ) : (
-              <form onSubmit={handleVerifyCode} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="code">Code de vérification</Label>
-                  <Input id="code" type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} disabled={verifying} className="text-center text-2xl tracking-widest font-mono" autoFocus />
-                  <p className="text-xs text-muted-foreground text-center">Le code expire dans 10 minutes</p>
-                </div>
-                <Button type="submit" className="w-full bg-gradient-primary hover:opacity-90" disabled={verifying || code.length !== 6}>
-                  {verifying ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Vérification...</> : <><Lock className="mr-2 h-4 w-4" />Vérifier le code</>}
-                </Button>
-                <Button type="button" variant="outline" className="w-full" onClick={handleResend} disabled={resendCooldown > 0}>
-                  {resendCooldown > 0 ? `Renvoyer dans ${resendCooldown}s` : <><Send className="h-4 w-4 mr-2" />Renvoyer le code</>}
-                </Button>
-                <Button type="button" variant="ghost" className="w-full" onClick={() => { setStep('request'); setCode(""); setError(null); }}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />Modifier l'identifiant
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <p className="text-center text-xs text-zinc-600 mt-5">
+          Pour votre sécurité, nous n'envoyons jamais de mot de passe par e-mail.
+        </p>
       </div>
     </main>
   );
 }
-
