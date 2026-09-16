@@ -1,0 +1,1 @@
+React + Vite SPA using Supabase for auth/data, React Query for server state (via queryKeys in lib), Radix-based shadcn/ui components under `components/ui/`, Workbox service worker for PWA, and i18next-style locale files under `i18n/locales/{en,ar,fr}/common.json`.

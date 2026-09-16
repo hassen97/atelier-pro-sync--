@@ -1,0 +1,6 @@
+- User-facing error and success messages are displayed through shadcn `Alert` / `AlertDescription` components with descriptive variants (`destructive`, default) rather than inline text.
+- Form inputs use the shared `@/components/ui/input` wrapped in a relative container with a left-positioned icon from `lucide-react` plus a `<Label>` above, giving consistent visual structure across all fields.
+- Long-running operations set a dedicated loading boolean (`loading`, `sending`, `verifying`, `saving`) and disable the submit button while the request is in flight, with a spinner icon shown inside the button.
+- Supabase interactions go through `supabase.functions.invoke(...)` for security-sensitive steps (signup guard, reset code, password update, trial grant, admin notification) instead of direct DB writes from the client.
+- Rate limiting and anti-abuse are enforced server-side via Edge Functions (`signup-guard`, `verify-reset-code`) and the client only reacts to returned `allowed`/`reason` flags or error messages.
+- Navigation after successful actions uses `navigate(from, { replace: true })` where `from` is resolved from `location.search.redirect` or `location.state.from.pathname`, centralizing redirect logic.

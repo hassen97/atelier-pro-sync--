@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: frontend_app/auth_area
+title: Authentication & Password Reset Pages
+scope:
+    - src/pages/Auth.tsx
+    - src/pages/ResetPassword.tsx
+    - src/pages/UpdatePassword.tsx
+source_files: []
+depends_on: []
+related_to: []

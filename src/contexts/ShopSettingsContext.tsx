@@ -6,6 +6,7 @@ interface ShopSettingsContextType {
   loading: boolean;
   saving: boolean;
   saveSettings: (newSettings: Partial<ShopSettings>) => Promise<boolean>;
+  updateHiddenNavItems: (items: string[]) => Promise<boolean>;
   refetch: () => Promise<void>;
 }
 

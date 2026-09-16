@@ -1,0 +1,3 @@
+- Environment variables for Supabase are prefixed with `VITE_` and consumed at build time via `import.meta.env`.
+- Heavy third-party libraries (Three.js, xlsx, jspdf, jsbarcode, chart libs) are excluded from the precache manifest and loaded lazily at runtime to keep the initial payload small.
+- React/Radix UI components are composed with `class-variance-authority` and `tailwind-merge` for variant-driven styling.

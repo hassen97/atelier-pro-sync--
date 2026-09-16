@@ -1,0 +1,1 @@
+The service worker file `src/sw.ts` relies on `vite-plugin-pwa`'s `injectManifest` to populate `self.__WB_MANIFEST` at build time; changing routing or asset patterns requires a rebuild so the precache manifest stays in sync.

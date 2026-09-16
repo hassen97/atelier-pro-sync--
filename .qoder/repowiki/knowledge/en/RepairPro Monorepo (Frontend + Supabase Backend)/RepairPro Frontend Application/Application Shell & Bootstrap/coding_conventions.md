@@ -1,0 +1,5 @@
+- Every page route is loaded lazily via a shared `lazyWithRetry` wrapper that attempts a hard reload once on first chunk import failure before falling back to a direct retry.
+- Protected routes are wrapped with `ProtectedRoute` and often additionally gated by `AuthUpdateGate` to enforce auth state freshness before rendering feature components.
+- Global cross-cutting concerns (auth, shop settings, brand theme, notifications, impersonation) are provided as nested context providers inside the router tree rather than per-page.
+- Caching behavior is centralized: React Query uses a uniform 5-minute stale / 15-minute gcTime policy, while the service worker applies strategy-per-route (NetworkFirst for HTML, StaleWhileRevalidate for heavy assets).
+- Theming is expressed as CSS custom properties under `:root` and `.dark` selectors and consumed via Tailwind's `@apply` directives throughout `index.css`.

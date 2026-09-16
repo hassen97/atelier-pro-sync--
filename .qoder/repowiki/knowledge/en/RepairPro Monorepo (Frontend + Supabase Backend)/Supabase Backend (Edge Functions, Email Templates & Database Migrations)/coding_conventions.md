@@ -1,0 +1,7 @@
+- Every Edge Function exports a single `Deno.serve(async (req) => ...)` handler that returns a `Response` with explicit JSON content type and standardized error shapes `{ error: string }`.
+- Functions read all secrets from `Deno.env.get(...)` rather than importing them, and return a 500 JSON error when required keys are missing instead of throwing.
+- Database access uses a service-role `createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)` instance and invokes business logic through Supabase RPCs (`enqueue_email`, `read_email_batch`, `delete_email`, `move_to_dlq`, `has_role`) instead of direct table mutations.
+- Email sending is decoupled from rendering: handlers render React Email templates to HTML/text, then enqueue a payload via `enqueue_email` RPC; actual delivery is handled exclusively by `process-email-queue`.
+- Queued payloads carry a stable `message_id` (via `crypto.randomUUID()`) and a `queued_at` ISO timestamp so the processor can deduplicate, track retry counts, and enforce per-queue TTL expiration.
+- Error handling distinguishes 429 rate-limit (writes `rate_limited` status and sets `retry_after_until` on `email_send_state` to pause processing) from 403 disabled-project errors (immediately moves to DLQ) and other failures (increments failed-attempt counter and retries on VT expiry).
+- SQL migrations follow a strict `YYYYMMDDHHMMSS_<uuid>.sql` filename convention and are kept as additive DDL scripts without inline comments, relying on file ordering for execution sequence.

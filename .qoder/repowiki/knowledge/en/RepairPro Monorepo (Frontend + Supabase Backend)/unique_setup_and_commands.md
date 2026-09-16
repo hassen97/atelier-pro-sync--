@@ -1,0 +1,1 @@
+`npm run dev` starts the Vite dev server on port 8080 with HMR; `npm run build` produces the production bundle; `npm run test` runs Vitest; deploy target is configured via `vercel.json` with a catch-all rewrite to `index.html`.

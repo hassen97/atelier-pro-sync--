@@ -1,0 +1,4 @@
+- Feature areas group related pages, components, and hooks under a single folder (e.g. `components/admin/`, `components/repairs/`, `components/inventory/`) rather than splitting by file type.
+- Data access is centralized in `hooks/use*.ts` files that encapsulate Supabase queries/mutations and expose typed results to components.
+- Shared primitive UI elements live in `components/ui/` and are composed into higher-level feature components instead of being duplicated per feature.
+- Global cross-cutting state (auth, shop settings, notifications, impersonation, branding) is exposed through React contexts in `contexts/` and consumed by components via hooks or direct context usage.

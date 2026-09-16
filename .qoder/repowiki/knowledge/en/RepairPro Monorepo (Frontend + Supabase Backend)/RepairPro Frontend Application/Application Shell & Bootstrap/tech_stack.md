@@ -1,0 +1,1 @@
+React 18 (`react-dom/client`), `react-router-dom` v6, `@tanstack/react-query` with stale-while-revalidate caching, `react-helmet-async` for document head management, Workbox (`workbox-precaching`, `workbox-routing`, `workbox-strategies`, `workbox-expiration`) via `vite-plugin-pwa` injectManifest for a single PWA service worker, Tailwind CSS with CSS variables theming.

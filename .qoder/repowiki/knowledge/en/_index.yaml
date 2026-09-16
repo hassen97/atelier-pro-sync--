@@ -1,0 +1,103 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: Q0DeR-MaG1C-BrAnCh-Fo2-NoN-GiT-Or-No-C0MmIt
+nodes_managed: true
+exported_at: "2026-09-16T15:21:23Z"
+modules:
+    "":
+        dir_name: RepairPro Monorepo (Frontend + Supabase Backend)
+        title: RepairPro Monorepo (Frontend + Supabase Backend)
+        scope:
+            - README.md
+            - package.json
+            - vite.config.ts
+            - tsconfig.json
+            - tailwind.config.ts
+            - postcss.config.js
+            - eslint.config.js
+            - vitest.config.ts
+            - .gitignore
+            - vercel.json
+            - components.json
+            - index.html
+            - public/
+            - .github/
+            - .lovable/
+            - .env
+            - AGENTS.md
+            - admin-dashboard.png
+            - admin-overview-getheavencoin.png
+            - auth-page.png
+            - avatar-after-click.png
+            - bell-after-click.png
+            - bun.lock
+            - flowtest20-final-checkout.png
+            - flowtest21-fast-onboarding-checkout.png
+            - flowtest22-filled-repair-form-before-save.png
+            - flowtest22-repair-list-after-save.png
+            - impersonate-manual-dashboard-works.png
+            - impersonate-result-landing.png
+            - package-lock.json
+            - test1-bell-popover-open.png
+            - test2-avatar-menu-open.png
+            - test3-impersonation-readonly-dashboard.png
+            - testa-login-failed.png
+            - trial-step3-before-click.png
+            - trial-step4-loading-spinner.png
+            - trial-step5-final-state.png
+            - trial-step7-already-active.png
+            - tsconfig.app.json
+            - tsconfig.node.json
+            - vite.config.ts.timestamp-1789442328154-eaf819750fcf28.mjs
+        source_files: []
+        children:
+            - frontend_app
+            - supabase_backend
+        depends_on: []
+        related_to: []
+    frontend_app:
+        dir_name: RepairPro Frontend Application
+        title: RepairPro Frontend Application
+        scope:
+            - src/
+        source_files: []
+        children:
+            - frontend_app/app_shell
+            - frontend_app/auth_area
+        depends_on: []
+        related_to: []
+    frontend_app/app_shell:
+        dir_name: Application Shell & Bootstrap
+        title: Application Shell & Bootstrap
+        scope:
+            - src/App.tsx
+            - src/main.tsx
+            - src/sw.ts
+            - src/index.css
+            - src/App.css
+            - src/vite-env.d.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    frontend_app/auth_area:
+        dir_name: Authentication & Password Reset Pages
+        title: Authentication & Password Reset Pages
+        scope:
+            - src/pages/Auth.tsx
+            - src/pages/ResetPassword.tsx
+            - src/pages/UpdatePassword.tsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    supabase_backend:
+        dir_name: Supabase Backend (Edge Functions, Email Templates & Database Migrations)
+        title: Supabase Backend (Edge Functions, Email Templates & Database Migrations)
+        scope:
+            - supabase/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

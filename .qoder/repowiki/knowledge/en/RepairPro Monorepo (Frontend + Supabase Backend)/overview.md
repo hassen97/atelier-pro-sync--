@@ -1,0 +1,1 @@
+Top-level workspace that builds the RepairPro React SPA with Vite and deploys it alongside a Supabase project whose Edge Functions, migrations, and email templates are versioned in this repository.

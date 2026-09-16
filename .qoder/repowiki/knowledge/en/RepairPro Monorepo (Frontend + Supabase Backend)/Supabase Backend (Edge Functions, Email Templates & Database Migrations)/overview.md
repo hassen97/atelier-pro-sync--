@@ -1,0 +1,1 @@
+Supabase project backend providing Deno Edge Functions for authentication hooks, transactional email queuing through Resend, admin operations, and a versioned SQL migration set that defines the application database schema.

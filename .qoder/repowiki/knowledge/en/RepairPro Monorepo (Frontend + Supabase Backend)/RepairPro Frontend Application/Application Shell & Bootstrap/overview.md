@@ -1,0 +1,1 @@
+Bootstraps the RepairPro React SPA by mounting the root component, wiring global providers, defining routes with lazy-loaded pages, and registering a single Workbox-powered service worker for PWA offline support.

@@ -24,6 +24,8 @@ import {
   KeyRound,
   Activity,
   Gift,
+  SlidersHorizontal,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,9 @@ import {
 } from "@/components/ui/tooltip";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { useAllowedPages } from "@/hooks/useTeam";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "react-i18next";
 import { useUnreadMessageCount } from "@/hooks/useCommunity";
 
@@ -75,16 +80,38 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: AppSidebarProps) {
   const location = useLocation();
-  const { settings } = useShopSettingsContext();
+  const { settings, updateHiddenNavItems } = useShopSettingsContext();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const { allowedPages } = useAllowedPages();
+  const { allowedPages, isTeamMember } = useAllowedPages();
   const { t } = useTranslation();
   const { data: unreadCount = 0 } = useUnreadMessageCount();
+  const { isReadOnly, isImpersonating } = useImpersonation();
 
-  // Filter navigation based on allowed pages
-  const filteredNavigation = allowedPages
+  // Only the shop owner can change the menu. shop_settings writes are owner-only
+  // (RLS), so hide the control for employees, impersonating admins, and read-only/demo.
+  const canCustomize = !isTeamMember && !isImpersonating && !isReadOnly;
+
+  const hiddenItems = settings.hidden_nav_items ?? [];
+
+  // Items this user is allowed to see/manage (employees are limited to allowed_pages).
+  const customizableItems = allowedPages
     ? navigation.filter((item) => allowedPages.includes(item.href))
     : navigation;
+
+  // Filter navigation based on allowed pages AND the owner's hidden preference.
+  const filteredNavigation = customizableItems.filter(
+    (item) => !hiddenItems.includes(item.href)
+  );
+
+  const labelFor = (item: { nameKey: string; labelOverride?: string }) =>
+    item.labelOverride ?? t(item.nameKey as any);
+
+  const toggleItem = (href: string, visible: boolean) => {
+    const next = new Set(hiddenItems);
+    if (visible) next.delete(href);
+    else next.add(href);
+    updateHiddenNavItems(Array.from(next));
+  };
 
   const isActive = (path: string) => {
     if (path === "/dashboard") return location.pathname === "/dashboard";
@@ -203,6 +230,70 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
 
       {/* Bottom Navigation */}
       <div className="px-3 py-3 border-t border-sidebar-border space-y-1">
+        {/* Customize menu (owner only) */}
+        {canCustomize && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all w-full",
+                  "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  collapsed && !isMobile && "justify-center px-2"
+                )}
+              >
+                <SlidersHorizontal className="h-5 w-5 shrink-0" />
+                {(!collapsed || isMobile) && (
+                  <span className="truncate">Personnaliser le menu</span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="start" className="w-64 p-2">
+              <div className="px-2 py-1.5">
+                <p className="text-sm font-semibold">Menus visibles</p>
+                <p className="text-xs text-muted-foreground">
+                  Masquez les éléments inutiles pour votre boutique.
+                </p>
+              </div>
+              <ScrollArea className="max-h-72">
+                <div className="flex flex-col gap-0.5 px-1">
+                  {customizableItems.map((item) => {
+                    const locked = item.href === "/dashboard";
+                    const visible = locked || !hiddenItems.includes(item.href);
+                    const Icon = item.icon;
+                    return (
+                      <div
+                        key={item.href}
+                        className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-accent"
+                      >
+                        <span className="flex items-center gap-2 min-w-0 text-sm">
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{labelFor(item)}</span>
+                        </span>
+                        <Switch
+                          checked={visible}
+                          disabled={locked}
+                          onCheckedChange={(checked) => toggleItem(item.href, checked)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+              {hiddenItems.length > 0 && (
+                <div className="mt-1 border-t pt-2 px-1">
+                  <button
+                    onClick={() => updateHiddenNavItems([])}
+                    className="w-full flex items-center justify-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-primary hover:bg-accent transition-colors"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Tout réafficher
+                  </button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+        )}
+
         {/* Feedback Button */}
         <button
           onClick={() => setFeedbackOpen(true)}

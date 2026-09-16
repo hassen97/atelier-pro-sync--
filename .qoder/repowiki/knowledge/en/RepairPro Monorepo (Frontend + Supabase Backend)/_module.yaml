@@ -1,0 +1,48 @@
+schema_version: 1
+module_path: ""
+title: RepairPro Monorepo (Frontend + Supabase Backend)
+scope:
+    - README.md
+    - package.json
+    - vite.config.ts
+    - tsconfig.json
+    - tailwind.config.ts
+    - postcss.config.js
+    - eslint.config.js
+    - vitest.config.ts
+    - .gitignore
+    - vercel.json
+    - components.json
+    - index.html
+    - public/
+    - .github/
+    - .lovable/
+    - .env
+    - AGENTS.md
+    - admin-dashboard.png
+    - admin-overview-getheavencoin.png
+    - auth-page.png
+    - avatar-after-click.png
+    - bell-after-click.png
+    - bun.lock
+    - flowtest20-final-checkout.png
+    - flowtest21-fast-onboarding-checkout.png
+    - flowtest22-filled-repair-form-before-save.png
+    - flowtest22-repair-list-after-save.png
+    - impersonate-manual-dashboard-works.png
+    - impersonate-result-landing.png
+    - package-lock.json
+    - test1-bell-popover-open.png
+    - test2-avatar-menu-open.png
+    - test3-impersonation-readonly-dashboard.png
+    - testa-login-failed.png
+    - trial-step3-before-click.png
+    - trial-step4-loading-spinner.png
+    - trial-step5-final-state.png
+    - trial-step7-already-active.png
+    - tsconfig.app.json
+    - tsconfig.node.json
+    - vite.config.ts.timestamp-1789442328154-eaf819750fcf28.mjs
+source_files: []
+depends_on: []
+related_to: []

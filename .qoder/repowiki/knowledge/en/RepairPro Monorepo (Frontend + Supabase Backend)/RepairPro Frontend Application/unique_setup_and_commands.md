@@ -1,0 +1,1 @@
+Entry point is `src/main.tsx` bootstrapped by Vite; the root component in `src/App.tsx` defines the route tree and mounts all global contexts, while `src/sw.ts` is built as a separate service worker bundle for PWA offline support.

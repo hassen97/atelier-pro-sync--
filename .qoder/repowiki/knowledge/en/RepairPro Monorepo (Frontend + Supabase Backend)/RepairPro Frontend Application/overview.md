@@ -1,0 +1,1 @@
+React SPA for RepairPro that wires Supabase-backed business pages, admin tools, and shared UI into a routed application with global contexts and service-worker PWA support.

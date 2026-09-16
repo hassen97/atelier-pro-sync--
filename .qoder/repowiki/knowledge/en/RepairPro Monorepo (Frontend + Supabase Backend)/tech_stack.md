@@ -1,0 +1,1 @@
+Vite 5 + React 18 + TypeScript SPA built with SWC, Tailwind CSS, Radix UI, TanStack Query, i18next, and a custom service worker via `vite-plugin-pwa`; deployed to Vercel and backed by Supabase (Edge Functions, Postgres migrations, Resend email).

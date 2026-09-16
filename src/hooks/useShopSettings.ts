@@ -35,6 +35,8 @@ export interface ShopSettings {
   loyalty_redeem_points: number;
   loyalty_redeem_value: number;
   loyalty_min_redeem: number;
+  // Per-shop-owner hidden sidebar menu hrefs
+  hidden_nav_items: string[];
 }
 
 const defaultSettings: ShopSettings = {
@@ -64,6 +66,7 @@ const defaultSettings: ShopSettings = {
   loyalty_redeem_points: 100,
   loyalty_redeem_value: 5,
   loyalty_min_redeem: 100,
+  hidden_nav_items: [],
 };
 
 export function useShopSettings() {
@@ -122,6 +125,7 @@ export function useShopSettings() {
           loyalty_redeem_points: Number((data as any).loyalty_redeem_points ?? 100),
           loyalty_redeem_value: Number((data as any).loyalty_redeem_value ?? 5),
           loyalty_min_redeem: Number((data as any).loyalty_min_redeem ?? 100),
+          hidden_nav_items: (data as any).hidden_nav_items ?? [],
         });
       }
     } catch (error) {
@@ -182,6 +186,7 @@ export function useShopSettings() {
             loyalty_redeem_points: updatedSettings.loyalty_redeem_points,
             loyalty_redeem_value: updatedSettings.loyalty_redeem_value,
             loyalty_min_redeem: updatedSettings.loyalty_min_redeem,
+            hidden_nav_items: updatedSettings.hidden_nav_items,
             updated_at: new Date().toISOString(),
           } as any)
           .eq("id", settings.id);
@@ -219,6 +224,7 @@ export function useShopSettings() {
             loyalty_redeem_points: updatedSettings.loyalty_redeem_points,
             loyalty_redeem_value: updatedSettings.loyalty_redeem_value,
             loyalty_min_redeem: updatedSettings.loyalty_min_redeem,
+            hidden_nav_items: updatedSettings.hidden_nav_items,
           } as any)
           .select()
           .single();
@@ -239,11 +245,50 @@ export function useShopSettings() {
     }
   };
 
+  /**
+   * Per-shop-owner sidebar menu visibility. Optimistically updates local state and
+   * persists ONLY the hidden_nav_items column (keyed by the owner/effective user id).
+   * Owner-only: employees and impersonating admins are blocked (RLS also denies writes).
+   */
+  const updateHiddenNavItems = async (items: string[]) => {
+    if (!user) {
+      toast.error("Vous devez être connecté");
+      return false;
+    }
+
+    if (effectiveUserId && effectiveUserId !== user.id && !impersonatedUserId) {
+      toast.error("Action réservée au propriétaire de la boutique");
+      return false;
+    }
+
+    const targetUserId = effectiveUserId || user.id;
+    const previous = settings.hidden_nav_items;
+
+    // Optimistic
+    setSettings((s) => ({ ...s, hidden_nav_items: items }));
+
+    try {
+      const { error } = await supabase
+        .from("shop_settings")
+        .update({ hidden_nav_items: items, updated_at: new Date().toISOString() } as any)
+        .eq("user_id", targetUserId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error("Error updating hidden nav items:", error);
+      setSettings((s) => ({ ...s, hidden_nav_items: previous }));
+      toast.error("Erreur lors de la mise à jour du menu");
+      return false;
+    }
+  };
+
   return {
     settings,
     loading,
     saving,
     saveSettings,
+    updateHiddenNavItems,
     refetch: fetchSettings,
   };
 }
