@@ -862,6 +862,42 @@ export type Database = {
         }
         Relationships: []
       }
+      password_reset_codes: {
+        Row: {
+          attempts: number
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          ip_address: string | null
+          user_id: string
+          verified: boolean
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          user_id: string
+          verified?: boolean
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string
+          verified?: boolean
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       password_reset_requests: {
         Row: {
           created_at: string
@@ -2707,6 +2743,7 @@ export type Database = {
       }
     }
     Functions: {
+      cleanup_expired_reset_codes: { Args: never; Returns: undefined }
       close_register_session: {
         Args: { _closed_by_name?: string; _report?: Json; _shop_id: string }
         Returns: string
