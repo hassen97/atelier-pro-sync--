@@ -254,7 +254,7 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
                   Masquez les éléments inutiles pour votre boutique.
                 </p>
               </div>
-              <ScrollArea className="max-h-72">
+              <div className="max-h-72 overflow-y-auto overscroll-contain">
                 <div className="flex flex-col gap-0.5 px-1">
                   {customizableItems.map((item) => {
                     const locked = item.href === "/dashboard";
@@ -278,7 +278,7 @@ export function AppSidebar({ collapsed, onToggle, isMobile, onMobileClose }: App
                     );
                   })}
                 </div>
-              </ScrollArea>
+              </div>
               {hiddenItems.length > 0 && (
                 <div className="mt-1 border-t pt-2 px-1">
                   <button
