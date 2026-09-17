@@ -26,6 +26,11 @@ export const TEMPLATE_META: Record<
     description: "Envoyé à l'administrateur quand une nouvelle boutique s'inscrit.",
     recipient: "Admin",
   },
+  reset_code: {
+    label: "Code de vérification (mot de passe)",
+    description: "Envoyé au propriétaire avec le code à 6 chiffres pour réinitialiser son mot de passe.",
+    recipient: "Propriétaire",
+  },
   password_reset: {
     label: "Réinitialisation du mot de passe",
     description: "Envoyé au propriétaire qui demande un nouveau mot de passe.",

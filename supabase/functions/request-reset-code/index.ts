@@ -73,16 +73,48 @@ Deno.serve(async (req) => {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     admin.from('password_reset_attempts').delete().lt('created_at', oneDayAgo).then(() => {})
 
+    const PROFILE_COLS = 'user_id,username,email,phone,whatsapp_phone'
+    const identifierDigits = digits(searchIdentifier)
+    const looksLikePhone = !searchIdentifier.includes('@') && identifierDigits.length >= 6 &&
+      identifierDigits.length >= searchIdentifier.replace(/[\s+().-]/g, '').length
+
     let profile: any = null
-    if (rawIdentifier && !rawIdentifier.includes('@')) {
-      const { data: profiles } = await admin.from('profiles').select('user_id,username,email,phone,whatsapp_phone').eq('username', searchIdentifier).limit(1)
+
+    if (looksLikePhone) {
+      // Phone lookup: normalise digits on both sides and match by suffix, so
+      // "+216 20 123 456", "0020123456" and "20123456" all resolve.
+      const { data: candidates } = await admin
+        .from('profiles')
+        .select(PROFILE_COLS)
+        .or('phone.not.is.null,whatsapp_phone.not.is.null')
+        .limit(5000)
+      profile = (candidates ?? []).find((p: any) =>
+        phoneMatches(searchIdentifier, p.phone, p.whatsapp_phone)
+      ) ?? null
+
+      if (!profile) {
+        const { data: shops } = await admin
+          .from('shop_settings')
+          .select('user_id,phone,whatsapp_phone')
+          .or('phone.not.is.null,whatsapp_phone.not.is.null')
+          .limit(5000)
+        const shop = (shops ?? []).find((s: any) =>
+          phoneMatches(searchIdentifier, s.phone, s.whatsapp_phone)
+        )
+        if (shop?.user_id) {
+          const { data: byShop } = await admin.from('profiles').select(PROFILE_COLS).eq('user_id', shop.user_id).limit(1)
+          profile = byShop?.[0] ?? null
+        }
+      }
+    } else if (rawIdentifier && !rawIdentifier.includes('@')) {
+      const { data: profiles } = await admin.from('profiles').select(PROFILE_COLS).eq('username', searchIdentifier).limit(1)
       profile = profiles?.[0]
     } else {
-      const { data: byEmail } = await admin.from('profiles').select('user_id,username,email,phone,whatsapp_phone').ilike('email', searchIdentifier).limit(1)
+      const { data: byEmail } = await admin.from('profiles').select(PROFILE_COLS).ilike('email', searchIdentifier).limit(1)
       if (byEmail?.[0]) {
         profile = byEmail[0]
       } else {
-        const { data: byUsername } = await admin.from('profiles').select('user_id,username,email,phone,whatsapp_phone').ilike('username', searchIdentifier).limit(1)
+        const { data: byUsername } = await admin.from('profiles').select(PROFILE_COLS).ilike('username', searchIdentifier).limit(1)
         profile = byUsername?.[0]
       }
     }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -52,6 +53,22 @@ const variants = {
   center: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -12 },
 };
+
+/** Read the real error message returned by an edge function. */
+async function readFunctionError(error: unknown, fallback: string): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json();
+      if (body && typeof body.error === "string" && body.error.trim()) return body.error;
+    } catch {
+      /* non-JSON body — use the fallback */
+    }
+    return fallback;
+  }
+  if (error instanceof Error && error.message) return fallback;
+  return fallback;
+}
+
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -156,9 +173,9 @@ export default function ResetPassword() {
       });
       const token = (data as { token?: string } | null)?.token;
       if (error || !token) {
-        const message =
-          (data as { error?: string } | null)?.error || "Code invalide ou expiré. Demandez un nouveau code.";
-        throw new Error(message);
+        throw new Error(
+          await readFunctionError(error, "Code invalide ou expiré. Demandez un nouveau code."),
+        );
       }
       setResetToken(token);
       setPassword("");
@@ -196,10 +213,12 @@ export default function ResetPassword() {
         headers: { Authorization: `Bearer ${resetToken}` },
       });
       if (error || !(data as { ok?: boolean } | null)?.ok) {
-        const message =
-          (data as { error?: string } | null)?.error ||
-          "Impossible de mettre à jour le mot de passe. Demandez un nouveau code.";
-        throw new Error(message);
+        throw new Error(
+          await readFunctionError(
+            error,
+            "Impossible de mettre à jour le mot de passe. Demandez un nouveau code.",
+          ),
+        );
       }
       setResetToken(null);
       setPassword("");

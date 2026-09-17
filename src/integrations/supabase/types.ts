@@ -1964,6 +1964,7 @@ export type Database = {
           currency: string
           email: string | null
           google_maps_url: string | null
+          hidden_nav_items: string[]
           id: string
           inventory_locked: boolean
           language: string | null
@@ -2000,6 +2001,7 @@ export type Database = {
           currency?: string
           email?: string | null
           google_maps_url?: string | null
+          hidden_nav_items?: string[]
           id?: string
           inventory_locked?: boolean
           language?: string | null
@@ -2036,6 +2038,7 @@ export type Database = {
           currency?: string
           email?: string | null
           google_maps_url?: string | null
+          hidden_nav_items?: string[]
           id?: string
           inventory_locked?: boolean
           language?: string | null
