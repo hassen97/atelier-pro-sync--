@@ -173,9 +173,9 @@ export default function ResetPassword() {
       });
       const token = (data as { token?: string } | null)?.token;
       if (error || !token) {
-        const message =
-          (data as { error?: string } | null)?.error || "Code invalide ou expiré. Demandez un nouveau code.";
-        throw new Error(message);
+        throw new Error(
+          await readFunctionError(error, "Code invalide ou expiré. Demandez un nouveau code."),
+        );
       }
       setResetToken(token);
       setPassword("");
@@ -213,10 +213,12 @@ export default function ResetPassword() {
         headers: { Authorization: `Bearer ${resetToken}` },
       });
       if (error || !(data as { ok?: boolean } | null)?.ok) {
-        const message =
-          (data as { error?: string } | null)?.error ||
-          "Impossible de mettre à jour le mot de passe. Demandez un nouveau code.";
-        throw new Error(message);
+        throw new Error(
+          await readFunctionError(
+            error,
+            "Impossible de mettre à jour le mot de passe. Demandez un nouveau code.",
+          ),
+        );
       }
       setResetToken(null);
       setPassword("");
