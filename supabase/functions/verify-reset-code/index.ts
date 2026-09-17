@@ -53,10 +53,50 @@ Deno.serve(async (req) => {
       return error('Code invalide (6 chiffres requis)')
     }
 
-    // ── Resolve user ───────────────────────────────────────────────────────
-    let profile: any = null
+    // ── Resolve user (username, email or phone) ────────────────────────────
+    const digits = (v: string) => v.replace(/[^0-9]/g, '')
+    const phoneMatches = (candidate: string, ...known: (string | null | undefined)[]) => {
+      const c = digits(candidate)
+      if (c.length < 6) return false
+      return known.some((k) => {
+        const d = digits(String(k ?? ''))
+        return d.length >= 6 && (d.endsWith(c) || c.endsWith(d))
+      })
+    }
 
-    if (searchIdentifier && !searchIdentifier.includes('@')) {
+    let profile: any = null
+    const identifierDigits = digits(searchIdentifier)
+    const looksLikePhone =
+      !searchIdentifier.includes('@') &&
+      identifierDigits.length >= 6 &&
+      identifierDigits.length >= searchIdentifier.replace(/[\s+().-]/g, '').length
+
+    if (looksLikePhone) {
+      const { data: candidates } = await admin
+        .from('profiles')
+        .select('user_id,username,phone,whatsapp_phone')
+        .or('phone.not.is.null,whatsapp_phone.not.is.null')
+        .limit(5000)
+      profile =
+        (candidates ?? []).find((p: any) => phoneMatches(searchIdentifier, p.phone, p.whatsapp_phone)) ?? null
+
+      if (!profile) {
+        const { data: shops } = await admin
+          .from('shop_settings')
+          .select('user_id,phone,whatsapp_phone')
+          .or('phone.not.is.null,whatsapp_phone.not.is.null')
+          .limit(5000)
+        const shop = (shops ?? []).find((s: any) => phoneMatches(searchIdentifier, s.phone, s.whatsapp_phone))
+        if (shop?.user_id) {
+          const { data: byShop } = await admin
+            .from('profiles')
+            .select('user_id,username')
+            .eq('user_id', shop.user_id)
+            .limit(1)
+          profile = byShop?.[0] ?? null
+        }
+      }
+    } else if (searchIdentifier && !searchIdentifier.includes('@')) {
       const { data: profiles } = await admin
         .from('profiles')
         .select('user_id,username')
@@ -80,6 +120,7 @@ Deno.serve(async (req) => {
         profile = byUsername?.[0]
       }
     }
+
 
     if (!profile?.user_id) {
       return error('Code invalide ou expiré')

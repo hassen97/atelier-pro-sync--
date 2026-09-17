@@ -12,12 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Mail, Save, Eye, Send, Bell, KeyRound, Clock, Sparkles } from "lucide-react";
+import { Loader2, Mail, Save, Eye, Send, Bell, KeyRound, Clock, Sparkles, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   signup_admin: Bell,
   password_reset: KeyRound,
+  reset_code: ShieldCheck,
   subscription_expiry: Clock,
   changelog: Sparkles,
 };
