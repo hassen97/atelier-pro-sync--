@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePublicPlans } from "@/hooks/useSubscriptionPlans";
@@ -9,6 +9,9 @@ import { SEO } from "@/components/seo/SEO";
 import { getUpdateStatus, applyUpdateNow } from "@/lib/swUpdate";
 import { TrialCountdownBanner } from "@/components/landing/TrialCountdownBanner";
 import { IndustrialHero } from "@/components/landing/IndustrialHero";
+import { TrustBar } from "@/components/landing/TrustBar";
+import { ProductShowcase } from "@/components/landing/ProductShowcase";
+import { Reveal } from "@/components/landing/Reveal";
 import { BlueprintSteps } from "@/components/landing/BlueprintSteps";
 import { ToolWall } from "@/components/landing/ToolWall";
 import { TelemetryStrip } from "@/components/landing/TelemetryStrip";
@@ -25,6 +28,8 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { data: plans } = usePublicPlans();
   const { startDemo, loading: demoLoading } = useDemoLogin();
+  const navRef = useRef<HTMLElement | null>(null);
+  const progressRef = useRef<HTMLSpanElement | null>(null);
 
   // Non-blocking update check: the landing renders immediately; a newer
   // deployment only surfaces as a persistent toast (never a full-screen gate).
@@ -43,6 +48,32 @@ export default function LandingPage() {
       });
   }, []);
 
+  // Floating nav condense + top scroll-progress beam. One passive listener,
+  // rAF-throttled, writes straight to the DOM (no re-render per scroll frame).
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const y = window.scrollY || 0;
+        navRef.current?.classList.toggle("rp-nav-scrolled", y > 8);
+        const doc = document.documentElement;
+        const max = doc.scrollHeight - window.innerHeight;
+        const p = max > 0 ? Math.min(1, y / max) : 0;
+        if (progressRef.current) progressRef.current.style.transform = `scaleX(${p})`;
+      });
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   const handlePlanClick = (planId: string) => {
     if (user) {
       navigate(`/checkout?plan=${planId}`);
@@ -52,7 +83,12 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="rp-landing" style={{ scrollBehavior: "smooth", minHeight: "100vh" }}>
+    <main id="contenu" tabIndex={-1} className="rp-landing" style={{ scrollBehavior: "smooth", minHeight: "100dvh" }}>
+      <a href="#contenu" className="rp-skip">Aller au contenu</a>
+      <div className="rp-grain" aria-hidden="true" />
+      <div className="rp-progress" aria-hidden="true">
+        <span ref={progressRef} />
+      </div>
       <SEO
         title="RepairPro — Gestion d'atelier de réparation mobile"
         description="SaaS tout-en-un pour ateliers de réparation mobile : inventaire, réparations, facturation et suivi clients."
@@ -60,7 +96,7 @@ export default function LandingPage() {
       />
 
       {/* ─── Navbar ─── */}
-      <nav className="rp-nav">
+      <nav className="rp-nav" ref={navRef}>
         <div className="rp-container rp-nav-inner">
           <Link to="/" className="rp-logo">
             <span className="rp-logo-mark">
@@ -71,6 +107,7 @@ export default function LandingPage() {
 
           <div className="rp-nav-links">
             <a href="#atelier" className="rp-link">Atelier</a>
+            <a href="#produit" className="rp-link">Produit</a>
             <a href="#outils" className="rp-link">Outils</a>
             <a href="#tarifs" className="rp-link">Tarifs</a>
             <a href="#faq" className="rp-link">FAQ</a>
@@ -101,6 +138,7 @@ export default function LandingPage() {
         {menuOpen && (
           <div className="rp-mobile-menu">
             <a href="#atelier" className="rp-link" onClick={() => setMenuOpen(false)}>Atelier</a>
+            <a href="#produit" className="rp-link" onClick={() => setMenuOpen(false)}>Produit</a>
             <a href="#outils" className="rp-link" onClick={() => setMenuOpen(false)}>Outils</a>
             <a href="#tarifs" className="rp-link" onClick={() => setMenuOpen(false)}>Tarifs</a>
             <a href="#faq" className="rp-link" onClick={() => setMenuOpen(false)}>FAQ</a>
@@ -129,7 +167,9 @@ export default function LandingPage() {
       {!user && <TrialCountdownBanner />}
 
       <IndustrialHero startDemo={startDemo} demoLoading={demoLoading} />
+      <TrustBar />
       <BlueprintSteps />
+      <ProductShowcase />
       <ToolWall />
       <TelemetryStrip />
       <WorkshopVisits />
@@ -138,12 +178,13 @@ export default function LandingPage() {
 
       {/* ─── Final CTA ─── */}
       <section className="rp-final">
+        <Reveal>
         <div className="rp-container">
           <span className="rp-eyebrow">Atelier · ouverture imminente</span>
           <h2>
             Prêt à ouvrir
             <br />
-            votre atelier numérique ?
+            votre atelier <span className="rp-grad">numérique</span> ?
           </h2>
           <p>Rejoignez les réparateurs qui ont abandonné le cahier pour RepairPro.</p>
           <div className="rp-hero-cta">
@@ -156,6 +197,7 @@ export default function LandingPage() {
             </button>
           </div>
         </div>
+        </Reveal>
       </section>
 
       <IndustrialFooter />

@@ -1,4 +1,5 @@
 import { Package, Wrench, Zap, BarChart3, Users } from "lucide-react";
+import { Reveal } from "@/components/landing/Reveal";
 
 const TOOLS = [
   {
@@ -33,26 +34,42 @@ const TOOLS = [
   },
 ];
 
+/** Drives the CSS spotlight: write pointer position to --mx/--my (no re-render). */
+function onToolMove(e: React.PointerEvent<HTMLDivElement>) {
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+  el.style.setProperty("--my", `${e.clientY - r.top}px`);
+}
+
 export function ToolWall() {
   return (
     <section id="outils" className="rp-section" style={{ paddingTop: 0 }}>
       <div className="rp-container">
-        <div className="rp-section-head">
-          <span className="rp-eyebrow">Mur d'outils · accrochez ce qu'il vous faut</span>
-          <h2>Chaque outil à sa place.</h2>
-          <p>Pas de superflu. Uniquement ce qui fait tourner l'atelier.</p>
-        </div>
-        <div className="rp-pegboard">
-          {TOOLS.map((t) => (
-            <div className={`rp-tool${t.wide ? " rp-tool-wide" : ""}`} key={t.title}>
-              <div className="rp-tool-icon">
-                <t.icon size={24} />
+        <Reveal>
+          <div className="rp-section-head">
+            <span className="rp-eyebrow">Mur d'outils · accrochez ce qu'il vous faut</span>
+            <h2>Chaque outil à sa place.</h2>
+            <p>Pas de superflu. Uniquement ce qui fait tourner l'atelier.</p>
+          </div>
+        </Reveal>
+        <Reveal delay={80}>
+          <div className="rp-pegboard">
+            {TOOLS.map((t) => (
+              <div
+                className={`rp-tool${t.wide ? " rp-tool-wide" : ""}`}
+                key={t.title}
+                onPointerMove={onToolMove}
+              >
+                <div className="rp-tool-icon">
+                  <t.icon size={24} strokeWidth={1.75} />
+                </div>
+                <h3>{t.title}</h3>
+                <p>{t.desc}</p>
               </div>
-              <h3>{t.title}</h3>
-              <p>{t.desc}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </Reveal>
       </div>
     </section>
   );

@@ -1,3 +1,5 @@
+import { Reveal } from "@/components/landing/Reveal";
+
 const FAQ = [
   {
     q: "Mes données sont-elles en sécurité ?",
@@ -29,10 +31,13 @@ export function TerminalFAQ() {
   return (
     <section id="faq" className="rp-section" style={{ paddingTop: 0 }}>
       <div className="rp-container">
-        <div className="rp-section-head">
-          <span className="rp-eyebrow">Terminal · questions fréquentes</span>
-          <h2>$ faq --show</h2>
-        </div>
+        <Reveal>
+          <div className="rp-section-head">
+            <span className="rp-eyebrow">Terminal · questions fréquentes</span>
+            <h2>$ faq --show</h2>
+          </div>
+        </Reveal>
+        <Reveal delay={80}>
         <div className="rp-terminal">
           <div className="rp-term-bar">
             <span className="rp-dot" style={{ background: "#ef4444" }} />
@@ -49,6 +54,7 @@ export function TerminalFAQ() {
             ))}
           </div>
         </div>
+        </Reveal>
       </div>
     </section>
   );

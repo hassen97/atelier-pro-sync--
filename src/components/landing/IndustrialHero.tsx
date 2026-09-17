@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { Link } from "react-router-dom";
-import { PlayCircle, Loader2, UserPlus } from "lucide-react";
+import { PlayCircle, Loader2, UserPlus, ChevronsDown, Zap, ShieldCheck } from "lucide-react";
+import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
 import { usePausedOffscreen } from "@/components/landing/usePausedOffscreen";
 
 const SCOPE_PATH =
@@ -13,7 +14,20 @@ interface IndustrialHeroProps {
 
 export function IndustrialHero({ startDemo, demoLoading }: IndustrialHeroProps) {
   const phoneRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
   const { ref: scopeRef, paused: scopePaused } = usePausedOffscreen<HTMLDivElement>();
+  const reduce = useReducedMotion();
+
+  // Scroll-driven assembly: the exploded layers collapse into a solid phone as
+  // the hero scrolls away. Driven by MotionValues (no useState → no re-renders).
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const zBattery = useTransform(scrollYProgress, [0, 0.7], ["60px", "5px"]);
+  const zBoard = useTransform(scrollYProgress, [0, 0.7], ["120px", "10px"]);
+  const zScreen = useTransform(scrollYProgress, [0, 0.7], ["180px", "15px"]);
+  const zGlass = useTransform(scrollYProgress, [0, 0.7], ["240px", "20px"]);
 
   // Mouse-follow parallax: mutate the transform directly to avoid re-renders.
   const onSceneMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -28,8 +42,12 @@ export function IndustrialHero({ startDemo, demoLoading }: IndustrialHeroProps) 
     if (phoneRef.current) phoneRef.current.style.transform = "rotateX(12deg) rotateY(-18deg)";
   };
 
+  const zStyle = (mv: typeof zBattery, fallback: string) =>
+    ({ "--z": reduce ? fallback : mv }) as React.CSSProperties;
+
   return (
-    <section className="rp-hero">
+    <section className="rp-hero" ref={heroRef}>
+      <div className="rp-hero-glow" aria-hidden="true" />
       <div className="rp-container">
         <div className="rp-hero-grid">
           <div>
@@ -71,24 +89,27 @@ export function IndustrialHero({ startDemo, demoLoading }: IndustrialHeroProps) 
             </div>
           </div>
 
-          {/* Exploded 3D phone */}
+          {/* Exploded 3D phone — assembles on scroll */}
           <div
             className="rp-scene"
             onMouseMove={onSceneMouseMove}
             onMouseLeave={onSceneMouseLeave}
             aria-hidden="true"
           >
+            <div className="rp-scene-core" />
+            <div className="rp-scene-ring" />
+            <div className="rp-scene-ring rp-ring-2" />
             <div className="rp-phone" ref={phoneRef}>
               <div className="rp-layer rp-l-frame">
                 <span className="rp-layer-label rp-label-frame">01 · Châssis titane</span>
               </div>
-              <div className="rp-layer rp-l-battery">
+              <motion.div className="rp-layer rp-l-battery" style={zStyle(zBattery, "5px")}>
                 <span className="rp-layer-label rp-label-battery">02 · Cellule 4500mAh</span>
-              </div>
-              <div className="rp-layer rp-l-board">
+              </motion.div>
+              <motion.div className="rp-layer rp-l-board" style={zStyle(zBoard, "10px")}>
                 <span className="rp-layer-label rp-label-board">03 · Carte mère</span>
-              </div>
-              <div className="rp-layer rp-l-screen">
+              </motion.div>
+              <motion.div className="rp-layer rp-l-screen" style={zStyle(zScreen, "15px")}>
                 <div className="rp-status-bar">
                   <span>09:41</span>
                   <span>◉ 100%</span>
@@ -114,10 +135,24 @@ export function IndustrialHero({ startDemo, demoLoading }: IndustrialHeroProps) 
                   </div>
                 </div>
                 <span className="rp-layer-label rp-label-screen">04 · Écran OLED</span>
-              </div>
-              <div className="rp-layer rp-l-glass">
+              </motion.div>
+              <motion.div className="rp-layer rp-l-glass" style={zStyle(zGlass, "20px")}>
                 <span className="rp-layer-label rp-label-glass">05 · Verre trempé</span>
-              </div>
+              </motion.div>
+            </div>
+            <span className="rp-bracket tl" />
+            <span className="rp-bracket tr" />
+            <span className="rp-bracket bl" />
+            <span className="rp-bracket br" />
+            <div className="rp-float-chip rp-chip-1">
+              <Zap size={13} strokeWidth={2} /> Caisse · <b>340ms</b>
+            </div>
+            <div className="rp-float-chip rp-chip-2">
+              <ShieldCheck size={13} strokeWidth={2} /> RLS · <b>isolé</b>
+            </div>
+            <div className="rp-scroll-cue">
+              <ChevronsDown size={18} strokeWidth={1.75} />
+              <span>Défilez · assemblage</span>
             </div>
           </div>
         </div>

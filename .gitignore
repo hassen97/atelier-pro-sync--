@@ -18,6 +18,9 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# Qoder local plugins/skills (not part of the app; do not sync to Lovable)
+.qoder/
 *.suo
 *.ntvs*
 *.njsproj

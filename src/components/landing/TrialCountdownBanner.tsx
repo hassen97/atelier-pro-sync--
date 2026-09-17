@@ -25,8 +25,10 @@ function pad(n: number) {
 }
 
 /**
- * First-visit urgency banner: a per-visitor 24h countdown. Signing up while the
- * timer is live grants a 7-day Pro trial (handled on the Auth page).
+ * First-visit offer banner, styled in the landing's "Industrial Workshop"
+ * language (square corners, forge-orange, mono type) so it no longer reads as a
+ * foreign template glued onto the page. Same per-visitor 24h window as before;
+ * signing up while it is live grants a 7-day Pro trial (handled on Auth).
  */
 export function TrialCountdownBanner() {
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -51,36 +53,26 @@ export function TrialCountdownBanner() {
   const s = totalSec % 60;
 
   return (
-    /* Plain div + CSS fade — keeps framer-motion out of the landing bundle */
-    <div className="animate-fade-in relative z-30 mx-auto max-w-5xl px-4 pt-24 sm:pt-28">
-      <div className="rounded-2xl border border-emerald-400/25 bg-gradient-to-r from-emerald-500/10 via-emerald-400/5 to-transparent p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-11 h-11 shrink-0 rounded-xl bg-emerald-500/15 flex items-center justify-center">
-            <Gift className="h-5 w-5 text-emerald-400" />
+    /* Plain div + CSS — keeps framer-motion out of the landing bundle */
+    <div className="rp-banner animate-fade-in">
+      <div className="rp-banner-inner">
+        <div className="rp-banner-card">
+          <span className="rp-banner-ic">
+            <Gift size={20} strokeWidth={1.75} />
+          </span>
+          <div className="rp-banner-txt">
+            <b>Offre de bienvenue · 7 jours Pro offerts</b>
+            <span>Essai complet, sans carte bancaire. Activez-le en créant votre compte.</span>
           </div>
-          <div className="min-w-0">
-            <p className="text-white font-semibold text-sm sm:text-base">
-              Offre de bienvenue : 7 jours Pro gratuits
-            </p>
-            <p className="text-emerald-300/80 text-xs sm:text-sm">
-              Créez votre compte avant la fin du compte à rebours pour en profiter.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-1.5 text-white">
-            <Clock className="h-4 w-4 text-emerald-400" />
-            <span className="font-mono font-bold tabular-nums text-base sm:text-lg tracking-tight">
+          <div className="rp-banner-cta">
+            <span className="rp-countdown" aria-label="Temps restant">
+              <Clock size={16} strokeWidth={1.75} />
               {pad(h)}:{pad(m)}:{pad(s)}
             </span>
+            <Link to="/auth?tab=register&trial=7" className="rp-btn rp-btn-primary rp-btn-sm">
+              Réclamer <ArrowRight size={14} />
+            </Link>
           </div>
-          <Link
-            to="/auth?tab=register&trial=7"
-            className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-semibold text-sm px-4 py-2 transition-colors"
-          >
-            Réclamer <ArrowRight className="h-4 w-4" />
-          </Link>
         </div>
       </div>
     </div>

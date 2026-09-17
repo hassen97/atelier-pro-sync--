@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { Reveal } from "@/components/landing/Reveal";
 import type { SubscriptionPlan } from "@/hooks/useSubscriptionPlans";
 
 interface IndustrialPricingProps {
@@ -11,15 +12,18 @@ export function IndustrialPricing({ plans, onPlanClick }: IndustrialPricingProps
   return (
     <section id="tarifs" className="rp-section" style={{ paddingTop: 0 }}>
       <div className="rp-container">
-        <div className="rp-section-head">
-          <span className="rp-eyebrow">Plans tarifaires · en dinars</span>
-          <h2>
-            Des tarifs simples,
-            <br />
-            un seul standard.
-          </h2>
-          <p>Pas de frais cachés. Pas de mauvaise surprise.</p>
-        </div>
+        <Reveal>
+          <div className="rp-section-head">
+            <span className="rp-eyebrow">Plans tarifaires · en dinars</span>
+            <h2>
+              Des tarifs simples,
+              <br />
+              un seul standard.
+            </h2>
+            <p>Pas de frais cachés. Pas de mauvaise surprise.</p>
+          </div>
+        </Reveal>
+        <Reveal delay={80}>
         <div className="rp-plans">
           {plans.map((plan, i) => {
             const features = Array.isArray(plan.features)
@@ -61,6 +65,7 @@ export function IndustrialPricing({ plans, onPlanClick }: IndustrialPricingProps
             );
           })}
         </div>
+        </Reveal>
       </div>
     </section>
   );

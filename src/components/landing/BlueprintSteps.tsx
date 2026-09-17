@@ -1,3 +1,5 @@
+import { Reveal } from "@/components/landing/Reveal";
+
 const STEPS = [
   {
     num: "01",
@@ -35,31 +37,35 @@ export function BlueprintSteps() {
   return (
     <section id="atelier" className="rp-section">
       <div className="rp-container">
-        <div className="rp-section-head">
-          <span className="rp-eyebrow">Plan de montage · 03 étapes</span>
-          <h2>
-            Votre journée,
-            <br />
-            assemblée comme un appareil.
-          </h2>
-          <p>Un flux conçu pour les réparateurs — pas pour les ingénieurs de la tech.</p>
-        </div>
-        <div className="rp-blueprint">
-          {STEPS.map((s) => (
-            <div className="rp-bp-step" key={s.num}>
-              <div className="rp-bp-num">{s.num}</div>
-              <h3>{s.title}</h3>
-              <p>{s.desc}</p>
-              <div className="rp-bp-spec">
-                {s.spec.map(([k, v]) => (
-                  <span key={k}>
-                    {k} · <b>{v}</b>
-                  </span>
-                ))}
+        <Reveal>
+          <div className="rp-section-head">
+            <span className="rp-eyebrow">Plan de montage · 03 étapes</span>
+            <h2>
+              Votre journée,
+              <br />
+              assemblée comme un appareil.
+            </h2>
+            <p>Un flux conçu pour les réparateurs — pas pour les ingénieurs de la tech.</p>
+          </div>
+        </Reveal>
+        <Reveal delay={80}>
+          <div className="rp-blueprint">
+            {STEPS.map((s) => (
+              <div className="rp-bp-step" key={s.num}>
+                <div className="rp-bp-num">{s.num}</div>
+                <h3>{s.title}</h3>
+                <p>{s.desc}</p>
+                <div className="rp-bp-spec">
+                  {s.spec.map(([k, v]) => (
+                    <span key={k}>
+                      {k} · <b>{v}</b>
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </Reveal>
       </div>
     </section>
   );

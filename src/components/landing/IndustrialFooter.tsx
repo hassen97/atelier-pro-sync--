@@ -1,14 +1,16 @@
 import repairProLogo from "@/assets/repairpro-logo.png";
 
+const SUPPORT_EMAIL = "contact@repairprotunisie.com";
+
 export function IndustrialFooter() {
   return (
     <footer className="rp-footer">
       <div className="rp-container">
         <div className="rp-footer-grid">
           <div className="rp-footer-brand">
-            <a href="#" className="rp-logo">
+            <a href="/" className="rp-logo">
               <span className="rp-logo-mark">
-                <img src={repairProLogo} alt="" width={18} height={18} />
+                <img src={repairProLogo} alt="RepairPro" width={18} height={18} />
               </span>
               REPAIRPRO<span style={{ color: "var(--rp-muted)" }}>//tn</span>
             </a>
@@ -20,29 +22,37 @@ export function IndustrialFooter() {
           <div>
             <h4>Produit</h4>
             <a href="#atelier" className="rp-foot-link">Atelier</a>
+            <a href="#produit" className="rp-foot-link">Aperçu produit</a>
             <a href="#outils" className="rp-foot-link">Outils</a>
             <a href="#tarifs" className="rp-foot-link">Tarifs</a>
             <a href="#faq" className="rp-foot-link">FAQ</a>
           </div>
           <div>
-            <h4>Ressources</h4>
-            <a href="#" className="rp-foot-link">Guide de démarrage</a>
-            <a href="#" className="rp-foot-link">Communauté</a>
-            <a href="#" className="rp-foot-link">Statut système</a>
+            <h4>Démarrer</h4>
+            <a href="/auth?tab=register" className="rp-foot-link">Créer un compte</a>
+            <a href="/auth" className="rp-foot-link">Connexion</a>
+            <a href="#faq" className="rp-foot-link">Essai gratuit</a>
           </div>
           <div>
             <h4>Contact</h4>
-            <a href="#" className="rp-foot-link">WhatsApp</a>
-            <a href="mailto:contact@repairprotunisie.com" className="rp-foot-link">
-              contact@repairprotunisie.com
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="rp-foot-link">
+              {SUPPORT_EMAIL}
             </a>
-            <a href="#" className="rp-foot-link">Facebook</a>
-            <a href="#" className="rp-foot-link">Instagram</a>
+            <a href={`mailto:${SUPPORT_EMAIL}?subject=Support%20WhatsApp`} className="rp-foot-link">
+              Support WhatsApp
+            </a>
+            <a href={`mailto:${SUPPORT_EMAIL}?subject=Question%20commerciale`} className="rp-foot-link">
+              Question commerciale
+            </a>
           </div>
         </div>
         <div className="rp-footer-bottom">
           <span>© {new Date().getFullYear()} RepairPro // Tous droits réservés</span>
-          <span>Confidentialité · Conditions · Mentions légales</span>
+          <span className="rp-legal">
+            <a href={`mailto:${SUPPORT_EMAIL}?subject=Confidentialité`}>Confidentialité</a>
+            <a href={`mailto:${SUPPORT_EMAIL}?subject=Conditions`}>Conditions</a>
+            <a href={`mailto:${SUPPORT_EMAIL}?subject=Mentions légales`}>Mentions légales</a>
+          </span>
         </div>
       </div>
     </footer>
