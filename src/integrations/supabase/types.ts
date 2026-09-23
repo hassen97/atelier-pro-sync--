@@ -1963,6 +1963,7 @@ export type Database = {
           created_at: string
           currency: string
           email: string | null
+          featured_on_landing: boolean
           google_maps_url: string | null
           hidden_nav_items: string[]
           id: string
@@ -2000,6 +2001,7 @@ export type Database = {
           created_at?: string
           currency?: string
           email?: string | null
+          featured_on_landing?: boolean
           google_maps_url?: string | null
           hidden_nav_items?: string[]
           id?: string
@@ -2037,6 +2039,7 @@ export type Database = {
           created_at?: string
           currency?: string
           email?: string | null
+          featured_on_landing?: boolean
           google_maps_url?: string | null
           hidden_nav_items?: string[]
           id?: string
@@ -2822,6 +2825,17 @@ export type Database = {
           gateway_key: string
           gateway_name: string
           id: string
+        }[]
+      }
+      get_featured_shops: {
+        Args: never
+        Returns: {
+          address: string
+          logo_url: string
+          phone: string
+          repair_count: number
+          shop_name: string
+          whatsapp_phone: string
         }[]
       }
       get_or_create_open_session: {
