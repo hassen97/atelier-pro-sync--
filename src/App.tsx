@@ -82,7 +82,6 @@ const Services = lazyWithRetry(() => import("./pages/Services"));
 const Vault = lazyWithRetry(() => import("./pages/Vault"));
 const PanicAnalyzer = lazyWithRetry(() => import("./pages/PanicAnalyzer"));
 const Referrals = lazyWithRetry(() => import("./pages/Referrals"));
-const DbRestore = lazyWithRetry(() => import("./pages/DbRestore"));
 
 
 
