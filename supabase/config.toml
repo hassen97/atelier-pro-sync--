@@ -7,8 +7,6 @@ project_id = "rgikflkocotkljbajzrb"
     verify_jwt = false
   [functions.approve-referral-reward]
     verify_jwt = false
-  [functions.restore-live-db]
-    verify_jwt = false
   [functions.auth-email-hook]
     verify_jwt = false
   [functions.auto-suspend]
