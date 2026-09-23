@@ -137,13 +137,6 @@ const App = () => (
                     <OnboardingSetup />
                   </ProtectedRoute>
                 } />
-                
-                {/* Temporary Live-restore bridge (platform admin only) */}
-                <Route path="/db-restore" element={
-                  <ProtectedRoute>
-                    <DbRestore />
-                  </ProtectedRoute>
-                } />
 
                 {/* Admin route - separate layout */}
                 <Route path="/admin" element={
