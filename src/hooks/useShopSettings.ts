@@ -37,6 +37,7 @@ export interface ShopSettings {
   loyalty_min_redeem: number;
   // Per-shop-owner hidden sidebar menu hrefs
   hidden_nav_items: string[];
+  featured_on_landing: boolean;
 }
 
 const defaultSettings: ShopSettings = {
@@ -67,6 +68,7 @@ const defaultSettings: ShopSettings = {
   loyalty_redeem_value: 5,
   loyalty_min_redeem: 100,
   hidden_nav_items: [],
+  featured_on_landing: false,
 };
 
 export function useShopSettings() {
@@ -126,6 +128,7 @@ export function useShopSettings() {
           loyalty_redeem_value: Number((data as any).loyalty_redeem_value ?? 5),
           loyalty_min_redeem: Number((data as any).loyalty_min_redeem ?? 100),
           hidden_nav_items: (data as any).hidden_nav_items ?? [],
+          featured_on_landing: (data as any).featured_on_landing ?? false,
         });
       }
     } catch (error) {
@@ -187,6 +190,7 @@ export function useShopSettings() {
             loyalty_redeem_value: updatedSettings.loyalty_redeem_value,
             loyalty_min_redeem: updatedSettings.loyalty_min_redeem,
             hidden_nav_items: updatedSettings.hidden_nav_items,
+            featured_on_landing: updatedSettings.featured_on_landing,
             updated_at: new Date().toISOString(),
           } as any)
           .eq("id", settings.id);
