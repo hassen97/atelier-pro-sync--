@@ -16,6 +16,7 @@ import { BlueprintSteps } from "@/components/landing/BlueprintSteps";
 import { ToolWall } from "@/components/landing/ToolWall";
 import { TelemetryStrip } from "@/components/landing/TelemetryStrip";
 import { FeaturedPartners } from "@/components/landing/FeaturedPartners";
+import { FeaturedShopsRow } from "@/components/landing/FeaturedShopsRow";
 import { WorkshopVisits } from "@/components/landing/WorkshopVisits";
 import { IndustrialPricing } from "@/components/landing/IndustrialPricing";
 import { TerminalFAQ } from "@/components/landing/TerminalFAQ";
@@ -166,6 +167,8 @@ export default function LandingPage() {
 
       {/* ─── First-visit trial offer ─── */}
       {!user && <TrialCountdownBanner />}
+
+      <FeaturedShopsRow />
 
       <IndustrialHero startDemo={startDemo} demoLoading={demoLoading} />
       <FeaturedPartners />
