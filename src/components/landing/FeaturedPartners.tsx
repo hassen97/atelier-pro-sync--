@@ -62,7 +62,7 @@ export function FeaturedPartners() {
         .rp-fp-marquee:hover .rp-fp-track { animation-play-state: paused; }
         @media (prefers-reduced-motion: reduce) { .rp-fp-track { animation: none; } }
         .rp-fp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
-        .rp-fp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-top: 28px; }
+        .rp-fp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-top: 28px; }
         .rp-fp-card { background: var(--rp-surface); border: 1px solid var(--rp-line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
         .rp-fp-stat { border: 1px solid var(--rp-line); border-radius: 14px; padding: 16px; text-align: center; background: var(--rp-surface); }
         .rp-fp-stat b { display: block; font-size: clamp(20px, 3vw, 28px); color: var(--rp-accent-2); }
