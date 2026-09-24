@@ -55,7 +55,7 @@ export function FeaturedPartners() {
   const loop = shops.length ? [...shops, ...shops, ...shops] : [];
 
   return (
-    <section className="rp-section" style={{ paddingTop: 32 }}>
+    <section id="partenaires" className="rp-section" style={{ paddingTop: 32 }}>
       <style>{`
         @keyframes rp-fp-scroll { from { transform: translateX(0); } to { transform: translateX(-33.333%); } }
         .rp-fp-track { display: flex; gap: 14px; width: max-content; animation: rp-fp-scroll 40s linear infinite; }
