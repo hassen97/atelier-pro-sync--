@@ -15,6 +15,7 @@ import { Reveal } from "@/components/landing/Reveal";
 import { BlueprintSteps } from "@/components/landing/BlueprintSteps";
 import { ToolWall } from "@/components/landing/ToolWall";
 import { TelemetryStrip } from "@/components/landing/TelemetryStrip";
+import { FeaturedPartners } from "@/components/landing/FeaturedPartners";
 import { WorkshopVisits } from "@/components/landing/WorkshopVisits";
 import { IndustrialPricing } from "@/components/landing/IndustrialPricing";
 import { TerminalFAQ } from "@/components/landing/TerminalFAQ";
@@ -167,6 +168,7 @@ export default function LandingPage() {
       {!user && <TrialCountdownBanner />}
 
       <IndustrialHero startDemo={startDemo} demoLoading={demoLoading} />
+      <FeaturedPartners />
       <TrustBar />
       <BlueprintSteps />
       <ProductShowcase />

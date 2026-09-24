@@ -529,6 +529,16 @@ export default function Settings() {
                 </div>
                 <Switch checked={showPaymentOnTracking} onCheckedChange={setShowPaymentOnTracking} />
               </div>
+              <div className="flex items-center justify-between rounded-lg border border-border/50 p-3 bg-muted/30">
+                <div>
+                  <p className="font-medium text-sm">Afficher mon atelier sur la page d'accueil RepairPro</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Votre logo, nom, région et numéro seront visibles parmi nos ateliers partenaires. Désactivable à tout moment.</p>
+                </div>
+                <Switch
+                  checked={!!(settings as any).featured_on_landing}
+                  onCheckedChange={(checked) => saveSettings({ featured_on_landing: checked } as any)}
+                />
+              </div>
             </div>
           </div>
         </GlassCard>
