@@ -159,25 +159,52 @@ export function RepairDialog({
   // State for brand/model selection
   const [selectedBrand, setSelectedBrand] = useState("");
 
+  // Rush intake: after creating a client we jump straight to the device section
+  // so the technician can keep typing without tapping the screen again.
+  const deviceSectionRef = useRef<HTMLDivElement>(null);
+
+  const focusDeviceSection = () => {
+    // Give the DOM a tick to swap the quick-client card out for the combobox.
+    setTimeout(() => {
+      const el = deviceSectionRef.current?.querySelector<HTMLElement>(
+        "button, input, [role='combobox']",
+      );
+      el?.focus();
+    }, 80);
+  };
+
   const handleQuickCustomerCreate = async () => {
-    if (!quickCustomerName.trim()) return;
-    
+    if (!quickCustomerName.trim() || creatingCustomer) return;
+
+    // Dismiss the tablet/phone software keyboard immediately — it otherwise
+    // stays open and hides half of the intake form during the save.
+    (document.activeElement as HTMLElement | null)?.blur?.();
+
     setCreatingCustomer(true);
     try {
       const newCustomer = await createCustomer.mutateAsync({
         name: quickCustomerName.trim(),
         phone: quickCustomerPhone.trim() || null,
       });
-      
+
       if (newCustomer?.id) {
-        form.setValue("customer_id", newCustomer.id);
+        form.setValue("customer_id", newCustomer.id, { shouldValidate: true });
       }
-      
+
       setQuickCustomerName("");
       setQuickCustomerPhone("");
       setShowQuickCustomer(false);
+      focusDeviceSection();
     } finally {
       setCreatingCustomer(false);
+    }
+  };
+
+  // Enter anywhere in the quick-client card saves it (hardware keyboards + tablets).
+  const handleQuickCustomerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleQuickCustomerCreate();
     }
   };
 
