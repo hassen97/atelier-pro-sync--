@@ -12,5 +12,31 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /pos
+Disallow: /repairs
+Disallow: /inventory
+Disallow: /customers
+Disallow: /customer-debts
+Disallow: /suppliers
+Disallow: /expenses
+Disallow: /invoices
+Disallow: /services
+Disallow: /statistics
+Disallow: /profit
+Disallow: /team
+Disallow: /vault
+Disallow: /warranty
+Disallow: /returns
+Disallow: /settings
+Disallow: /maintenance
+Disallow: /messages
+Disallow: /communaute
+Disallow: /referrals
+Disallow: /checkout
+Disallow: /onboarding
+Disallow: /update-password
+Disallow: /panic-analyzer
 
 Sitemap: https://www.getheavencoin.com/sitemap.xml
