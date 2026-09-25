@@ -28,14 +28,12 @@ Disallow: /profit
 Disallow: /team
 Disallow: /vault
 Disallow: /warranty
-Disallow: /returns
 Disallow: /settings
-Disallow: /maintenance
 Disallow: /messages
 Disallow: /communaute
 Disallow: /referrals
 Disallow: /checkout
-Disallow: /onboarding
+Disallow: /onboarding/
 Disallow: /update-password
 Disallow: /panic-analyzer
 
