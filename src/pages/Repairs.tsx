@@ -636,7 +636,12 @@ export default function Repairs() {
           <Input
             placeholder="Rechercher par client, téléphone, appareil ou N° réparation..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              // A search must always start from the first page, otherwise the
+              // matches live on page 1 while the table still shows page 3.
+              setPage(0);
+            }}
             className="pl-9"
           />
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -154,30 +154,61 @@ export function RepairDialog({
   const [quickCustomerName, setQuickCustomerName] = useState("");
   const [quickCustomerPhone, setQuickCustomerPhone] = useState("");
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  // Once a client was just created inline, the client search must NOT pop open
+  // again — the technician is already done with that step.
+  const [customerJustCreated, setCustomerJustCreated] = useState(false);
   const [selectedParts, setSelectedParts] = useState<SelectedPart[]>([]);
   
   // State for brand/model selection
   const [selectedBrand, setSelectedBrand] = useState("");
 
+  // Rush intake: after creating a client we jump straight to the device section
+  // so the technician can keep typing without tapping the screen again.
+  const deviceSectionRef = useRef<HTMLDivElement>(null);
+
+  const focusDeviceSection = () => {
+    // Give the DOM a tick to swap the quick-client card out for the combobox.
+    setTimeout(() => {
+      const el = deviceSectionRef.current?.querySelector<HTMLElement>(
+        "button, input, [role='combobox']",
+      );
+      el?.focus();
+    }, 80);
+  };
+
   const handleQuickCustomerCreate = async () => {
-    if (!quickCustomerName.trim()) return;
-    
+    if (!quickCustomerName.trim() || creatingCustomer) return;
+
+    // Dismiss the tablet/phone software keyboard immediately — it otherwise
+    // stays open and hides half of the intake form during the save.
+    (document.activeElement as HTMLElement | null)?.blur?.();
+
     setCreatingCustomer(true);
     try {
       const newCustomer = await createCustomer.mutateAsync({
         name: quickCustomerName.trim(),
         phone: quickCustomerPhone.trim() || null,
       });
-      
+
       if (newCustomer?.id) {
-        form.setValue("customer_id", newCustomer.id);
+        form.setValue("customer_id", newCustomer.id, { shouldValidate: true });
       }
-      
+
       setQuickCustomerName("");
       setQuickCustomerPhone("");
+      setCustomerJustCreated(true);
       setShowQuickCustomer(false);
+      focusDeviceSection();
     } finally {
       setCreatingCustomer(false);
+    }
+  };
+
+  // Enter anywhere in the quick-client card saves it (hardware keyboards + tablets).
+  const handleQuickCustomerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleQuickCustomerCreate();
     }
   };
 
@@ -467,17 +498,21 @@ export function RepairDialog({
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Nom *</label>
                     <Input
+                      autoFocus
                       placeholder="Nom du client"
                       value={quickCustomerName}
                       onChange={(e) => setQuickCustomerName(e.target.value)}
+                      onKeyDown={handleQuickCustomerKeyDown}
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Téléphone</label>
                     <Input
+                      inputMode="tel"
                       placeholder="Numéro (optionnel)"
                       value={quickCustomerPhone}
                       onChange={(e) => setQuickCustomerPhone(e.target.value)}
+                      onKeyDown={handleQuickCustomerKeyDown}
                     />
                   </div>
                 </div>
@@ -508,7 +543,7 @@ export function RepairDialog({
             )}
 
             {/* Device Info - Brand and Model with autocomplete */}
-            <div className="grid grid-cols-2 gap-4">
+            <div ref={deviceSectionRef} className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="device_brand"
