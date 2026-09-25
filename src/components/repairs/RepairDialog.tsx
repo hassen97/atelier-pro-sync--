@@ -154,6 +154,9 @@ export function RepairDialog({
   const [quickCustomerName, setQuickCustomerName] = useState("");
   const [quickCustomerPhone, setQuickCustomerPhone] = useState("");
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  // Once a client was just created inline, the client search must NOT pop open
+  // again — the technician is already done with that step.
+  const [customerJustCreated, setCustomerJustCreated] = useState(false);
   const [selectedParts, setSelectedParts] = useState<SelectedPart[]>([]);
   
   // State for brand/model selection
@@ -193,6 +196,7 @@ export function RepairDialog({
 
       setQuickCustomerName("");
       setQuickCustomerPhone("");
+      setCustomerJustCreated(true);
       setShowQuickCustomer(false);
       focusDeviceSection();
     } finally {
