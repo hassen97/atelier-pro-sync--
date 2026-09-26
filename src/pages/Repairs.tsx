@@ -153,7 +153,14 @@ export default function Repairs() {
   const [bulkConfirm, setBulkConfirm] = useState<null | "delete" | "rejected">(null);
 
   const queryClient = useQueryClient();
-  const { data: repairsResult = { data: [], count: 0 }, isLoading } = useRepairs(page);
+
+  const isSearching = searchQuery.trim().length >= 2;
+  const normalQuery = useRepairs(page);
+  const searchQueryResult = useSearchRepairs(searchQuery, page, activeTab);
+
+  const activeResult = isSearching ? searchQueryResult : normalQuery;
+  const { data: repairsResult = { data: [], count: 0 }, isLoading } = activeResult;
+
   const rawRepairs = repairsResult.data;
   const totalCount = repairsResult.count;
   const totalPages = Math.ceil(totalCount / REPAIRS_PAGE_SIZE);
