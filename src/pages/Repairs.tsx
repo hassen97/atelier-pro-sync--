@@ -1,14 +1,31 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, Filter, ChevronLeft, ChevronRight, CheckSquare, X, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  CheckSquare,
+  X,
+  CheckCircle2,
+  XCircle,
+  Trash2,
+} from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RepairCard } from "@/components/repairs/RepairCard";
 import { type RepairStatus } from "@/components/repairs/RepairStatusSelect";
@@ -20,6 +37,7 @@ import type { SelectedPart } from "@/components/repairs/RepairDialog";
 import { PaymentConfirmDialog } from "@/components/repairs/PaymentConfirmDialog";
 import {
   useRepairs,
+  useSearchRepairs,
   useRepairByTicketNumber,
   useRepairStatusCounts,
   useCreateRepair,
@@ -118,7 +136,7 @@ export default function Repairs() {
   const [repairDialogOpen, setRepairDialogOpen] = useState(false);
   const [selectedRepairId, setSelectedRepairId] = useState<string | null>(null);
   const [editingRepair, setEditingRepair] = useState<RepairWithCustomer | null>(null);
-  
+
   // Payment confirmation state
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
   const [paymentConfirmRepair, setPaymentConfirmRepair] = useState<ReturnType<typeof transformRepair> | null>(null);
@@ -140,7 +158,6 @@ export default function Repairs() {
   const totalCount = repairsResult.count;
   const totalPages = Math.ceil(totalCount / REPAIRS_PAGE_SIZE);
   const { data: statusCounts } = useRepairStatusCounts();
-
 
   const { data: customers = [] } = useAllCustomers();
   const { data: repairCategories = [] } = useCategories("repair");
@@ -173,7 +190,7 @@ export default function Repairs() {
   // Transform repairs for UI (memoized: this page re-renders on every keystroke/dialog toggle)
   const baseRepairs = useMemo(
     () => (rawRepairs as unknown as RepairWithCustomer[]).map((r) => transformRepair(r, shopInitials)),
-    [rawRepairs, shopInitials]
+    [rawRepairs, shopInitials],
   );
   // Inject the server-side numeric hit if it's not already in the current page
   const repairs = useMemo(() => {
@@ -182,9 +199,7 @@ export default function Repairs() {
     return [transformRepair(ticketHit as unknown as RepairWithCustomer, shopInitials), ...baseRepairs];
   }, [baseRepairs, ticketHit, shopInitials]);
 
-  const selectedRepair = selectedRepairId
-    ? repairs.find((r) => r.id === selectedRepairId) || null
-    : null;
+  const selectedRepair = selectedRepairId ? repairs.find((r) => r.id === selectedRepairId) || null : null;
 
   const filteredRepairs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -215,7 +230,7 @@ export default function Repairs() {
       rejected: repairs.filter((r) => r.status === "rejected").length,
       warranty: repairs.filter((r) => r.is_warranty).length,
     }),
-    [repairs, totalCount]
+    [repairs, totalCount],
   );
 
   const counts = statusCounts ?? pageCounts;
@@ -224,17 +239,14 @@ export default function Repairs() {
   const selectedCount = selectedIds.size;
   const allFilteredSelected = filteredRepairs.length > 0 && filteredRepairs.every((r) => selectedIds.has(r.id));
 
-  const handleSelectChange = useCallback(
-    (repair: ReturnType<typeof transformRepair>, checked: boolean) => {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        if (checked) next.add(repair.id);
-        else next.delete(repair.id);
-        return next;
-      });
-    },
-    []
-  );
+  const handleSelectChange = useCallback((repair: ReturnType<typeof transformRepair>, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(repair.id);
+      else next.delete(repair.id);
+      return next;
+    });
+  }, []);
 
   const toggleSelectAll = () => {
     setSelectedIds((prev) => {
@@ -250,10 +262,7 @@ export default function Repairs() {
 
   const handleBulkStatus = (status: RepairStatus) => {
     if (selectedCount === 0) return;
-    bulkUpdateStatus.mutate(
-      { ids: Array.from(selectedIds), status },
-      { onSuccess: () => exitSelection() }
-    );
+    bulkUpdateStatus.mutate({ ids: Array.from(selectedIds), status }, { onSuccess: () => exitSelection() });
   };
 
   const handleBulkDelete = () => {
@@ -299,10 +308,7 @@ export default function Repairs() {
     }
   };
 
-  const handleStatusChange = (
-    repair: ReturnType<typeof transformRepair>,
-    newStatus: RepairStatus
-  ) => {
+  const handleStatusChange = (repair: ReturnType<typeof transformRepair>, newStatus: RepairStatus) => {
     // If moving to in_progress, prompt for received_by / repaired_by
     if (newStatus === "in_progress") {
       setAssignRepair(repair);
@@ -332,7 +338,7 @@ export default function Repairs() {
               description: `→ ${statusLabels[newStatus]}`,
             });
           },
-        }
+        },
       );
     }
   };
@@ -358,7 +364,7 @@ export default function Repairs() {
     if (!paymentConfirmRepair || !pendingStatus) return;
 
     setIsProcessingPayment(true);
-    
+
     try {
       const repair = paymentConfirmRepair;
       const remaining = repair.total - repair.paid;
@@ -394,7 +400,9 @@ export default function Repairs() {
           paymentType = "partial";
           note = `Paiement partiel (statut: ${pendingStatus}, dette restante: ${Math.max(0, debtAmount).toFixed(3)})`;
         }
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         await supabase.from("repair_payments").insert({
           user_id: effectiveUserId!,
           repair_id: repair.id,
@@ -431,15 +439,13 @@ export default function Repairs() {
       };
 
       toast.success(`Réparation ${statusLabels[pendingStatus].toLowerCase()}`, {
-        description: data.isFullPayment 
-          ? "Paiement complet enregistré" 
+        description: data.isFullPayment
+          ? "Paiement complet enregistré"
           : `Paiement de ${data.paymentAmount.toFixed(3)} DT enregistré`,
       });
 
       queryClient.invalidateQueries({ queryKey: ["session-totals"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-
-
 
       // Reset state
       setPaymentConfirmOpen(false);
@@ -453,25 +459,29 @@ export default function Repairs() {
     }
   };
 
-  const handleRepairSubmit = async (data: {
-    customer_id?: string;
-    category_id?: string;
-    device_model: string;
-    imei?: string;
-    problem_description: string;
-    diagnosis?: string;
-    labor_cost: number;
-    parts_cost: number;
-    total_cost: number;
-    amount_paid: number;
-    notes?: string;
-    estimated_ready_date?: string;
-    technician_note?: string;
-    received_by?: string;
-    repaired_by?: string;
-    device_condition?: string;
-    device_unlock_code?: string;
-  }, selectedParts: SelectedPart[] = [], keepOpen?: boolean) => {
+  const handleRepairSubmit = async (
+    data: {
+      customer_id?: string;
+      category_id?: string;
+      device_model: string;
+      imei?: string;
+      problem_description: string;
+      diagnosis?: string;
+      labor_cost: number;
+      parts_cost: number;
+      total_cost: number;
+      amount_paid: number;
+      notes?: string;
+      estimated_ready_date?: string;
+      technician_note?: string;
+      received_by?: string;
+      repaired_by?: string;
+      device_condition?: string;
+      device_unlock_code?: string;
+    },
+    selectedParts: SelectedPart[] = [],
+    keepOpen?: boolean,
+  ) => {
     const repairData = {
       customer_id: data.customer_id || null,
       category_id: data.category_id || null,
@@ -524,7 +534,7 @@ export default function Repairs() {
           p_product_id: part.product_id,
           p_quantity: part.quantity,
         });
-        
+
         // Fallback: direct update if RPC doesn't exist
         if (stockError) {
           const { data: product } = await supabase
@@ -532,7 +542,7 @@ export default function Repairs() {
             .select("quantity")
             .eq("id", part.product_id)
             .single();
-          
+
           if (product) {
             await supabase
               .from("products")
@@ -548,9 +558,7 @@ export default function Repairs() {
     // Rush-hour auto-print: "Enregistrer + Nouveau" fires BOTH print jobs
     // (customer receipt + phone label) immediately after creation.
     if (keepOpen && createdRow) {
-      const matchedCustomer = data.customer_id
-        ? customers.find((c) => c.id === data.customer_id)
-        : undefined;
+      const matchedCustomer = data.customer_id ? customers.find((c) => c.id === data.customer_id) : undefined;
       const printable: PrintableRepair = {
         id: repairId,
         ticket_number: createdRow.ticket_number ?? null,
@@ -582,7 +590,7 @@ export default function Repairs() {
         .catch(() =>
           toast.error("Impression impossible", {
             description: "Utilisez « Imprimer fiche » sur la carte de la réparation.",
-          })
+          }),
         );
     }
 
@@ -597,10 +605,7 @@ export default function Repairs() {
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <PageHeader
-          title="Gestion des Réparations"
-          description="Suivi et gestion des fiches de réparation"
-        />
+        <PageHeader title="Gestion des Réparations" description="Suivi et gestion des fiches de réparation" />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-64" />
@@ -616,14 +621,11 @@ export default function Repairs() {
         title="Gestion des Réparations"
         description={
           totalCount > 0
-            ? `Affichage de ${(page * REPAIRS_PAGE_SIZE) + 1}–${Math.min((page + 1) * REPAIRS_PAGE_SIZE, totalCount)} sur ${totalCount} réparation${totalCount > 1 ? "s" : ""} (incluant les dettes)`
+            ? `Affichage de ${page * REPAIRS_PAGE_SIZE + 1}–${Math.min((page + 1) * REPAIRS_PAGE_SIZE, totalCount)} sur ${totalCount} réparation${totalCount > 1 ? "s" : ""} (incluant les dettes)`
             : "Suivi et gestion des fiches de réparation"
         }
       >
-        <Button
-          className="bg-gradient-primary hover:opacity-90"
-          onClick={handleNewRepair}
-        >
+        <Button className="bg-gradient-primary hover:opacity-90" onClick={handleNewRepair}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvelle réparation
         </Button>
@@ -782,11 +784,7 @@ export default function Repairs() {
         onConfirm={confirmCancel}
       />
 
-      <RepairReceiptDialog
-        repair={selectedRepair}
-        open={receiptDialogOpen}
-        onOpenChange={setReceiptDialogOpen}
-      />
+      <RepairReceiptDialog repair={selectedRepair} open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen} />
 
       <RepairDialog
         open={repairDialogOpen}
@@ -827,7 +825,9 @@ export default function Repairs() {
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
-              className={bulkConfirm === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+              className={
+                bulkConfirm === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""
+              }
               onClick={() => {
                 if (bulkConfirm === "delete") handleBulkDelete();
                 else handleBulkStatus("rejected");
