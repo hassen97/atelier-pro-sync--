@@ -302,6 +302,7 @@ export function RepairDialog({
     } else {
       setSelectedBrand("");
       setSelectedParts([]);
+      setCustomerJustCreated(false);
       form.reset({
         customer_id: "",
         customer_name: "",
@@ -357,6 +358,7 @@ export function RepairDialog({
     form.reset();
     setSelectedBrand("");
     setSelectedParts([]);
+    setCustomerJustCreated(false);
     if (keepOpen) {
       // Ready for the next customer: restore the auto "Reçu par" (reset may
       // predate the loaded user) and reopen the client search with focus.
