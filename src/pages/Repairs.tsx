@@ -154,9 +154,19 @@ export default function Repairs() {
 
   const queryClient = useQueryClient();
 
-  const isSearching = searchQuery.trim().length >= 2;
+  const trimmed = searchQuery.trim();
+  const isSearching = trimmed.length >= 2;
+
+  const searchFilter = useMemo(
+    () => ({
+      status: activeTab === "all" || activeTab === "warranty" ? undefined : activeTab,
+      warrantyOnly: activeTab === "warranty",
+    }),
+    [activeTab],
+  );
+
   const normalQuery = useRepairs(page);
-  const searchQueryResult = useSearchRepairs(searchQuery, page, activeTab);
+  const searchQueryResult = useSearchRepairs(searchQuery, page, searchFilter);
 
   const activeResult = isSearching ? searchQueryResult : normalQuery;
   const { data: repairsResult = { data: [], count: 0 }, isLoading } = activeResult;
