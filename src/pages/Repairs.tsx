@@ -208,6 +208,9 @@ export default function Repairs() {
   const selectedRepair = selectedRepairId ? repairs.find((r) => r.id === selectedRepairId) || null : null;
 
   const filteredRepairs = useMemo(() => {
+    if (isSearching) {
+      return repairs;
+    }
     const q = searchQuery.trim().toLowerCase();
     return repairs.filter((repair) => {
       const ticketStr = repair.ticket_number ? String(repair.ticket_number) : "";
@@ -224,7 +227,7 @@ export default function Repairs() {
       const matchesWarranty = activeTab === "warranty" ? repair.is_warranty : true;
       return matchesSearch && matchesTab && matchesWarranty;
     });
-  }, [repairs, searchQuery, trimmed, activeTab]);
+  }, [repairs, searchQuery, trimmed, activeTab, isSearching]);
 
   // Page-local fallback used until the shop-wide aggregate resolves
   const pageCounts = useMemo(
