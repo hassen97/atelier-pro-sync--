@@ -190,7 +190,6 @@ export default function Repairs() {
   const shopInitials = getShopInitials(settings.shop_name);
 
   // Numeric search → server-side lookup so a ticket number on another page is found
-  const trimmed = searchQuery.trim();
   const numericSearch = /^\d+$/.test(trimmed) ? parseInt(trimmed, 10) : null;
   const { data: ticketHit } = useRepairByTicketNumber(numericSearch);
 
