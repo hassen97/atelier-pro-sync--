@@ -90,6 +90,83 @@ export function useRepairs(page = 0) {
   });
 }
 
+const REPAIR_LIST_SELECT = `id, status, device_model, problem_description, diagnosis,
+   deposit_date, delivery_date, imei, labor_cost, parts_cost,
+   total_cost, amount_paid, notes, tracking_token, ticket_number,
+   estimated_ready_date, technician_note, customer_id, category_id,
+   is_warranty, received_by, repaired_by, device_condition,
+   device_unlock_code,
+   warranty_ticket_id, created_at, updated_at,
+   customer:customers(id, name, phone, email),
+   category:categories(id, name)`;
+
+/** Escape a value for use inside a PostgREST or() filter. */
+function sanitizeSearch(term: string) {
+  return term.replace(/[(),*%]/g, " ").trim();
+}
+
+/**
+ * Database-wide repairs search (not limited to the current page).
+ * Matches customer name/phone, device model, IMEI, problem description and ticket number.
+ * Results are paginated server-side, so the first matches always appear on page 1.
+ */
+export function useSearchRepairs(
+  query: string,
+  page = 0,
+  filter: { status?: string; warrantyOnly?: boolean } = {}
+) {
+  const effectiveUserId = useEffectiveUserId();
+  const term = sanitizeSearch(query);
+  const from = page * REPAIRS_PAGE_SIZE;
+  const to = from + REPAIRS_PAGE_SIZE - 1;
+  const { status, warrantyOnly } = filter;
+
+  return useQuery({
+    queryKey: ["repairs", "search", effectiveUserId, term, page, status ?? null, !!warrantyOnly],
+    queryFn: async () => {
+      if (!effectiveUserId || term.length < 2) return { data: [], count: 0 };
+
+      // 1) Resolve customers matching the term (name or phone) so their repairs match too.
+      const { data: customerRows, error: custErr } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("user_id", effectiveUserId)
+        .or(`name.ilike.%${term}%,phone.ilike.%${term}%`)
+        .limit(500);
+      if (custErr) throw custErr;
+      const customerIds = (customerRows ?? []).map((c) => c.id);
+
+      // 2) Search repairs on their own fields + the resolved customer ids.
+      const orParts = [
+        `device_model.ilike.%${term}%`,
+        `imei.ilike.%${term}%`,
+        `problem_description.ilike.%${term}%`,
+      ];
+      if (/^\d+$/.test(term)) orParts.push(`ticket_number.eq.${term}`);
+      if (customerIds.length > 0) orParts.push(`customer_id.in.(${customerIds.join(",")})`);
+
+      let q = supabase
+        .from("repairs")
+        .select(REPAIR_LIST_SELECT, { count: "exact" })
+        .eq("user_id", effectiveUserId)
+        .or(orParts.join(","));
+
+      if (status) q = q.eq("status", status);
+      if (warrantyOnly) q = q.eq("is_warranty", true);
+
+      const { data, error, count } = await q
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+      return { data: data ?? [], count: count ?? 0 };
+    },
+    enabled: !!effectiveUserId && term.length >= 2,
+    placeholderData: (prev) => prev,
+    staleTime: 15 * 1000,
+  });
+}
+
 export interface RepairStatusCounts {
   all: number;
   pending: number;
