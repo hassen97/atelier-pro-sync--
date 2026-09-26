@@ -455,7 +455,7 @@ export function RepairDialog({
                           <div className="flex-1">
                             <CustomerCombobox
                               key={`intake-${intakeSeq}`}
-                              autoOpen={open && !isEditing}
+                              autoOpen={open && !isEditing && !customerJustCreated}
                               value={field.value || ""}
                               onValueChange={field.onChange}
                             />
