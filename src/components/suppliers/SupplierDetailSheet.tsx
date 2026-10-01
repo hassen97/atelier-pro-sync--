@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
-import { getThermalPrintCss, printThermalHtml, thermalEscape } from "@/lib/receiptPdf";
+import { getThermalPrintCss, printThermalHtml, thermalEscape, getBrandingFooterHtml } from "@/lib/receiptPdf";
 import {
   Supplier,
   SupplierTransaction,
@@ -114,6 +114,7 @@ export function SupplierDetailSheet({
         <div class="total-row grand"><span>Montant :</span><span class="val">${formatCurrency(tx.amount)}</span></div>
         <div class="total-row"><span>Solde :</span><span class="val">${formatCurrency(Math.abs(tx.computedBalance))}</span></div>
         <div class="sep-bold"></div>
+        ${getBrandingFooterHtml("Reçu généré avec")}
       </main></body></html>`;
     printThermalHtml(html, "width=400,height=600");
   };

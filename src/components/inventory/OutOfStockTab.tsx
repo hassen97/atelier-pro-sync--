@@ -20,7 +20,7 @@ import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 import { format as formatDate } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
-import { printThermalHtml } from "@/lib/receiptPdf";
+import { printThermalHtml, getBrandingFooterHtml } from "@/lib/receiptPdf";
 
 interface ShortageItem {
   id: string;
@@ -82,14 +82,22 @@ export function OutOfStockTab() {
           html, body { width: 80mm; }
           body {
             padding: 4mm 3mm;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Courier New', Courier, "Liberation Mono", monospace;
             color: #000;
             background: #fff;
-            font-size: 12px;
+            font-size: 12.5px;
             line-height: 1.4;
+            /* Thermal printers fade thin/gray strokes — force solid black bold */
+            font-weight: bold;
             -webkit-font-smoothing: none;
+            -moz-osx-font-smoothing: unset;
+            text-rendering: geometricPrecision;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+          }
+          th, td, .meta, .date, .footer, .sku, .sign, .total {
+            font-weight: bold;
+            color: #000;
           }
           .shop {
             text-align: center;
@@ -98,7 +106,7 @@ export function OutOfStockTab() {
             text-transform: uppercase;
             word-break: break-word;
           }
-          .meta { text-align: center; font-size: 10.5px; margin-bottom: 1mm; word-break: break-word; }
+          .meta { text-align: center; font-size: 11px; margin-bottom: 1mm; word-break: break-word; }
           .title {
             text-align: center;
             font-weight: bold;
@@ -108,26 +116,26 @@ export function OutOfStockTab() {
             border-bottom: 1px dashed #000;
             padding: 1.5mm 0;
           }
-          .date { text-align: center; font-size: 10.5px; margin-bottom: 2mm; }
+          .date { text-align: center; font-size: 11px; margin-bottom: 2mm; }
           table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-          th { font-size: 11px; text-align: left; border-bottom: 1px solid #000; padding: 1mm 0.5mm; }
+          th { font-size: 12px; text-align: left; border-bottom: 1.5px solid #000; padding: 1mm 0.5mm; }
           th.center, td.center { text-align: center; }
           td {
-            font-size: 11px;
+            font-size: 12px;
             padding: 1.4mm 0.5mm;
-            border-bottom: 1px dotted #999;
+            border-bottom: 1px dashed #000;
             vertical-align: top;
             overflow-wrap: break-word;
             word-break: break-word;
           }
           td.name { width: 58%; }
           th.center, td.center { width: 21%; }
-          .sku { font-size: 9.5px; color: #333; }
+          .sku { font-size: 10.5px; color: #000; opacity: 0.85; }
           td.qty { font-weight: bold; }
           .total { margin-top: 2mm; font-size: 12px; font-weight: bold; text-align: right; }
-          .sign { margin-top: 8mm; font-size: 10.5px; }
+          .sign { margin-top: 8mm; font-size: 11px; }
           .sign-line { margin-top: 6mm; border-top: 1px solid #000; width: 50mm; max-width: 100%; padding-top: 1mm; }
-          .footer { text-align: center; font-size: 9.5px; margin-top: 4mm; word-break: break-word; }
+          .footer { text-align: center; font-size: 10.5px; margin-top: 4mm; word-break: break-word; }
         </style>
       </head>
       <body>
@@ -151,6 +159,7 @@ export function OutOfStockTab() {
           <div class="sign-line">Signature / Cachet</div>
         </div>
         <div class="footer">Généré par ${escapeHtml(shopName)}</div>
+        ${getBrandingFooterHtml()}
       </body>
       </html>
     `;

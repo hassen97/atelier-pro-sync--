@@ -46,6 +46,18 @@ function escHtml(s: string): string {
 
 export const thermalEscape = escHtml;
 
+// ── "Made with RepairPro" branding ──────────────────────────────────────
+// Appended to every printed document (receipts, invoices, order slips,
+// supplier payments, closing reports, vault credentials). Uses self-contained
+// inline styles so it renders identically even in templates that don't load
+// the shared thermal CSS (e.g. the standalone order-receipt / rupture slip).
+export const BRAND_NAME = "RepairPro";
+export const BRAND_DOMAIN = "www.getheavencoin.com";
+
+export function getBrandingFooterHtml(label = "Généré avec") {
+  return `<div style="border-top:1px dashed #000;margin:4px 0 2px;"></div><p style="font-size:9.5px;line-height:1.3;text-align:center;font-weight:bold;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${label} ${BRAND_NAME} \u00b7 ${BRAND_DOMAIN}</p>`;
+}
+
 export function getThermalPrintCss(pageW = "72mm", fontSize = "12px") {
   return `
     @page { size: ${pageW} auto; margin: 0; }
@@ -367,6 +379,7 @@ ${data.trackingUrl ? `
 
 <p class="footer">Présentez ce ticket pour récupérer<br>votre appareil.</p>
 ${thankYouHtml}
+${getBrandingFooterHtml()}
 
 </main></body>
 </html>`;
@@ -484,6 +497,7 @@ ${data.phone ? `<p class="field"><span class="bold">Tél:</span> ${escHtml(data.
 <div class="sep"></div>
 <p class="field"><span class="bold">Créé le:</span> ${escHtml(data.createdAt)}</p>
 <p class="footer">Conservez ces informations en lieu sûr.</p>
+${getBrandingFooterHtml("Billet généré avec")}
 
 </main></body>
 </html>`;
@@ -633,6 +647,7 @@ ${data.closedBy ? `<p class="z-meta">Clôturé par: ${escHtml(data.closedBy)}</p
   <div class="z-sign-line"></div>
 </div>
 <div class="sep-bold"></div>
+${getBrandingFooterHtml("Rapport généré avec")}
 
 </main></body>
 </html>`;
@@ -909,6 +924,16 @@ export async function generateClosingReportPdf(
   doc.setTextColor(...grey());
   doc.text("Signature de l'employé", margin, y + 4);
 
+  // ── "Made with RepairPro" branding footer on every page ──
+  const totalPages = doc.getNumberOfPages();
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(140, 140, 140);
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.text(`Généré avec ${BRAND_NAME} \u00b7 ${BRAND_DOMAIN}`, pageW / 2, 291, { align: "center" });
+  }
+
   const fileDate = data.dateTime.replace(/[^0-9]/g, "").slice(0, 8) || "rapport";
   doc.save(`cloture-${fileDate}.pdf`);
 }
@@ -991,6 +1016,7 @@ export function printOrderReceipt(data: OrderReceiptData) {
   <div class="total">Total articles : ${data.items.length}</div>
   <div class="sign"><div class="sign-line">Signature / Cachet</div></div>
   <div class="footer">Généré par ${escHtml(data.shopName)}</div>
+  ${getBrandingFooterHtml()}
 </body>
 </html>`;
 

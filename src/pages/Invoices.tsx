@@ -50,7 +50,7 @@ import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useInvoices, useUpdateInvoice, useDeleteInvoice, InvoiceWithRelations } from "@/hooks/useInvoices";
 import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
-import { getThermalPrintCss, printThermalHtml, thermalEscape } from "@/lib/receiptPdf";
+import { getThermalPrintCss, printThermalHtml, thermalEscape, getBrandingFooterHtml } from "@/lib/receiptPdf";
 import { toast } from "sonner";
 
 const statusConfig = {
@@ -109,6 +109,7 @@ export default function Invoices() {
         <div class="total-row grand"><span>TOTAL :</span><span class="val">${format(Number(invoice.total_amount))}</span></div>
         <div class="total-row"><span>Statut :</span><span class="val">${status}</span></div>
         <div class="sep-bold"></div>
+        ${getBrandingFooterHtml("Facture générée avec")}
       </main></body></html>`;
     printThermalHtml(html, "width=400,height=600");
   };
