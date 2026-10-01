@@ -43,6 +43,12 @@ POS / inventory / repairs SaaS for phone-repair shops (Tunisia). React 18 SPA + 
 - `useSales()` (`src/hooks/useSales.ts`) is legacy — it fetches the whole sales history + nested items unbounded. Live pages use the narrow `useAllUnpaidSales()` (batched, unpaid-only) behind `CustomerDebts`; invalidations: `["sales-unpaid-all"]`, `["repairs-unpaid-all"]`. Prefer paginated/aggregate hooks for perf-sensitive queries.
 - **Subscription writes are server-side only.** Clients never write `shop_subscriptions` (RLS denies since migration `20260816120000_lockdown_shop_subscriptions_trial_grants`): owners SELECT their own rows, platform admins keep an ALL policy (order approval, God Mode set/adjust). Welcome trials are granted exclusively by the `grant-trial` edge function (`supabase/functions/grant-trial/`): one per user (append-only `trial_claims` log, service-role only), fresh accounts < 24h, 3 claims per IP per 7 days, cheapest active Pro plan, 7 days, `status='trialing'` with `trial_ends_at`. Do NOT reintroduce client-side trial grants or self-write policies.
 
+## Database changes — Lovable Cloud workflow
+
+- The project uses the **integrated Supabase Cloud instance managed by Lovable**. The user cannot run `supabase migration apply` or any CLI-based DB command locally.
+- Whenever a change requires a schema / policy / RPC / seed update, ALWAYS: (1) tell the user explicitly that a database update is required and what it does; (2) provide the exact SQL as a copy-paste block ready for **Lovable Cloud → SQL Editor**; (3) also write the matching file under `supabase/migrations/` so the chronological history stays in sync; (4) after they run the SQL, regenerate or manually update `src/integrations/supabase/types.ts` so TypeScript types match the new schema.
+- NEVER assume a new migration file alone is enough — the SQL must be handed to the user for Lovable Cloud.
+
 ## PWA / build gotchas
 
 - Single service worker `src/sw.ts` (vite-plugin-pwa `injectManifest`); registration logic in `src/lib/swUpdate.ts`. The SW never runs in Lovable preview / iframe / localhost.

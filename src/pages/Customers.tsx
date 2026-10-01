@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Plus, Phone, Mail, User, CreditCard, MoreHorizontal, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Phone, Mail, User, CreditCard, MoreHorizontal, Eye, ChevronLeft, ChevronRight, Wrench, Wallet, ShoppingCart, ArrowUpDown } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useCustomers, useAllCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, type Customer } from "@/hooks/useCustomers";
+import { useCustomerStats, useSortedCustomers, type CustomerStatsSort } from "@/hooks/useCustomerStats";
 import { CustomerDialog } from "@/components/customers/CustomerDialog";
 import { CustomerDossierDialog } from "@/components/customers/CustomerDossierDialog";
 
@@ -19,14 +21,27 @@ const CUSTOMERS_PAGE_SIZE = 50;
 
 export default function Customers() {
   const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<CustomerStatsSort>("name");
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [dossierCustomer, setDossierCustomer] = useState<Customer | null>(null);
 
-  const { data: customersResult, isLoading } = useCustomers(page);
-  const customers: Customer[] = customersResult?.data ?? [];
-  const totalCount = customersResult?.count ?? 0;
+  const isNameSort = sort === "name";
+
+  // DEFAULT path (untouched behaviour): name sort via useCustomers + stats enrichment
+  const { data: customersResult, isLoading: loadingName } = useCustomers(page);
+  const nameCustomers: Customer[] = customersResult?.data ?? [];
+  const nameIds = isNameSort ? nameCustomers.map((c) => c.id) : [];
+  const { data: nameStats = {} } = useCustomerStats(nameIds);
+
+  // OPT-IN path: global sort driven by the customer_stats view (disabled when sort === "name")
+  const { data: sortedResult, isLoading: loadingSorted } = useSortedCustomers(page, sort);
+
+  const customers: Customer[] = isNameSort ? nameCustomers : sortedResult?.customers ?? [];
+  const statsMap = isNameSort ? nameStats : sortedResult?.statsMap ?? {};
+  const totalCount = isNameSort ? (customersResult?.count ?? 0) : (sortedResult?.count ?? 0);
+  const isLoading = isNameSort ? loadingName : loadingSorted;
   const totalPages = Math.ceil(totalCount / CUSTOMERS_PAGE_SIZE);
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
@@ -73,14 +88,34 @@ export default function Customers() {
         <StatCard title="Total créances" value={format(totalDebts)} icon={CreditCard} variant="destructive" />
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Rechercher par nom ou téléphone..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 max-w-md" />
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Rechercher par nom ou téléphone..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 max-w-md" />
+        </div>
+        <div className="flex items-center gap-2">
+          <ArrowUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Select value={sort} onValueChange={(v) => { setSort(v as CustomerStatsSort); setPage(0); }}>
+            <SelectTrigger className="w-[210px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Trier : Nom (A-Z)</SelectItem>
+              <SelectItem value="repairs">Trier : + de réparations</SelectItem>
+              <SelectItem value="paid">Trier : + payé</SelectItem>
+              <SelectItem value="outstanding">Trier : + doit (créance)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <h2 className="sr-only">Liste des clients</h2>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filteredCustomers.map((customer) => (
+        {filteredCustomers.map((customer) => {
+          const stats = statsMap[customer.id];
+          const outstanding = stats ? stats.outstanding : 0;
+          const useStats = !!stats;
+          const isDebt = useStats ? outstanding > 0.005 : Number(customer.balance) < 0;
+          const debtAmount = useStats ? Math.abs(outstanding) : Math.abs(Number(customer.balance));
+          return (
           <Card key={customer.id} className="hover:shadow-soft transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-4">
@@ -103,15 +138,30 @@ export default function Customers() {
                 </DropdownMenu>
               </div>
               {customer.email && <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3"><Mail className="h-3 w-3" /><span className="truncate">{customer.email}</span></div>}
+              <div className="grid grid-cols-3 gap-2 text-center py-2 rounded-lg bg-muted/40 mb-1">
+                <div>
+                  <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground"><Wrench className="h-3 w-3" />Rép.</div>
+                  <div className="text-sm font-bold font-mono-numbers">{stats?.repair_count ?? 0}</div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground"><ShoppingCart className="h-3 w-3" />Achats</div>
+                  <div className="text-sm font-bold font-mono-numbers">{stats?.sale_count ?? 0}</div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground"><Wallet className="h-3 w-3" />Payé</div>
+                  <div className="text-sm font-bold font-mono-numbers" title={format(stats?.total_paid ?? 0)}>{format(stats?.total_paid ?? 0)}</div>
+                </div>
+              </div>
               <div className="flex items-center justify-between pt-3 border-t border-border">
                 <span className="text-sm text-muted-foreground">Solde</span>
-                <Badge className={cn(Number(customer.balance) < 0 ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-success/10 text-success border-success/20")}>
-                  {Number(customer.balance) < 0 ? `Doit: ${format(Math.abs(Number(customer.balance)))}` : "À jour"}
+                <Badge className={cn(isDebt ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-success/10 text-success border-success/20")}>
+                  {isDebt ? `Doit: ${format(debtAmount)}` : "À jour"}
                 </Badge>
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {filteredCustomers.length === 0 && !isLoading && <div className="text-center py-12 text-muted-foreground">{customers.length === 0 ? "Aucun client enregistré. Cliquez sur 'Nouveau client' pour commencer." : "Aucun client trouvé"}</div>}
