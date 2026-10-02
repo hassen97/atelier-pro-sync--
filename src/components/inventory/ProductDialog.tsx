@@ -34,6 +34,7 @@ const productSchema = z.object({
   subcategory_id: z.string().optional(),
   cost_price: z.coerce.number().min(0, "Le prix doit être positif"),
   sell_price: z.coerce.number().min(0, "Le prix doit être positif"),
+  promo_percentage: z.coerce.number().min(0, "Min 0%").max(100, "Max 100%").default(0),
   quantity: z.coerce.number().int().min(0, "La quantité doit être positive"),
   min_quantity: z.coerce.number().int().min(0, "Le seuil doit être positif"),
 });
@@ -52,6 +53,7 @@ interface ProductDialogProps {
     subcategory_id?: string | null;
     cost_price: number;
     sell_price: number;
+    promo_percentage?: number | null;
     quantity: number;
     min_quantity: number;
   } | null;
@@ -84,7 +86,7 @@ export function ProductDialog({
       category_id: "",
       subcategory_id: "",
       cost_price: 0,
-      sell_price: 0,
+      sell_price: 0, promo_percentage: 0,
       quantity: 0,
       min_quantity: 5,
     },
@@ -101,7 +103,7 @@ export function ProductDialog({
 
   const defaultDraftValues = {
     name: "", sku: "", description: "", category_id: "", subcategory_id: "",
-    cost_price: 0, sell_price: 0, quantity: 0, min_quantity: 5,
+    cost_price: 0, sell_price: 0, promo_percentage: 0, quantity: 0, min_quantity: 5,
   };
 
   const { clearDraft } = useFormDraft("product", {
@@ -121,6 +123,7 @@ export function ProductDialog({
         subcategory_id: product.subcategory_id || "",
         cost_price: Number(product.cost_price) || 0,
         sell_price: Number(product.sell_price) || 0,
+            promo_percentage: Number(product.promo_percentage) || 0,
         quantity: product.quantity || 0,
         min_quantity: product.min_quantity || 5,
       });
@@ -132,7 +135,7 @@ export function ProductDialog({
         category_id: "",
         subcategory_id: "",
         cost_price: 0,
-        sell_price: 0,
+        sell_price: 0, promo_percentage: 0,
         quantity: 0,
         min_quantity: 5,
       });
@@ -157,6 +160,8 @@ export function ProductDialog({
 
   const costPrice = form.watch("cost_price") || 0;
   const sellPrice = form.watch("sell_price") || 0;
+  const promoPct = Number(form.watch("promo_percentage")) || 0;
+  const promoFinal = sellPrice * (1 - Math.min(Math.max(promoPct,0),100) / 100);
   const margin = costPrice > 0 ? ((sellPrice - costPrice) / costPrice) * 100 : 0;
 
   return (
@@ -312,6 +317,26 @@ export function ProductDialog({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="promo_percentage"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Promotion (%)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="1" min="0" max="100" placeholder="0" {...field} value={field.value ?? 0} />
+                  </FormControl>
+                  {promoPct > 0 && sellPrice > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Prix final : <span className="line-through">{sellPrice.toFixed(3)}</span>{" "}
+                      <span className="font-bold text-primary">{promoFinal.toFixed(3)} {currencyCode}</span> (-{promoPct}%)
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Margin Display */}
             {costPrice > 0 && (

@@ -39,6 +39,7 @@ const productSchema = z.object({
   subcategory_id: z.string().optional(),
   cost_price: z.coerce.number().min(0),
   sell_price: z.coerce.number().min(0),
+  promo_percentage: z.coerce.number().min(0, "Min 0%").max(100, "Max 100%").default(0),
   quantity: z.coerce.number().int().min(0),
   min_quantity: z.coerce.number().int().min(0),
 });
@@ -58,6 +59,7 @@ interface ProductSheetProps {
     subcategory_id?: string | null;
     cost_price: number;
     sell_price: number;
+    promo_percentage?: number | null;
     quantity: number;
     min_quantity: number;
   } | null;
@@ -108,7 +110,7 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
         category_id: "",
         subcategory_id: "",
         cost_price: 0,
-        sell_price: 0,
+        sell_price: 0, promo_percentage: 0,
         quantity: 0,
         min_quantity: 5,
       },
@@ -117,6 +119,8 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
     const barcodes = useWatch({ control: form.control, name: "barcodes" }) || [];
     const costPrice = useWatch({ control: form.control, name: "cost_price" }) || 0;
     const sellPrice = useWatch({ control: form.control, name: "sell_price" }) || 0;
+  const promoPct = Number(form.watch("promo_percentage")) || 0;
+  const promoFinal = sellPrice * (1 - Math.min(Math.max(promoPct,0),100) / 100);
     const margin = sellPrice > 0 ? ((sellPrice - costPrice) / sellPrice) * 100 : 0;
     const productName = useWatch({ control: form.control, name: "name" }) || "";
     const selectedCategoryId = useWatch({ control: form.control, name: "category_id" }) || "";
@@ -151,6 +155,7 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
             subcategory_id: product.subcategory_id || "",
             cost_price: Number(product.cost_price) || 0,
             sell_price: Number(product.sell_price) || 0,
+            promo_percentage: Number(product.promo_percentage) || 0,
             quantity: product.quantity || 0,
             min_quantity: product.min_quantity || 5,
           });
@@ -162,7 +167,7 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
             category_id: "",
             subcategory_id: "",
             cost_price: 0,
-            sell_price: 0,
+            sell_price: 0, promo_percentage: 0,
             quantity: 0,
             min_quantity: 5,
           });
@@ -428,7 +433,27 @@ export const ProductSheet = forwardRef<ProductSheetRef, ProductSheetProps>(
                   />
                 </div>
 
-                {/* Reactive Margin */}
+                <FormField
+              control={form.control}
+              name="promo_percentage"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Promotion (%)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="1" min="0" max="100" placeholder="0" {...field} value={field.value ?? 0} />
+                  </FormControl>
+                  {promoPct > 0 && sellPrice > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Prix final : <span className="line-through">{sellPrice.toFixed(3)}</span>{" "}
+                      <span className="font-bold text-primary">{promoFinal.toFixed(3)} {currencyCode}</span> (-{promoPct}%)
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Reactive Margin */}
                 <div className={`p-3 rounded-lg flex justify-between items-center transition-colors ${
                   margin > 0 ? "bg-success/10 border border-success/20" : "bg-muted/50"
                 }`}>
