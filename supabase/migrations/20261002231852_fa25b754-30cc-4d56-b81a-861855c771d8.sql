@@ -1,0 +1,1 @@
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS promo_percentage numeric DEFAULT 0 CHECK (promo_percentage IS NULL OR (promo_percentage >= 0 AND promo_percentage <= 100));

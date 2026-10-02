@@ -1172,6 +1172,7 @@ export type Database = {
           id: string
           min_quantity: number
           name: string
+          promo_percentage: number | null
           quantity: number
           sell_price: number
           sku: string | null
@@ -1188,6 +1189,7 @@ export type Database = {
           id?: string
           min_quantity?: number
           name: string
+          promo_percentage?: number | null
           quantity?: number
           sell_price?: number
           sku?: string | null
@@ -1204,6 +1206,7 @@ export type Database = {
           id?: string
           min_quantity?: number
           name?: string
+          promo_percentage?: number | null
           quantity?: number
           sell_price?: number
           sku?: string | null
