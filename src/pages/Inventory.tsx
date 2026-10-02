@@ -700,6 +700,8 @@ export default function Inventory() {
         onSaved={returnFocusToScanBar}
       />
 
+      <PrintLabelModal product={labelProduct} open={!!labelProduct} onOpenChange={(o) => { if (!o) setLabelProduct(null); }} />
+
       {/* Edit Dialog (existing products) */}
       <ProductDialog
         open={editDialogOpen}

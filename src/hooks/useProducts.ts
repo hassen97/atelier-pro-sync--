@@ -31,7 +31,7 @@ export function useProducts({ page = 0, search = "", categoryId }: UseProductsOp
       let query = supabase
         .from("products")
         .select(
-          `id, name, sku, barcodes, description, cost_price, sell_price,
+          `id, name, sku, barcodes, description, cost_price, sell_price, promo_percentage,
            quantity, min_quantity, category_id, subcategory_id,
            category:categories(id, name),
            subcategory:subcategories(id, name)`,
