@@ -52,7 +52,7 @@ export function useCustomerStats(customerIds: string[]) {
     queryKey: ["customer-stats", effectiveUserId, idsKey],
     queryFn: async () => {
       if (!effectiveUserId || customerIds.length === 0) return {} as Record<string, CustomerStats>;
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("customer_stats")
         .select("*")
         .eq("user_id", effectiveUserId)
@@ -91,7 +91,7 @@ export function useSortedCustomers(page: number, sort: CustomerStatsSort) {
         sort === "repairs" ? "repair_count" : sort === "paid" ? "total_paid" : "outstanding";
 
       // 1) ordered + paginated customer ids straight from the view (indexed)
-      const { data: statsRows, error: statsError, count } = await supabase
+      const { data: statsRows, error: statsError, count } = await (supabase as any)
         .from("customer_stats")
         .select("customer_id, repair_count, repair_total, repair_paid, sale_count, sale_total, sale_paid, total_billed, total_paid, outstanding", { count: "exact" })
         .eq("user_id", effectiveUserId)

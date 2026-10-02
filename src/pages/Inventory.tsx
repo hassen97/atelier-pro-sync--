@@ -31,7 +31,8 @@ import { ActivityLogTab } from "@/components/inventory/ActivityLogTab";
 import { OutOfStockTab } from "@/components/inventory/OutOfStockTab";
 import { useInventoryAccess } from "@/hooks/useInventoryAccess";
 import { PremiumFeature } from "@/components/billing/PremiumFeature";
-import { Lock, Unlock } from "lucide-react";
+import { Lock, Unlock, Printer } from "lucide-react";
+import { PrintLabelModal, LabelProduct } from "@/components/inventory/PrintLabelModal";
 import { toast } from "sonner";
 
 interface ProductWithCategory {
@@ -45,6 +46,7 @@ export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("__all__");
   const [currentPage, setCurrentPage] = useState(0);
+  const [labelProduct, setLabelProduct] = useState<LabelProduct | null>(null);
   
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -560,7 +562,7 @@ export default function Inventory() {
                           )}
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap items-center gap-1">
                               {item.barcodes.length > 0 ? (
                                 item.barcodes.map((b) => (
                                   <span key={b} className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
@@ -571,6 +573,27 @@ export default function Inventory() {
                                 <span className="font-mono text-xs text-muted-foreground">{item.sku}</span>
                               ) : (
                                 <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                              {(item.barcodes.length > 0 || item.sku) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  title="Imprimer l'étiquette"
+                                  aria-label={`Imprimer l'étiquette de ${item.name}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const codes = Array.from(new Set([...item.barcodes, ...(item.sku ? [item.sku] : [])].filter(Boolean)));
+                                    setLabelProduct({
+                                      name: item.name,
+                                      price: item.price,
+                                      promoPercentage: Number((item._original as { promo_percentage?: number | null }).promo_percentage) || 0,
+                                      codes,
+                                    });
+                                  }}
+                                >
+                                  <Printer className="h-3.5 w-3.5" />
+                                </Button>
                               )}
                             </div>
                           </TableCell>
@@ -676,6 +699,8 @@ export default function Inventory() {
         isLoading={createProduct.isPending}
         onSaved={returnFocusToScanBar}
       />
+
+      <PrintLabelModal product={labelProduct} open={!!labelProduct} onOpenChange={(o) => { if (!o) setLabelProduct(null); }} />
 
       {/* Edit Dialog (existing products) */}
       <ProductDialog

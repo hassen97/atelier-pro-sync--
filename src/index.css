@@ -586,6 +586,23 @@
 
 
 
+.label-print-root { display: none; }
+@media print {
+  body.label-printing > *:not(.label-print-root) { display: none !important; }
+  body.label-printing { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  body.label-printing .label-print-root {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    margin: 0;
+    padding: 0;
+  }
+  body.label-printing .label-print-root * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
 
 @media print {
   @page { margin: 0; }
