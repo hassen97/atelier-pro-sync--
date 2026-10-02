@@ -37,7 +37,7 @@ import { toast } from "sonner";
 
 interface ProductWithCategory {
   id: string; name: string; sku: string | null; barcodes: string[]; description: string | null;
-  cost_price: number; sell_price: number; quantity: number; min_quantity: number;
+  cost_price: number; sell_price: number; promo_percentage?: number | null; quantity: number; min_quantity: number;
   category?: { id: string; name: string } | null;
   category_id?: string | null;
 }
@@ -122,6 +122,7 @@ export default function Inventory() {
     barcodes: p.barcodes || (p.sku ? [p.sku] : []),
     cost: Number(p.cost_price) || 0,
     price: Number(p.sell_price) || 0,
+    promo: Number(p.promo_percentage) || 0,
     stock: p.quantity || 0,
     threshold: p.min_quantity || 5,
     _original: p,
@@ -599,7 +600,17 @@ export default function Inventory() {
                           </TableCell>
                           <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
                           {!isEmployee && <TableCell className="text-right font-mono-numbers">{format(item.cost)}</TableCell>}
-                          <TableCell className="text-right font-mono-numbers">{format(item.price)}</TableCell>
+                          <TableCell className="text-right font-mono-numbers">
+                            {item.promo > 0 ? (
+                              <div className="flex flex-col items-end leading-tight">
+                                <span className="text-xs text-muted-foreground line-through">{format(item.price)}</span>
+                                <span className="flex items-center gap-1 font-semibold text-primary">
+                                  {format(item.price * (1 - item.promo / 100))}
+                                  <span className="rounded bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">-{item.promo}%</span>
+                                </span>
+                              </div>
+                            ) : format(item.price)}
+                          </TableCell>
                           {!isEmployee && (
                             <TableCell className="text-right">
                               <span className="text-success font-medium">+{margin.toFixed(0)}%</span>
