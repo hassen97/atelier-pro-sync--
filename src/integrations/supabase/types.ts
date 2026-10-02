@@ -2706,48 +2706,6 @@ export type Database = {
       }
     }
     Views: {
-      customer_stats: {
-        Row: {
-          customer_id: string | null
-          outstanding: number | null
-          repair_count: number | null
-          repair_paid: number | null
-          repair_total: number | null
-          sale_count: number | null
-          sale_paid: number | null
-          sale_total: number | null
-          total_billed: number | null
-          total_paid: number | null
-          user_id: string | null
-        }
-        Insert: {
-          customer_id?: never
-          outstanding?: never
-          repair_count?: never
-          repair_paid?: never
-          repair_total?: never
-          sale_count?: never
-          sale_paid?: never
-          sale_total?: never
-          total_billed?: never
-          total_paid?: never
-          user_id?: never
-        }
-        Update: {
-          customer_id?: never
-          outstanding?: never
-          repair_count?: never
-          repair_paid?: never
-          repair_total?: never
-          sale_count?: never
-          sale_paid?: never
-          sale_total?: never
-          total_billed?: never
-          total_paid?: never
-          user_id?: never
-        }
-        Relationships: []
-      }
       unpaid_sales: {
         Row: {
           amount_paid: number | null
