@@ -41,7 +41,7 @@ export function OutOfStockTab() {
   const { settings } = useShopSettingsContext();
   const [filterMode, setFilterMode] = useState<"all" | "out">("all");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [zoom, setZoom] = useState(1.2);
+  const [zoom, setZoom] = useState(1);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const items = useMemo(() => {
@@ -170,7 +170,7 @@ export function OutOfStockTab() {
       toast.error("Aucun produit à imprimer");
       return;
     }
-    setZoom(1.2);
+    setZoom(1);
     setPreviewOpen(true);
   };
 
