@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { printThermalHtml } from "@/lib/receiptPdf";
 import { Printer } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -107,22 +107,50 @@ export function PrintLabelModal({ product, open, onOpenChange }: PrintLabelModal
     setCode(codes[0] ?? "");
   }, [codes]);
 
-  const handlePrint = () => {
-    const style = document.createElement("style");
-    style.id = "label-print-page-style";
-    style.textContent = "@media print { @page { size: 50mm 30mm; margin: 0; } }";
-    document.head.appendChild(style);
-    document.body.classList.add("label-printing");
-    const cleanup = () => {
-      document.body.classList.remove("label-printing");
-      style.remove();
-      window.removeEventListener("afterprint", cleanup);
-    };
-    window.addEventListener("afterprint", cleanup);
-    setTimeout(() => {
-      window.print();
-      setTimeout(cleanup, 1000);
-    }, 50);
+  const handlePrint = async () => {
+    if (!product || !code) return;
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    let svgHtml = "";
+    try {
+      const { default: JsBarcode } = await import("jsbarcode");
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      JsBarcode(svg, code, { format: "CODE128", width: 2, height: 40, displayValue: false, margin: 0, background: "#ffffff", lineColor: "#000000" });
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.setAttribute("shape-rendering", "crispEdges");
+      svgHtml = svg.outerHTML;
+    } catch {
+      svgHtml = "";
+    }
+    const promo = Number(product.promoPercentage) || 0;
+    const hasPromo = promo > 0 && promo < 100;
+    const finalPrice = hasPromo ? Math.round(product.price * (1 - promo / 100) * 1000) / 1000 : product.price;
+    const name = esc(settings.shop_name || "Mon Atelier");
+    const priceHtml = hasPromo
+      ? `<div class="promo"><span class="old">${esc(format(product.price))}</span><span class="big">${esc(format(finalPrice))}</span><span class="badge">-${promo}%</span></div>`
+      : `<div class="big">${esc(format(product.price))}</div>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Étiquette ${esc(code)}</title>
+<style>
+@page { size: 50mm 30mm; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; color: #000; font-weight: bold;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html, body { width: 50mm; height: 30mm; overflow: hidden; background: #fff; }
+body { font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: none; -moz-osx-font-smoothing: unset; text-rendering: geometricPrecision; }
+.label { width: 50mm; height: 30mm; padding: 1.2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; text-align: center; overflow: hidden; page-break-after: avoid; }
+.shop { font-size: 6pt; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
+.name { font-size: 8pt; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
+.big { font-size: 11pt; font-weight: 900; line-height: 1; }
+.promo { display: flex; align-items: center; justify-content: space-between; line-height: 1; }
+.old { font-size: 7pt; text-decoration: line-through; }
+.badge { font-size: 6.5pt; font-weight: 900; background: #000 !important; color: #fff !important; padding: 0.3mm 1mm; border-radius: 0.6mm; }
+svg { display: block; width: 46mm; height: 9mm; margin: 0 auto; shape-rendering: crispEdges; }
+.code { font-size: 6.5pt; font-family: 'Courier New', monospace; letter-spacing: 0.5px; line-height: 1.1; margin-top: 0.3mm; }
+</style></head><body><div class="label">
+<div class="shop">${name}</div>
+<div class="name">${esc(product.name)}</div>
+${priceHtml}
+<div>${svgHtml}<div class="code">${esc(code)}</div></div>
+</div></body></html>`;
+    printThermalHtml(html, "width=400,height=300");
   };
 
   if (!product) return null;
@@ -165,13 +193,6 @@ export function PrintLabelModal({ product, open, onOpenChange }: PrintLabelModal
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {open && code &&
-        createPortal(
-          <div className="label-print-root" aria-hidden="true">
-            <Label shopName={shopName} product={product} code={code} format={format} />
-          </div>,
-          document.body,
-        )}
     </>
   );
 }
