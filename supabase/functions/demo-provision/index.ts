@@ -233,8 +233,22 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Authorization: this function performs privileged service-role writes
+    // (including granting the demo account the super_admin role), so it must
+    // only be reachable server-to-server. Accept either:
+    //   - the service role key in the apikey header (used by demo-login), or
+    //   - the DEMO_RESET_SECRET header (used by the scheduled reset cron).
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resetSecret = req.headers.get("x-demo-reset-secret");
-    const forceReset = resetSecret != null && resetSecret === Deno.env.get("DEMO_RESET_SECRET");
+    const hasResetSecret =
+      resetSecret != null && resetSecret === Deno.env.get("DEMO_RESET_SECRET");
+    const hasServiceKey = req.headers.get("apikey") === serviceKey;
+
+    if (!hasResetSecret && !hasServiceKey) {
+      return json({ error: "Non autorisé" }, 401);
+    }
+
+    const forceReset = hasResetSecret;
 
     const uid = await ensureDemoUser(admin);
 
