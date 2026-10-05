@@ -114,7 +114,7 @@ export function PrintLabelModal({ product, open, onOpenChange }: PrintLabelModal
     try {
       const { default: JsBarcode } = await import("jsbarcode");
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      JsBarcode(svg, code, { format: "CODE128", width: 2, height: 40, displayValue: false, margin: 0, background: "#ffffff", lineColor: "#000000" });
+      JsBarcode(svg, code, { format: "CODE128", width: 3, height: 60, displayValue: false, margin: 0, background: "#ffffff", lineColor: "#000000" });
       svg.setAttribute("preserveAspectRatio", "none");
       svg.setAttribute("shape-rendering", "crispEdges");
       svgHtml = svg.outerHTML;
@@ -130,20 +130,22 @@ export function PrintLabelModal({ product, open, onOpenChange }: PrintLabelModal
       : `<div class="big">${esc(format(product.price))}</div>`;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Étiquette ${esc(code)}</title>
 <style>
-@page { size: 80mm 30mm portrait; margin: 0; }
-* { margin: 0; padding: 0; box-sizing: border-box; color: #000; font-weight: bold;
+@page { size: 80mm 28mm portrait; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; color: #000; font-weight: 900;
   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-html, body { width: 80mm; height: 30mm; overflow: hidden; background: #fff; margin: 0; padding: 0; }
-body { font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: none; -moz-osx-font-smoothing: unset; text-rendering: geometricPrecision; }
-.label { width: 72mm; height: 30mm; margin: 0 auto; padding: 1.2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; text-align: center; overflow: hidden; page-break-after: avoid; }
-.shop { font-size: 6pt; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
-.name { font-size: 8pt; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
-.big { font-size: 11pt; font-weight: 900; line-height: 1; }
+html, body { width: 80mm; height: 28mm; overflow: hidden; background: #fff; margin: 0; padding: 0; }
+body { font-family: Arial, Helvetica, sans-serif; text-rendering: geometricPrecision; }
+.label { width: 72mm; margin: 0 auto; padding: 0 2mm; display: flex; flex-direction: column; justify-content: flex-start; gap: 0.6mm; text-align: center; overflow: hidden; page-break-after: avoid; }
+.shop { font-size: 7pt; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.05; }
+.name { font-size: 9pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.05; }
+.big { font-size: 13pt; line-height: 1; }
 .promo { display: flex; align-items: center; justify-content: space-between; line-height: 1; }
-.old { font-size: 7pt; text-decoration: line-through; }
-.badge { font-size: 6.5pt; font-weight: 900; background: #000 !important; color: #fff !important; padding: 0.3mm 1mm; border-radius: 0.6mm; }
-svg { display: block; width: 60mm; height: 10mm; margin: 0 auto; shape-rendering: crispEdges; }
-.code { font-size: 6.5pt; font-family: 'Courier New', monospace; letter-spacing: 0.5px; line-height: 1.1; margin-top: 0.3mm; }
+.old { font-size: 8pt; text-decoration: line-through; }
+.badge { font-size: 7.5pt; background: #000 !important; color: #fff !important; padding: 0.3mm 1mm; border-radius: 0.6mm; }
+svg { display: block; width: 64mm; height: 11mm; margin: 0 auto; shape-rendering: crispEdges; }
+svg rect { fill: #000 !important; }
+svg rect:first-child { fill: #fff !important; }
+.code { font-size: 8pt; font-family: Arial, Helvetica, sans-serif; letter-spacing: 1px; line-height: 1.05; margin-top: 0.4mm; text-shadow: 0 0 0.2px #000; }
 </style></head><body><div class="label">
 <div class="shop">${name}</div>
 <div class="name">${esc(product.name)}</div>
