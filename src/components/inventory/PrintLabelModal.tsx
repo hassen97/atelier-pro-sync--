@@ -130,19 +130,19 @@ export function PrintLabelModal({ product, open, onOpenChange }: PrintLabelModal
       : `<div class="big">${esc(format(product.price))}</div>`;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Étiquette ${esc(code)}</title>
 <style>
-@page { size: 50mm 30mm; margin: 0; }
+@page { size: 80mm 30mm portrait; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; color: #000; font-weight: bold;
   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-html, body { width: 50mm; height: 30mm; overflow: hidden; background: #fff; }
+html, body { width: 80mm; height: 30mm; overflow: hidden; background: #fff; margin: 0; padding: 0; }
 body { font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: none; -moz-osx-font-smoothing: unset; text-rendering: geometricPrecision; }
-.label { width: 50mm; height: 30mm; padding: 1.2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; text-align: center; overflow: hidden; page-break-after: avoid; }
+.label { width: 72mm; height: 30mm; margin: 0 auto; padding: 1.2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; text-align: center; overflow: hidden; page-break-after: avoid; }
 .shop { font-size: 6pt; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
 .name { font-size: 8pt; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
 .big { font-size: 11pt; font-weight: 900; line-height: 1; }
 .promo { display: flex; align-items: center; justify-content: space-between; line-height: 1; }
 .old { font-size: 7pt; text-decoration: line-through; }
 .badge { font-size: 6.5pt; font-weight: 900; background: #000 !important; color: #fff !important; padding: 0.3mm 1mm; border-radius: 0.6mm; }
-svg { display: block; width: 46mm; height: 9mm; margin: 0 auto; shape-rendering: crispEdges; }
+svg { display: block; width: 60mm; height: 10mm; margin: 0 auto; shape-rendering: crispEdges; }
 .code { font-size: 6.5pt; font-family: 'Courier New', monospace; letter-spacing: 0.5px; line-height: 1.1; margin-top: 0.3mm; }
 </style></head><body><div class="label">
 <div class="shop">${name}</div>
@@ -162,7 +162,7 @@ ${priceHtml}
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Imprimer l'étiquette</DialogTitle>
-            <DialogDescription>Aperçu de l'étiquette thermique 50 × 30 mm.</DialogDescription>
+            <DialogDescription>Aperçu de l'étiquette thermique 80 × 30 mm (Epson TM-T20X).</DialogDescription>
           </DialogHeader>
           {codes.length === 0 ? (
             <p className="text-sm text-muted-foreground">Ce produit n'a pas de code-barres ni de SKU.</p>
