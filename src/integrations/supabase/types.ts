@@ -2801,6 +2801,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      generate_inventory_access_code: { Args: never; Returns: Json }
       generate_referral_code: { Args: never; Returns: string }
       get_active_connections: {
         Args: never
@@ -2875,6 +2876,16 @@ export type Database = {
       is_team_member: {
         Args: { _member_id: string; _owner_id: string }
         Returns: boolean
+      }
+      loyalty_adjust: {
+        Args: { _customer_id: string; _note?: string; _points: number }
+        Returns: number
+      }
+      loyalty_earn_repair: { Args: { _repair_id: string }; Returns: number }
+      loyalty_earn_sale: { Args: { _sale_id: string }; Returns: number }
+      loyalty_redeem: {
+        Args: { _discount?: number; _points: number; _sale_id: string }
+        Returns: number
       }
       move_to_dlq: {
         Args: {
