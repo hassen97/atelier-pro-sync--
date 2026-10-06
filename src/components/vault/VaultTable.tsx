@@ -1,3 +1,4 @@
+import { neutralizeCsvFormula } from "@/lib/csvSafe";
 import { useMemo, useState } from "react";
 import { Copy, Download, Eye, EyeOff, MoreHorizontal, Pencil, Printer, Trash2 } from "lucide-react";
 import {
@@ -100,7 +101,7 @@ export function VaultTable({ search, onSearchChange, onEdit }: VaultTableProps) 
       e.password,
       new Date(e.created_at).toLocaleString("fr-FR"),
     ]);
-    const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+    const escape = (v: string) => `"${neutralizeCsvFormula(v).replace(/"/g, '""')}"`;
     const csv = [headers, ...rows].map((r) => r.map(escape).join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
