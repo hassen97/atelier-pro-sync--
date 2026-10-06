@@ -41,13 +41,11 @@ export function useInventoryAccess() {
     if (!user) return;
     setGenerating(true);
     try {
-      const code = String(Math.floor(100000 + Math.random() * 900000));
-      const expires_at = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
-      const { error } = await supabase
-        .from("inventory_access_codes" as any)
-        .insert({ user_id: user.id, code, expires_at });
+      // Generated server-side with a cryptographically secure RNG.
+      const { data, error } = await supabase.rpc("generate_inventory_access_code" as any);
       if (error) throw error;
-      setGeneratedCode({ code, expires_at });
+      const res = data as { code: string; expires_at: string };
+      setGeneratedCode({ code: res.code, expires_at: res.expires_at });
       toast.success("Code temporaire généré");
     } catch (err) {
       console.error(err);
