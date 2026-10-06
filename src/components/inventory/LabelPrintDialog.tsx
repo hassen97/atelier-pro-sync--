@@ -61,6 +61,9 @@ export function LabelPrintDialog({
     });
   }, [open, barcode]);
 
+  const rawProductName = productName;
+  const rawBarcode = barcode;
+  const barcodeImgRaw = barcodeImg;
   const handlePrint = () => {
     const printWindow = window.open("", "_blank", "width=400,height=300");
     if (!printWindow) return;
