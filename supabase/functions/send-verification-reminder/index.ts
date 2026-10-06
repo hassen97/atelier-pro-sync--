@@ -2,11 +2,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import * as React from "npm:react@18.3.1";
 import { renderAsync } from "npm:@react-email/components@0.0.22";
 import { VerificationReminderEmail } from "../_shared/email-templates/verification-reminder.tsx";
+import { isInternalCaller } from "../_shared/internalAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
 const PUBLIC_BASE_URL = "https://www.getheavencoin.com";
@@ -32,40 +33,13 @@ Deno.serve(async (req) => {
   }
   const mode = body.mode === "auto" ? "auto" : "manual";
 
-  // Auth check for manual mode (must be platform_admin)
-  if (mode === "manual") {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    const token = authHeader.replace("Bearer ", "");
-    if (token !== serviceKey) {
-      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      const { data: { user } } = await userClient.auth.getUser();
-      if (!user) {
-        return new Response(
-          JSON.stringify({ error: "Unauthorized" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const { data: roleRow } = await admin
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "platform_admin")
-        .maybeSingle();
-      if (!roleRow) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden — platform admin required" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
+  // Every mode (manual AND auto) requires a platform admin, the service role,
+  // or the scheduled job's secret.
+  if (!(await isInternalCaller(req))) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   // Find profiles in waiting list (pending verification, not yet verified)
