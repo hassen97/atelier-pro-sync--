@@ -43,7 +43,7 @@ project_id = "rgikflkocotkljbajzrb"
     verify_jwt = false
   [functions.send-onboarding-reminder]
     verify_jwt = false
-  [functions.request-reset-code]`r`n    verify_jwt = false`r`n  [functions.send-password-reset]
+  [functions.send-password-reset]
     verify_jwt = false
   [functions.send-verification-reminder]
     verify_jwt = false
@@ -55,5 +55,9 @@ project_id = "rgikflkocotkljbajzrb"
     verify_jwt = false
   [functions.system-health-monitor]
     verify_jwt = false
-  [functions.update-password-with-token]`r`n    verify_jwt = false`r`n  [functions.verify-reset-code]`r`n    verify_jwt = false`r`n  [functions.wipe-employee]
+  [functions.update-password-with-token]
+    verify_jwt = false
+  [functions.verify-reset-code]
+    verify_jwt = false
+  [functions.wipe-employee]
     verify_jwt = false

@@ -55,39 +55,15 @@ export function useAdjustLoyaltyPoints() {
 
   return useMutation({
     mutationFn: async (params: AdjustParams) => {
-      if (!effectiveUserId) throw new Error("Non authentifié");
-
-      // Read current balance
-      const { data: customer, error: cErr } = await supabase
-        .from("customers")
-        .select("loyalty_points")
-        .eq("id", params.customer_id)
-        .single();
-      if (cErr) throw cErr;
-
-      const current = (customer as any)?.loyalty_points ?? 0;
-      const newBalance = Math.max(0, current + params.amount_points);
-
-      const { error: txErr } = await supabase
-        .from("loyalty_transactions" as any)
-        .insert({
-          user_id: effectiveUserId,
-          customer_id: params.customer_id,
-          type: "adjustment",
-          amount_points: params.amount_points,
-          source: "manual",
-          note: params.note ?? null,
-          created_by: user?.id ?? null,
-        });
-      if (txErr) throw txErr;
-
-      const { error: uErr } = await supabase
-        .from("customers")
-        .update({ loyalty_points: newBalance } as any)
-        .eq("id", params.customer_id);
-      if (uErr) throw uErr;
-
-      return { new_balance: newBalance };
+      if (!effectiveUserId || !user) throw new Error("Non authentifié");
+      // Server-side: owner-only, bounded, atomic balance + ledger.
+      const { data, error } = await supabase.rpc("loyalty_adjust" as any, {
+        _customer_id: params.customer_id,
+        _points: Math.trunc(Number(params.amount_points) || 0),
+        _note: params.note ?? null,
+      });
+      if (error) throw error;
+      return { new_balance: Number(data) || 0 };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loyalty-transactions"] });
@@ -97,14 +73,14 @@ export function useAdjustLoyaltyPoints() {
     },
     onError: (e: any) => {
       console.error("Loyalty adjust error:", e);
-      toast.error("Erreur lors de l'ajustement");
+      toast.error(e?.message || "Erreur lors de l'ajustement");
     },
   });
 }
 
 /**
- * Internal helper used by sale & repair mutations.
- * Inserts the ledger row and updates the customer's running balance atomically (best-effort).
+ * Award points for a sale or repair. Points are computed on the server from
+ * the real recorded sale/repair and the shop's earn rate (idempotent).
  */
 export async function applyLoyaltyEarn(args: {
   user_id: string;
@@ -116,34 +92,17 @@ export async function applyLoyaltyEarn(args: {
   repair_id?: string;
   created_by?: string | null;
 }): Promise<number> {
-  const points = Math.floor(args.amount_money * args.earn_rate);
-  if (points <= 0) return 0;
-
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("loyalty_points")
-    .eq("id", args.customer_id)
-    .maybeSingle();
-  const current = (customer as any)?.loyalty_points ?? 0;
-
-  await supabase.from("loyalty_transactions" as any).insert({
-    user_id: args.user_id,
-    customer_id: args.customer_id,
-    type: "earned",
-    amount_points: points,
-    amount_money: args.amount_money,
-    source: args.source,
-    sale_id: args.sale_id ?? null,
-    repair_id: args.repair_id ?? null,
-    created_by: args.created_by ?? null,
-  });
-
-  await supabase
-    .from("customers")
-    .update({ loyalty_points: current + points } as any)
-    .eq("id", args.customer_id);
-
-  return points;
+  if (args.source === "sale" && args.sale_id) {
+    const { data, error } = await supabase.rpc("loyalty_earn_sale" as any, { _sale_id: args.sale_id });
+    if (error) { console.error("loyalty earn (sale)", error); return 0; }
+    return Number(data) || 0;
+  }
+  if (args.source === "repair" && args.repair_id) {
+    const { data, error } = await supabase.rpc("loyalty_earn_repair" as any, { _repair_id: args.repair_id });
+    if (error) { console.error("loyalty earn (repair)", error); return 0; }
+    return Number(data) || 0;
+  }
+  return 0;
 }
 
 export async function applyLoyaltyRedeem(args: {
@@ -154,33 +113,14 @@ export async function applyLoyaltyRedeem(args: {
   sale_id?: string;
   created_by?: string | null;
 }): Promise<number> {
-  if (args.points <= 0) return 0;
-
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("loyalty_points")
-    .eq("id", args.customer_id)
-    .maybeSingle();
-  const current = (customer as any)?.loyalty_points ?? 0;
-  const newBalance = Math.max(0, current - args.points);
-
-  await supabase.from("loyalty_transactions" as any).insert({
-    user_id: args.user_id,
-    customer_id: args.customer_id,
-    type: "redeemed",
-    amount_points: -args.points,
-    amount_money: args.discount_money,
-    source: "sale",
-    sale_id: args.sale_id ?? null,
-    created_by: args.created_by ?? null,
+  if (args.points <= 0 || !args.sale_id) return 0;
+  const { data, error } = await supabase.rpc("loyalty_redeem" as any, {
+    _sale_id: args.sale_id,
+    _points: Math.trunc(args.points),
+    _discount: args.discount_money ?? 0,
   });
-
-  await supabase
-    .from("customers")
-    .update({ loyalty_points: newBalance } as any)
-    .eq("id", args.customer_id);
-
-  return newBalance;
+  if (error) { console.error("loyalty redeem", error); return 0; }
+  return Number(data) || 0;
 }
 
 /** Idempotency check: has this repair already earned points? */

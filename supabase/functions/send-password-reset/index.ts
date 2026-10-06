@@ -162,32 +162,11 @@ Deno.serve(async (req) => {
     const isRealEmail = (v?: string | null) =>
       !!v && v.includes('@') && !v.toLowerCase().endsWith('@repairpro.local')
 
-    let targetEmail = isRealEmail(profile.email) ? String(profile.email).trim() : null
-
-    // No e-mail on file: accept the one supplied, but only after the phone
-    // number proves the requester already knows the account's contact details.
-    if (!targetEmail && isRealEmail(providedEmail)) {
-      const { data: shop } = await admin
-        .from('shop_settings')
-        .select('phone, whatsapp_phone')
-        .eq('user_id', profile.user_id)
-        .maybeSingle()
-
-      const matched =
-        !!providedPhone &&
-        phoneMatches(
-          providedPhone,
-          profile.phone,
-          profile.whatsapp_phone,
-          shop?.phone,
-          shop?.whatsapp_phone,
-        )
-
-      if (matched) {
-        targetEmail = providedEmail
-        await admin.from('profiles').update({ email: providedEmail }).eq('user_id', profile.user_id)
-      }
-    }
+    // Security: only the e-mail already stored on the account is ever used.
+    // A requester can never supply or overwrite the destination address.
+    void providedPhone
+    void phoneMatches
+    const targetEmail = isRealEmail(profile.email) ? String(profile.email).trim() : null
 
     // A supplied e-mail must equal the stored one; we never redirect a reset
     // link to an address the account does not own.

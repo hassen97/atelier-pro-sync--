@@ -61,12 +61,21 @@ export function LabelPrintDialog({
     });
   }, [open, barcode]);
 
+  const rawProductName = productName;
+  const rawBarcode = barcode;
+  const barcodeImgRaw = barcodeImg;
   const handlePrint = () => {
     const printWindow = window.open("", "_blank", "width=400,height=300");
     if (!printWindow) return;
 
-    const shopName = settings.shop_name || "RepairPro";
-    const priceFormatted = format(Number(price) || 0);
+    // Escape every user-controlled value before it reaches the print document.
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/[&<>"'`]/g, (c) => `&#${c.charCodeAt(0)};`);
+    const shopName = esc(settings.shop_name || "RepairPro");
+    const priceFormatted = esc(format(Number(price) || 0));
+    const productName = esc(rawProductName);
+    const barcode = esc(rawBarcode);
+    const barcodeImg = barcodeImgRaw && barcodeImgRaw.startsWith("data:image/png;base64,") ? barcodeImgRaw : null;
 
     printWindow.document.write(`
       <!DOCTYPE html>

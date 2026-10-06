@@ -1,3 +1,4 @@
+import { neutralizeCsvFormula } from "@/lib/csvSafe";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Search, Plus, Package, AlertTriangle, MoreHorizontal, Download, History, Zap, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2, PackageX, Trash2, FolderInput, X } from "lucide-react";
 import { useEffectiveUserId } from "@/hooks/useTeam";
@@ -306,7 +307,7 @@ export default function Inventory() {
       const sanitize = (v: unknown): string => {
         const s = v == null ? "" : String(v);
         // Strip line breaks and dangerous CSV chars; escape double quotes
-        const cleaned = s.replace(/[\r\n]+/g, " ").trim();
+        const cleaned = neutralizeCsvFormula(s.replace(/[\r\n]+/g, " ").trim());
         if (/[";]/.test(cleaned)) {
           return `"${cleaned.replace(/"/g, '""')}"`;
         }

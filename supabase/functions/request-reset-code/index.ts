@@ -124,16 +124,11 @@ Deno.serve(async (req) => {
     if (!userRes.user) return ok()
 
     const isRealEmail = (v?: string | null) => !!v && v.includes('@') && !v.toLowerCase().endsWith('@repairpro.local')
-    let targetEmail = isRealEmail(profile.email) ? String(profile.email).trim() : null
-
-    if (!targetEmail && isRealEmail(providedEmail)) {
-      const { data: shop } = await admin.from('shop_settings').select('phone, whatsapp_phone').eq('user_id', profile.user_id).maybeSingle()
-      const matched = !!providedPhone && phoneMatches(providedPhone, profile.phone, profile.whatsapp_phone, shop?.phone, shop?.whatsapp_phone)
-      if (matched) {
-        targetEmail = providedEmail
-        await admin.from('profiles').update({ email: providedEmail }).eq('user_id', profile.user_id)
-      }
-    }
+    // Security: the code is ONLY ever sent to the e-mail already stored on the
+    // account. A requester can never supply (or overwrite) the destination
+    // address. Accounts without an e-mail must ask the platform admin.
+    void providedPhone
+    const targetEmail = isRealEmail(profile.email) ? String(profile.email).trim() : null
 
     if (targetEmail && isRealEmail(providedEmail) && providedEmail !== targetEmail.toLowerCase()) return ok()
     if (!targetEmail) return ok()

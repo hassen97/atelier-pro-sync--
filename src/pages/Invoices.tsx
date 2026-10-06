@@ -1,3 +1,4 @@
+import { neutralizeCsvFormula } from "@/lib/csvSafe";
 import { useState } from "react";
 import {
   Search,
@@ -107,7 +108,7 @@ export default function Invoices() {
         ${invoice.sale ? `<p class="field">Vente : ${format(Number(invoice.sale.total_amount))}</p>` : ""}
         <div class="sep-bold"></div>
         <div class="total-row grand"><span>TOTAL :</span><span class="val">${format(Number(invoice.total_amount))}</span></div>
-        <div class="total-row"><span>Statut :</span><span class="val">${status}</span></div>
+        <div class="total-row"><span>Statut :</span><span class="val">${thermalEscape(status)}</span></div>
         <div class="sep-bold"></div>
         ${getBrandingFooterHtml("Facture générée avec")}
       </main></body></html>`;
@@ -172,7 +173,7 @@ Statut: ${statusConfig[invoice.status as keyof typeof statusConfig]?.label || in
 
     const csvContent = [
       headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+      ...rows.map((row) => row.map((cell) => `"${neutralizeCsvFormula(cell).replace(/"/g, '""')}"`).join(",")),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
