@@ -1,0 +1,12 @@
+DROP POLICY IF EXISTS "Anyone can view supplier proofs" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can delete repair photos" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can delete supplier proofs" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can update repair photos" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload repair photos" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload supplier proofs" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload their logo" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete their logo" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update their logo" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can view shop logos" ON storage.objects;
+DROP POLICY IF EXISTS "Public can view individual shop logos" ON storage.objects;
+DROP POLICY IF EXISTS "Repair photos are publicly accessible" ON storage.objects;
