@@ -69,9 +69,9 @@ export default function OnboardingSetup() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (skip = false) => {
     if (!user) return;
-    if (!shopName.trim()) {
+    if (!skip && !shopName.trim()) {
       toast.error("Le nom de la boutique est obligatoire");
       return;
     }
@@ -83,12 +83,17 @@ export default function OnboardingSetup() {
 
       // Save shop settings FIRST (the critical step). Upsert on user_id so it
       // works whether or not the trigger-created row exists, and always
-      // satisfies the owner RLS check.
+      // satisfies the owner RLS check. "Skip" only flips the funnel flag and
+      // keeps whatever the shop already has (details editable in Settings).
       await withSessionRetry(async () => {
-        const { error } = await supabase
-          .from("shop_settings")
-          .upsert(
-            {
+        const payload = skip
+          ? {
+              user_id: uid,
+              ...(shopName.trim() ? { shop_name: shopName.trim() } : {}),
+              onboarding_completed: true,
+              updated_at: new Date().toISOString(),
+            }
+          : {
               user_id: uid,
               shop_name: shopName.trim(),
               address: address.trim() || null,
@@ -99,11 +104,13 @@ export default function OnboardingSetup() {
               store_hours: storeHours.trim() || null,
               onboarding_completed: true,
               updated_at: new Date().toISOString(),
-            } as any,
-            { onConflict: "user_id" }
-          );
+            };
+        const { error } = await supabase
+          .from("shop_settings")
+          .upsert(payload as any, { onConflict: "user_id" });
         if (error) throw error;
       });
+
 
       // Force the ProtectedRoute funnel guard to drop its cached
       // "onboarding not completed" verdict (staleTime 30s). Without this, a
