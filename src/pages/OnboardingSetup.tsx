@@ -371,7 +371,7 @@ export default function OnboardingSetup() {
                 <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
                   Retour
                 </Button>
-                <Button onClick={handleSubmit} disabled={saving} className="flex-1">
+                <Button onClick={() => handleSubmit(false)} disabled={saving} className="flex-1">
                   {saving ? (
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sauvegarde...</>
                   ) : (
