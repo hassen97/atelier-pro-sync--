@@ -69,9 +69,9 @@ export default function OnboardingSetup() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (skip = false) => {
     if (!user) return;
-    if (!shopName.trim()) {
+    if (!skip && !shopName.trim()) {
       toast.error("Le nom de la boutique est obligatoire");
       return;
     }
@@ -83,12 +83,17 @@ export default function OnboardingSetup() {
 
       // Save shop settings FIRST (the critical step). Upsert on user_id so it
       // works whether or not the trigger-created row exists, and always
-      // satisfies the owner RLS check.
+      // satisfies the owner RLS check. "Skip" only flips the funnel flag and
+      // keeps whatever the shop already has (details editable in Settings).
       await withSessionRetry(async () => {
-        const { error } = await supabase
-          .from("shop_settings")
-          .upsert(
-            {
+        const payload = skip
+          ? {
+              user_id: uid,
+              ...(shopName.trim() ? { shop_name: shopName.trim() } : {}),
+              onboarding_completed: true,
+              updated_at: new Date().toISOString(),
+            }
+          : {
               user_id: uid,
               shop_name: shopName.trim(),
               address: address.trim() || null,
@@ -99,11 +104,13 @@ export default function OnboardingSetup() {
               store_hours: storeHours.trim() || null,
               onboarding_completed: true,
               updated_at: new Date().toISOString(),
-            } as any,
-            { onConflict: "user_id" }
-          );
+            };
+        const { error } = await supabase
+          .from("shop_settings")
+          .upsert(payload as any, { onConflict: "user_id" });
         if (error) throw error;
       });
+
 
       // Force the ProtectedRoute funnel guard to drop its cached
       // "onboarding not completed" verdict (staleTime 30s). Without this, a
@@ -364,7 +371,7 @@ export default function OnboardingSetup() {
                 <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
                   Retour
                 </Button>
-                <Button onClick={handleSubmit} disabled={saving} className="flex-1">
+                <Button onClick={() => handleSubmit(false)} disabled={saving} className="flex-1">
                   {saving ? (
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sauvegarde...</>
                   ) : (
@@ -376,7 +383,19 @@ export default function OnboardingSetup() {
           )}
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-4">
+        <div className="mt-4 text-center">
+          <Button
+            variant="ghost"
+            onClick={() => handleSubmit(true)}
+            disabled={saving}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Passer et découvrir l'application
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-2">
           Vous pourrez modifier ces informations à tout moment dans les Paramètres.
         </p>
       </div>
