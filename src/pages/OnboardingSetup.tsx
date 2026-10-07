@@ -383,7 +383,19 @@ export default function OnboardingSetup() {
           )}
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-4">
+        <div className="mt-4 text-center">
+          <Button
+            variant="ghost"
+            onClick={() => handleSubmit(true)}
+            disabled={saving}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Passer et découvrir l'application
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-2">
           Vous pourrez modifier ces informations à tout moment dans les Paramètres.
         </p>
       </div>
