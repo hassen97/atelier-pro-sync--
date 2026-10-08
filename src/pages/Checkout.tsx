@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { ProofPickerSheet } from "@/components/ui/ProofPickerSheet";
 import { useSupportWhatsapp, buildWhatsappLink } from "@/hooks/useSupportWhatsapp";
-import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 
 const gatewayIcons: Record<string, any> = {
   stripe: CreditCard,
@@ -41,7 +40,17 @@ export default function Checkout() {
   const { data: subscription } = useSubscription();
   const createOrder = useCreateOrder();
   const { data: supportWhatsapp } = useSupportWhatsapp();
-  const { settings: shopSettings } = useShopSettingsContext();
+  // Checkout lives outside the shop-settings provider: read the shop name directly.
+  const [shopName, setShopName] = useState("");
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("shop_settings")
+      .select("shop_name")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setShopName(data?.shop_name || ""));
+  }, [user?.id]);
   const queryClient = useQueryClient();
 
   const [selectedGateway, setSelectedGateway] = useState<string | null>(null);
@@ -451,7 +460,7 @@ export default function Checkout() {
           const username = user?.email?.split("@")[0] ?? "";
           const href = buildWhatsappLink(
             supportWhatsapp,
-            `Bonjour, je souhaite activer le plan ${plan.name} (${finalPrice} ${plan.currency}) pour ma boutique ${shopSettings?.shop_name || ""}${username ? ` (@${username})` : ""}${appliedPromo ? ` avec le code ${appliedPromo.code}` : ""}. Je vous envoie ma preuve de paiement D17 / Flouci ici.`,
+            `Bonjour, je souhaite activer le plan ${plan.name} (${finalPrice} ${plan.currency}) pour ma boutique ${shopName}${username ? ` (@${username})` : ""}${appliedPromo ? ` avec le code ${appliedPromo.code}` : ""}. Je vous envoie ma preuve de paiement D17 / Flouci ici.`,
           );
           if (!href) return null;
           return (
