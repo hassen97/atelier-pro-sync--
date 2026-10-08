@@ -16,6 +16,8 @@ import {
   Landmark, Globe, Bitcoin, Image, ChevronRight, Zap, Camera, Ticket, X
 } from "lucide-react";
 import { ProofPickerSheet } from "@/components/ui/ProofPickerSheet";
+import { useSupportWhatsapp, buildWhatsappLink } from "@/hooks/useSupportWhatsapp";
+import { useShopSettingsContext } from "@/contexts/ShopSettingsContext";
 
 const gatewayIcons: Record<string, any> = {
   stripe: CreditCard,
@@ -38,6 +40,8 @@ export default function Checkout() {
   const { data: gateways, isLoading: gatewaysLoading } = useEnabledGateways();
   const { data: subscription } = useSubscription();
   const createOrder = useCreateOrder();
+  const { data: supportWhatsapp } = useSupportWhatsapp();
+  const { settings: shopSettings } = useShopSettingsContext();
   const queryClient = useQueryClient();
 
   const [selectedGateway, setSelectedGateway] = useState<string | null>(null);
@@ -441,6 +445,34 @@ export default function Checkout() {
             )}
           </div>
         </div>
+
+        {/* Fast lane: pay via WhatsApp */}
+        {(() => {
+          const username = user?.email?.split("@")[0] ?? "";
+          const href = buildWhatsappLink(
+            supportWhatsapp,
+            `Bonjour, je souhaite activer le plan ${plan.name} (${finalPrice} ${plan.currency}) pour ma boutique ${shopSettings?.shop_name || ""}${username ? ` (@${username})` : ""}${appliedPromo ? ` avec le code ${appliedPromo.code}` : ""}. Je vous envoie ma preuve de paiement D17 / Flouci ici.`,
+          );
+          if (!href) return null;
+          return (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-8 flex items-center gap-3 rounded-xl p-4 transition-opacity hover:opacity-90"
+              style={{ background: "hsla(142, 70%, 40%, 0.12)", border: "1px solid hsla(142, 70%, 45%, 0.4)" }}
+            >
+              <div className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center" style={{ background: "hsl(142 70% 40%)" }}>
+                <Smartphone className="h-5 w-5" style={{ color: "white" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm" style={{ color: "hsl(0 0% 95%)" }}>Payer par D17 / Flouci via WhatsApp</p>
+                <p className="text-xs" style={{ color: "hsl(240 5% 60%)" }}>Envoyez votre capture directement sur WhatsApp, nous activons votre compte rapidement.</p>
+              </div>
+              <ChevronRight className="h-5 w-5 shrink-0" style={{ color: "hsl(142 70% 55%)" }} />
+            </a>
+          );
+        })()}
 
         {/* Step 1: Select payment method */}
         <div className="mb-8">
