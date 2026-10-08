@@ -12,6 +12,8 @@ import { WhatsNewModal } from "@/components/announcements/WhatsNewModal";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { LanguageModal } from "@/components/i18n/LanguageModal";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
+import { FloatingWhatsAppHelp } from "./FloatingWhatsAppHelp";
+import { InstallAppPrompt } from "@/components/pwa/InstallAppPrompt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
