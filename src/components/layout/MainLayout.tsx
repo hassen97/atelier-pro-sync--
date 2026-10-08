@@ -240,6 +240,10 @@ export function MainLayout() {
         </main>
       </div>
 
+      {/* Support + install helpers */}
+      {deferredReady && <FloatingWhatsAppHelp />}
+      {deferredReady && <InstallAppPrompt />}
+
       {/* What's New Modal */}
       <WhatsNewModal />
 
