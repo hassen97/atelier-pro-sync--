@@ -183,6 +183,24 @@ export default function Dashboard() {
         </Button>
       </PageHeader>
 
+      {/* First-visit welcome: steer new shops to their first repair ticket */}
+      {recentRepairs.length === 0 && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-base font-semibold text-foreground">Bienvenue sur RepairPro ! 👋</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Créez votre premier ticket de réparation et imprimez-le en moins de 30 secondes.
+              </p>
+            </div>
+            <Button className="bg-gradient-primary hover:opacity-90 shrink-0" onClick={() => setRepairDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Créer mon premier ticket
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick Action Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Button
